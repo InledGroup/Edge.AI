@@ -40,9 +40,8 @@ export class WikipediaSearchProvider implements SearchProvider {
    * Obtiene el proxy CORS si es necesario
    */
   private getCorsProxy(): string {
-    // Siempre usar proxy CORS en el navegador (tanto localhost como producción)
-    // Wikipedia API soporta origin=* pero algunos navegadores lo bloquean
-    return 'https://corsproxy.io/?';
+    // Usar proxy personalizado de InLed para evitar problemas CORS
+    return 'https://aiproxy.inled.es/?url=';
   }
 
   /**
@@ -160,8 +159,8 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
    * Obtiene el proxy CORS si es necesario
    */
   private getCorsProxy(): string {
-    // Siempre usar proxy CORS en el navegador (tanto localhost como producción)
-    return 'https://corsproxy.io/?';
+    // Usar proxy personalizado de InLed para evitar problemas CORS
+    return 'https://aiproxy.inled.es/?url=';
   }
 
   /**
