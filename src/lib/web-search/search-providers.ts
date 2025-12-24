@@ -66,14 +66,14 @@ export class WikipediaSearchProvider implements SearchProvider {
       origin: '*', // Habilitar CORS
     });
 
-    // Construir URL con proxy si es necesario
-    const corsProxy = this.getCorsProxy();
+    // Construir URL completa
     const fullUrl = `${baseUrl}?${params}`;
-    const url = corsProxy
-      ? `${corsProxy}${encodeURIComponent(fullUrl)}`
-      : fullUrl;
 
-    console.log(`[Wikipedia] Using proxy: ${!!corsProxy}, URL: ${url.substring(0, 100)}...`);
+    // Usar proxy para evitar CORS
+    const corsProxy = this.getCorsProxy();
+    const url = `${corsProxy}${encodeURIComponent(fullUrl)}`;
+
+    console.log(`[Wikipedia] Using proxy, target: ${fullUrl.substring(0, 80)}...`);
 
     try {
       // Fetch con timeout
@@ -84,7 +84,7 @@ export class WikipediaSearchProvider implements SearchProvider {
         method: 'GET',
         signal: controller.signal,
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
         },
       });
 
@@ -136,15 +136,13 @@ export class WikipediaSearchProvider implements SearchProvider {
 // ============================================================================
 
 /**
- * Proveedor de búsqueda en DuckDuckGo (versión HTML)
+ * Proveedor de búsqueda en DuckDuckGo Lite
  *
- * NOTA: DuckDuckGo HTML puede tener limitaciones CORS.
- * Esta implementación es experimental y puede fallar.
+ * Usa la versión Lite que soporta GET y funciona mejor con proxies.
  */
 export class DuckDuckGoSearchProvider implements SearchProvider {
   readonly name = 'duckduckgo' as const;
 
-  private readonly baseUrl = 'https://html.duckduckgo.com/html/';
   private readonly timeout = 10000; // 10 segundos
 
   /**
@@ -166,8 +164,7 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
   /**
    * Realiza búsqueda en DuckDuckGo
    *
-   * IMPORTANTE: DuckDuckGo puede bloquear requests desde navegador por CORS.
-   * Este método puede fallar y debe ser tratado como fallback.
+   * Usa la versión Lite de DuckDuckGo que soporta GET
    */
   async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
     const {
@@ -175,31 +172,32 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
       timeout = this.timeout,
     } = options;
 
-    // Construir form data (DuckDuckGo HTML usa POST)
-    const formData = new URLSearchParams({
+    // Construir query params para DuckDuckGo Lite (soporta GET)
+    const params = new URLSearchParams({
       q: query,
-      b: '', // Offset (vacío = primera página)
       kl: 'wt-wt', // Región (wt-wt = mundial)
     });
+
+    // Usar DuckDuckGo Lite que funciona mejor con proxies
+    const fullUrl = `https://lite.duckduckgo.com/lite/?${params}`;
 
     try {
       // Fetch con timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      // Construir URL con proxy si es necesario
+      // Construir URL con proxy
       const corsProxy = this.getCorsProxy();
-      const url = corsProxy
-        ? `${corsProxy}${encodeURIComponent(this.baseUrl)}`
-        : this.baseUrl;
+      const url = `${corsProxy}${encodeURIComponent(fullUrl)}`;
+
+      console.log(`[DuckDuckGo] Using proxy, target: ${fullUrl.substring(0, 80)}...`);
 
       const response = await fetch(url, {
-        method: 'POST',
+        method: 'GET',
         signal: controller.signal,
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'text/html',
         },
-        body: formData,
       });
 
       clearTimeout(timeoutId);
@@ -227,7 +225,7 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
   }
 
   /**
-   * Parse HTML de resultados de DuckDuckGo
+   * Parse HTML de resultados de DuckDuckGo Lite
    */
   private parseResults(html: string): SearchResult[] {
     const parser = new DOMParser();
@@ -235,18 +233,21 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
 
     const results: SearchResult[] = [];
 
-    // DuckDuckGo HTML usa clase "result" para cada resultado
-    const resultElements = doc.querySelectorAll('.result');
+    // DuckDuckGo Lite usa tabla para resultados
+    const rows = doc.querySelectorAll('tr');
 
-    resultElements.forEach((element) => {
+    rows.forEach((row) => {
       try {
-        // Título y URL
-        const linkElement = element.querySelector('.result__a');
-        const title = linkElement?.textContent?.trim() || '';
-        const url = this.extractUrl(linkElement?.getAttribute('href') || '');
+        // Buscar el link principal (clase "result-link")
+        const linkElement = row.querySelector('a.result-link');
+        if (!linkElement) return;
 
-        // Snippet
-        const snippetElement = element.querySelector('.result__snippet');
+        const title = linkElement.textContent?.trim() || '';
+        const href = linkElement.getAttribute('href') || '';
+        const url = this.extractUrl(href);
+
+        // Buscar el snippet (clase "result-snippet")
+        const snippetElement = row.querySelector('.result-snippet');
         const snippet = snippetElement?.textContent?.trim() || '';
 
         if (title && url) {
@@ -275,10 +276,10 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
     if (!href) return '';
 
     try {
-      // Si es URL relativa de DuckDuckGo, extraer parámetro uddg
-      if (href.startsWith('//duckduckgo.com/l/?')) {
-        const params = new URLSearchParams(href.split('?')[1]);
-        const uddg = params.get('uddg');
+      // DuckDuckGo Lite usa formato: //duckduckgo.com/l/?uddg=URL
+      if (href.includes('//duckduckgo.com/l/') || href.includes('//lite.duckduckgo.com/lite/')) {
+        const url = new URL(href.startsWith('//') ? 'https:' + href : href);
+        const uddg = url.searchParams.get('uddg');
         if (uddg) {
           return decodeURIComponent(uddg);
         }
@@ -287,6 +288,11 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
       // Si ya es URL completa, retornar
       if (href.startsWith('http://') || href.startsWith('https://')) {
         return href;
+      }
+
+      // Si es URL relativa que empieza con //, agregar https:
+      if (href.startsWith('//')) {
+        return 'https:' + href;
       }
 
       return '';
