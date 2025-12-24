@@ -1,0 +1,30 @@
+import { defineConfig } from 'astro/config';
+import preact from '@astrojs/preact';
+import tailwind from '@astrojs/tailwind';
+
+// https://astro.build/config
+export default defineConfig({
+  integrations: [
+    preact({
+      compat: true, // Enable React compatibility layer
+    }),
+    tailwind({
+      applyBaseStyles: true,
+    })
+  ],
+  vite: {
+    optimizeDeps: {
+      exclude: ['@mlc-ai/web-llm', '@wllama/wllama']
+    },
+    worker: {
+      format: 'es'
+    },
+    build: {
+      target: 'esnext'
+    }
+  },
+  output: 'static',
+  build: {
+    inlineStylesheets: 'auto'
+  }
+});

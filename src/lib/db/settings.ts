@@ -1,0 +1,209 @@
+// ============================================================================
+// Settings Store - Key-value settings storage
+// ============================================================================
+
+import { getDB } from './schema';
+import type { Settings } from '@/types';
+
+/**
+ * Default settings
+ */
+const DEFAULT_SETTINGS: Settings = {
+  chunkSize: 512,
+  chunkOverlap: 50,
+  topK: 5,
+  temperature: 0.7,
+  maxTokens: 2048,
+  theme: 'auto',
+  // Web search defaults
+  enableWebSearch: true, // Enabled by default - show the toggle
+  webSearchSources: ['wikipedia', 'duckduckgo'], // Both providers
+  webSearchMaxUrls: 3, // Max 3 URLs to fetch
+};
+
+/**
+ * Get a setting value
+ */
+export async function getSetting<K extends keyof Settings>(
+  key: K
+): Promise<Settings[K]> {
+  const db = await getDB();
+  const value = await db.get('settings', key);
+  return value !== undefined ? value : DEFAULT_SETTINGS[key];
+}
+
+/**
+ * Set a setting value
+ */
+export async function setSetting<K extends keyof Settings>(
+  key: K,
+  value: Settings[K]
+): Promise<void> {
+  const db = await getDB();
+  await db.put('settings', value, key);
+}
+
+/**
+ * Get all settings
+ */
+export async function getAllSettings(): Promise<Settings> {
+  const db = await getDB();
+  const keys = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
+
+  const settings: Partial<Settings> = {};
+
+  for (const key of keys) {
+    const value = await db.get('settings', key);
+    settings[key] = value !== undefined ? value : DEFAULT_SETTINGS[key];
+  }
+
+  return settings as Settings;
+}
+
+/**
+ * Update multiple settings at once
+ */
+export async function updateSettings(
+  updates: Partial<Settings>
+): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction('settings', 'readwrite');
+
+  for (const [key, value] of Object.entries(updates)) {
+    await tx.store.put(value, key);
+  }
+
+  await tx.done;
+}
+
+/**
+ * Reset settings to defaults
+ */
+export async function resetSettings(): Promise<void> {
+  await updateSettings(DEFAULT_SETTINGS);
+}
+
+/**
+ * Reset a specific setting to default
+ */
+export async function resetSetting<K extends keyof Settings>(
+  key: K
+): Promise<void> {
+  await setSetting(key, DEFAULT_SETTINGS[key]);
+}
+
+/**
+ * Get selected models
+ */
+export async function getSelectedModels() {
+  const [chatModel, embeddingModel] = await Promise.all([
+    getSetting('selectedChatModel'),
+    getSetting('selectedEmbeddingModel')
+  ]);
+
+  return {
+    chatModel,
+    embeddingModel
+  };
+}
+
+/**
+ * Set selected models
+ */
+export async function setSelectedModels(
+  chatModel?: string,
+  embeddingModel?: string
+): Promise<void> {
+  const updates: Partial<Settings> = {};
+
+  if (chatModel !== undefined) {
+    updates.selectedChatModel = chatModel;
+  }
+
+  if (embeddingModel !== undefined) {
+    updates.selectedEmbeddingModel = embeddingModel;
+  }
+
+  await updateSettings(updates);
+}
+
+/**
+ * Get RAG settings
+ */
+export async function getRAGSettings() {
+  const [chunkSize, chunkOverlap, topK] = await Promise.all([
+    getSetting('chunkSize'),
+    getSetting('chunkOverlap'),
+    getSetting('topK')
+  ]);
+
+  return {
+    chunkSize,
+    chunkOverlap,
+    topK
+  };
+}
+
+/**
+ * Update RAG settings
+ */
+export async function updateRAGSettings(settings: {
+  chunkSize?: number;
+  chunkOverlap?: number;
+  topK?: number;
+}): Promise<void> {
+  await updateSettings(settings);
+}
+
+/**
+ * Get generation settings
+ */
+export async function getGenerationSettings() {
+  const [temperature, maxTokens] = await Promise.all([
+    getSetting('temperature'),
+    getSetting('maxTokens')
+  ]);
+
+  return {
+    temperature,
+    maxTokens
+  };
+}
+
+/**
+ * Update generation settings
+ */
+export async function updateGenerationSettings(settings: {
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<void> {
+  await updateSettings(settings);
+}
+
+/**
+ * Get web search settings
+ */
+export async function getWebSearchSettings() {
+  const [enableWebSearch, webSearchSources, webSearchMaxUrls] = await Promise.all([
+    getSetting('enableWebSearch'),
+    getSetting('webSearchSources'),
+    getSetting('webSearchMaxUrls')
+  ]);
+
+  return {
+    enableWebSearch: enableWebSearch ?? false,
+    webSearchSources: webSearchSources ?? ['wikipedia'],
+    webSearchMaxUrls: webSearchMaxUrls ?? 3
+  };
+}
+
+/**
+ * Update web search settings
+ */
+export async function updateWebSearchSettings(settings: {
+  enableWebSearch?: boolean;
+  webSearchSources?: ('wikipedia' | 'duckduckgo')[];
+  webSearchMaxUrls?: number;
+}): Promise<void> {
+  await updateSettings(settings);
+}

@@ -1,0 +1,683 @@
+---
+// Edge.AI - Marketing Landing Page
+import "@/styles/global.css";
+import {
+    Shield,
+    Zap,
+    Coins,
+    Lock,
+    Rocket,
+    BookOpen,
+    HardDrive,
+    Layout,
+    ShieldCheck,
+    ChevronRight,
+    ChevronDown,
+    Globe,
+} from "lucide-preact";
+---
+
+<!doctype html>
+<html lang="es" data-theme="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Edge.AI - IA 100% Local y Privada</title>
+        <meta
+            name="description"
+            content="Plataforma de IA conversacional 100% local - Sin backend, sin cuentas, sin envío de datos"
+        />
+        <link rel="icon" href="https://hosted.inled.es/inledai.png" />
+        <style>
+            /* Smooth scroll behavior */
+            html {
+                scroll-behavior: smooth;
+            }
+
+            /* Custom animations */
+            @keyframes float {
+                0%,
+                100% {
+                    transform: translateY(0px);
+                }
+                50% {
+                    transform: translateY(-20px);
+                }
+            }
+
+            @keyframes gradient-shift {
+                0%,
+                100% {
+                    background-position: 0% 50%;
+                }
+                50% {
+                    background-position: 100% 50%;
+                }
+            }
+
+            @keyframes fade-in-up {
+                from {
+                    opacity: 0;
+                    transform: translateY(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .animate-float {
+                animation: float 6s ease-in-out infinite;
+            }
+
+            .animate-gradient {
+                background-size: 200% 200%;
+                animation: gradient-shift 8s ease infinite;
+            }
+
+            .fade-in-up {
+                animation: fade-in-up 0.8s ease-out forwards;
+            }
+
+            /* Stagger delays for cards */
+            .card-1 {
+                animation-delay: 0.1s;
+            }
+            .card-2 {
+                animation-delay: 0.2s;
+            }
+            .card-3 {
+                animation-delay: 0.3s;
+            }
+            .card-4 {
+                animation-delay: 0.4s;
+            }
+            .card-5 {
+                animation-delay: 0.5s;
+            }
+            .card-6 {
+                animation-delay: 0.6s;
+            }
+
+            /* Gradient text */
+            .gradient-text {
+                background: linear-gradient(
+                    90deg,
+                    var(--color-primary),
+                    #20b813,
+                    var(--color-primary)
+                );
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+
+            /* Glass morphism effect */
+            .glass {
+                background: rgba(20, 20, 20, 0.6);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            /* Grid pattern background */
+            .grid-pattern {
+                background-image:
+                    linear-gradient(
+                        rgba(40, 229, 24, 0.03) 1px,
+                        transparent 1px
+                    ),
+                    linear-gradient(
+                        90deg,
+                        rgba(40, 229, 24, 0.03) 1px,
+                        transparent 1px
+                    );
+                background-size: 50px 50px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="min-h-screen bg-[var(--color-bg)] grid-pattern">
+            <!-- Hero Section -->
+            <section class="relative overflow-hidden">
+                <!-- Animated Background Effects -->
+                <div
+                    class="absolute inset-0 pointer-events-none overflow-hidden"
+                >
+                    <div
+                        class="absolute top-0 left-1/4 w-[600px] h-[600px] bg-[var(--color-primary)] opacity-15 blur-[150px] rounded-full animate-float"
+                    >
+                    </div>
+                    <div
+                        class="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-[#20b813] opacity-10 blur-[120px] rounded-full"
+                        style="animation: float 8s ease-in-out infinite;"
+                    >
+                    </div>
+                    <div
+                        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--color-primary)] opacity-5 blur-[200px] rounded-full"
+                    >
+                    </div>
+                </div>
+
+                <div
+                    class="container mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32 relative"
+                >
+                    <div class="max-w-5xl mx-auto">
+                        <!-- Logo Badge -->
+                        <div
+                            class="flex justify-center mb-10 opacity-0 fade-in-up"
+                        >
+                            <div class="relative group">
+                                <img
+                                    src="https://hosted.inled.es/inledai.png"
+                                    alt="Logo"
+                                    class="w-24 rounded-3xl animate-gradient flex items-center justify-center font-bold text-5xl text-black transform hover:scale-110 transition-transform duration-300"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- Main Heading -->
+                        <div class="text-center space-y-6 mb-12">
+                            <h1
+                                class="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-extrabold leading-none tracking-tight opacity-0 fade-in-up"
+                                style="animation-delay: 0.1s;"
+                            >
+                                <span
+                                    class="block mb-3 gradient-text animate-gradient"
+                                >
+                                    IA
+                                </span>
+                                <span class="block text-[var(--color-text)]">
+                                    que no sale de tu ordenador
+                                </span>
+                            </h1>
+
+                            <p
+                                class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)] max-w-3xl mx-auto leading-relaxed px-4 opacity-0 fade-in-up"
+                                style="animation-delay: 0.2s;"
+                            >
+                                Chatea con modelos de IA que se ejecutan en tu
+                                ordenador, buscan en internet y leen tus
+                                documentos sin subirlos a la nube. <br /> Hasta puedes
+                                desactivar la Wifi una vez descargado el modelo
+                                <span
+                                    class="block mt-2 text-[var(--color-primary)] font-bold"
+                                >
+                                    Privado · Local · Ilimitado
+                                </span>
+                            </p>
+                        </div>
+
+                        <!-- CTA Buttons -->
+                        <div
+                            class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 px-4 opacity-0 fade-in-up"
+                            style="animation-delay: 0.3s;"
+                        >
+                            <a
+                                href="/"
+                                class="group relative px-10 py-5 bg-gradient-to-r from-[var(--color-primary)] to-[#20b813] text-black font-bold rounded-2xl text-lg sm:text-xl transition-all duration-300 hover:shadow-2xl hover:shadow-[var(--color-primary)]/60 hover:scale-105 w-full sm:w-auto overflow-hidden"
+                            >
+                                <span
+                                    class="relative z-10 flex items-center justify-center gap-2"
+                                >
+                                    Probar Ahora
+                                    <ChevronRight
+                                        size={20}
+                                        className="group-hover:translate-x-1 transition-transform"
+                                    />
+                                </span>
+                                <div
+                                    class="absolute inset-0 bg-gradient-to-r from-[#20b813] to-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                >
+                                </div>
+                            </a>
+
+                            <a
+                                href="#features"
+                                class="group px-10 py-5 glass hover:bg-[var(--color-primary)]/5 text-[var(--color-text)] font-bold rounded-2xl text-lg sm:text-xl transition-all duration-300 hover:border-[var(--color-primary)]/50 w-full sm:w-auto"
+                            >
+                                <span
+                                    class="flex items-center justify-center gap-2"
+                                >
+                                    Ver Características
+                                    <ChevronDown
+                                        size={20}
+                                        className="group-hover:translate-y-1 transition-transform"
+                                    />
+                                </span>
+                            </a>
+                        </div>
+
+                        <!-- Trust Indicators -->
+                        <div
+                            class="flex flex-wrap justify-center gap-8 text-sm sm:text-base text-[var(--color-text-secondary)] opacity-0 fade-in-up"
+                            style="animation-delay: 0.4s;"
+                        >
+                            <div
+                                class="flex items-center gap-3 px-4 py-2 glass rounded-full"
+                            >
+                                <Shield
+                                    size={20}
+                                    className="text-[var(--color-primary)]"
+                                />
+                                <span class="font-medium">Sin servidores</span>
+                            </div>
+                            <div
+                                class="flex items-center gap-3 px-4 py-2 glass rounded-full"
+                            >
+                                <Zap
+                                    size={20}
+                                    className="text-[var(--color-primary)]"
+                                />
+                                <span class="font-medium">Sin registro</span>
+                            </div>
+                            <div
+                                class="flex items-center gap-3 px-4 py-2 glass rounded-full"
+                            >
+                                <Coins
+                                    size={20}
+                                    className="text-[var(--color-primary)]"
+                                />
+                                <span class="font-medium">Sin costos</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Decorative divider -->
+                <div
+                    class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--color-primary)]/50 to-transparent"
+                >
+                </div>
+            </section>
+
+            <!-- Features Section -->
+            <section id="features" class="relative py-20 sm:py-24 lg:py-32">
+                <!-- Background decoration -->
+                <div
+                    class="absolute inset-0 pointer-events-none overflow-hidden"
+                >
+                    <div
+                        class="absolute top-1/2 right-0 w-[400px] h-[400px] bg-[var(--color-primary)] opacity-5 blur-[120px] rounded-full"
+                    >
+                    </div>
+                </div>
+
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative">
+                    <!-- Section Header -->
+                    <div class="text-center mb-16 lg:mb-20">
+                        <h2
+                            class="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight"
+                        >
+                            <span class="gradient-text animate-gradient">
+                                Nunca antes desarrollado, novedoso
+                            </span>
+                        </h2>
+                        <p
+                            class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)] max-w-3xl mx-auto px-4"
+                        >
+                            Todo el poder de la IA sin comprometer tu privacidad
+                        </p>
+                    </div>
+
+                    <!-- Feature Cards Grid -->
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-7xl mx-auto"
+                    >
+                        <!-- Feature Card 1 -->
+                        <div
+                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-1"
+                        >
+                            <div class="relative mb-6">
+                                <div
+                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
+                                >
+                                </div>
+                                <div
+                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
+                                >
+                                    <Lock size={32} strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <h3
+                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                            >
+                                Privacidad Total
+                            </h3>
+                            <p
+                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                            >
+                                Las conversaciones se almacenan en tu navegador usando IndexedDB. No se envían a ningún servidor, se quedan en tu dispositivo.
+                            </p>
+                        </div>
+
+                        <!-- Feature Card 2 -->
+                        <div
+                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-2"
+                        >
+                            <div class="relative mb-6">
+                                <div
+                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
+                                >
+                                </div>
+                                <div
+                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
+                                >
+                                    <Rocket size={32} strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <h3
+                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                            >
+                                Modelos Potentes
+                            </h3>
+                            <p
+                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                            >
+                                Gracias a potentes algoritmos de detección, Edge AI escoge el modelo de IA que mejor se adapta a las especificaciones de tu dispositivo.
+                            </p>
+                        </div>
+
+                        <!-- Feature Card 3 -->
+                        <div
+                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-3"
+                        >
+                            <div class="relative mb-6">
+                                <div
+                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
+                                >
+                                </div>
+                                <div
+                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
+                                >
+                                    <BookOpen size={32} strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <h3
+                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                            >
+                                Añade documentos sin comprometer la privacidad
+                            </h3>
+                            <p
+                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                            >
+                                Con novedosos sistemas de tecnología RAG, Edge.AI puede responder a tus preguntas sobre documentos que tú le añadas que nunca saldrán de tu dispositivo.
+                            </p>
+                        </div>
+
+                        <!-- Feature Card 4 -->
+                        <div
+                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-4"
+                        >
+                            <div class="relative mb-6">
+                                <div
+                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
+                                >
+                                </div>
+                                <div
+                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
+                                >
+                                    <Zap size={32} strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <h3
+                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                            >
+                                Rápido y Eficiente
+                            </h3>
+                            <p
+                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                            >
+                                Optimizado con WebGPU y WebAssembly para máximo
+                                rendimiento. Funciona offline una vez descargado
+                                el modelo.
+                            </p>
+                        </div>
+
+                        <!-- Feature Card 5 -->
+                        <div
+                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-5"
+                        >
+                            <div class="relative mb-6">
+                                <div
+                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
+                                >
+                                </div>
+                                <div
+                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
+                                >
+                                    <Globe size={32} strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <h3
+                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                            >
+                                Búsqueda en internet
+                            </h3>
+                            <p
+                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                            >
+                                Si necesitas que Edge.AI busque en internet: lo tienes. <br>
+                                Búsqueda en Wikipedia y DuckDuckGo, privada, sin relacionarte con la búsqueda. <br>
+                                La búsqueda se realiza en tu dispositivo, no pasa por nuestros servidores
+                            </p>
+                        </div>
+
+                        <!-- Feature Card 6 -->
+                        <div
+                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-6"
+                        >
+                            <div class="relative mb-6">
+                                <div
+                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
+                                >
+                                </div>
+                                <div
+                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
+                                >
+                                    <Layout size={32} strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <h3
+                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                            >
+                                Interfaz Moderna
+                            </h3>
+                            <p
+                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                            >
+                                Diseño limpio e intuitivo con modo oscuro.
+                                Experiencia de usuario fluida y profesional.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Decorative divider -->
+                <div
+                    class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--color-primary)]/50 to-transparent"
+                >
+                </div>
+            </section>
+
+            <!-- Hero CTA Section -->
+            <section class="py-20 md:py-32 relative overflow-hidden">
+                <!-- Background Effects -->
+                <div class="absolute inset-0 pointer-events-none">
+                    <div
+                        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[var(--color-primary)] opacity-5 blur-[150px] rounded-full"
+                    >
+                    </div>
+                </div>
+
+                <div class="container mx-auto px-6 relative">
+                    <div class="max-w-4xl mx-auto text-center">
+                        <!-- CTA Content -->
+                        <h2
+                            class="text-4xl md:text-6xl font-bold mb-6 leading-tight"
+                        >
+                            <span class="text-[var(--color-text)]">
+                                Empieza hoy con Edge.AI
+                            </span>
+                            <br />
+                            <span
+                                class="bg-gradient-to-r from-[var(--color-primary)] via-[#20b813] to-[var(--color-primary)] bg-clip-text text-transparent"
+                            >
+                                Solo con un clic
+                            </span>
+                        </h2>
+
+                        <p
+                            class="text-xl md:text-2xl text-[var(--color-text-secondary)] mb-12 max-w-2xl mx-auto leading-relaxed"
+                        >
+                            No necesitas registrarte, no hay planes de pago, no
+                            hay límites.
+                            <span class="text-[var(--color-primary)]"
+                                >Simplemente empieza a usar IA de forma privada.</span
+                            >
+                        </p>
+
+                        <!-- CTA Buttons -->
+                        <div
+                            class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12"
+                        >
+                            <a
+                                href="/"
+                                class="group relative px-10 py-5 bg-gradient-to-r from-[var(--color-primary)] to-[#20b813] text-black font-bold rounded-xl text-xl transition-all duration-300 hover:shadow-2xl hover:shadow-[var(--color-primary)]/50 hover:scale-105 w-full sm:w-auto"
+                            >
+                                <span class="relative z-10"
+                                    >Comenzar Gratis</span
+                                >
+                                <div
+                                    class="absolute inset-0 bg-gradient-to-r from-[#20b813] to-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl"
+                                >
+                                </div>
+                            </a>
+                        </div>
+
+                        <!-- Benefits List -->
+                        <div
+                            class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16"
+                        >
+                            <div class="flex flex-col items-center gap-3">
+                                <div
+                                    class="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)]"
+                                >
+                                    <Zap size={32} strokeWidth={1.5} />
+                                </div>
+                                <h3
+                                    class="font-semibold text-lg text-[var(--color-text)]"
+                                >
+                                    Listo en Segundos
+                                </h3>
+                                <p
+                                    class="text-sm text-[var(--color-text-secondary)]"
+                                >
+                                    Solo abre el navegador, descarga los modelos y chatea
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-3">
+                                <div
+                                    class="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)]"
+                                >
+                                    <ShieldCheck size={32} strokeWidth={1.5} />
+                                </div>
+                                <h3
+                                    class="font-semibold text-lg text-[var(--color-text)]"
+                                >
+                                    100% Privado
+                                </h3>
+                                <p
+                                    class="text-sm text-[var(--color-text-secondary)]"
+                                >
+                                    Tus datos nunca salen de tu dispositivo
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-3">
+                                <div
+                                    class="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)]"
+                                >
+                                    <Coins size={32} strokeWidth={1.5} />
+                                </div>
+                                <h3
+                                    class="font-semibold text-lg text-[var(--color-text)]"
+                                >
+                                    Siempre Gratis
+                                </h3>
+                                <p
+                                    class="text-sm text-[var(--color-text-secondary)]"
+                                >
+                                    Sin tarifas ocultas ni suscripciones
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer
+                class="border-t border-[var(--color-border)] bg-[var(--color-bg)]/50 backdrop-blur-sm"
+            >
+                <div class="container mx-auto px-6 py-8">
+                    <div class="flex flex-col items-center gap-4 text-center">
+                        <!-- Logo -->
+                        <div class="flex items-center gap-3">
+                            <div class="relative">
+                                <div
+                                    class="absolute inset-0 bg-[var(--color-primary)] blur-xl opacity-50 rounded-full"
+                                >
+                                </div>
+                                <div>
+                                    <img src="https://hosted.inled.es/inledai.png" alt="Edge.AI Logo" class="w-16  rounded-full">
+                                </div>
+                            </div>
+                            <div>
+                                <h3
+                                    class="text-xl font-bold bg-gradient-to-r from-[var(--color-primary)] via-[#20b813] to-[var(--color-primary)] bg-clip-text text-transparent"
+                                >
+                                    Edge.AI
+                                </h3>
+                            </div>
+                        </div>
+
+                        <p
+                            class="text-sm text-[var(--color-text-secondary)] max-w-md"
+                        >
+                            ¿Desde cuando la IA es igual a preocupaciones?
+                        </p>
+
+                        <div
+                            class="flex flex-wrap justify-center gap-4 text-xs text-[var(--color-text-tertiary)]"
+                        >
+                            <span
+                                >Usamos <span
+                                    class="text-[var(--color-primary)]"
+                                    >WebLLM</span
+                                ></span
+                            >
+                            <span>·</span>
+                            <span
+                                ><span class="text-[var(--color-primary)]"
+                                    >Wllama</span
+                                ></span
+                            >
+                        </div>
+
+                        <div
+                            class="pt-4 border-t border-[var(--color-border)] w-full"
+                        >
+                            <p
+                                class="text-xs text-[var(--color-text-tertiary)]"
+                            >
+                                Licenciado bajo GNU General Public License v3.0 | Inled Group
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </body>
+</html>

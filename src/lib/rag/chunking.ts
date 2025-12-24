@@ -1,0 +1,72 @@
+// Chunking Module - Adapted for IndexedDB local storage
+// Converts semantic chunks to DB-ready format
+
+import { semanticChunkText, type SemanticChunk } from './semantic-chunking';
+import { createChunksBatch } from '@/lib/db/chunks';
+import type { Chunk } from '@/types';
+
+/**
+ * Process document text into chunks and store in IndexedDB
+ * Returns array of created chunks
+ */
+export async function chunkAndStoreDocument(
+  documentId: string,
+  text: string,
+  chunkSize: number = 800,
+  overlap: number = 50
+): Promise<Chunk[]> {
+  console.log(`📄 Chunking document ${documentId}...`);
+
+  // Use semantic chunking
+  const semanticChunks = semanticChunkText(text, chunkSize);
+
+  console.log(`✂️ Created ${semanticChunks.length} semantic chunks`);
+
+  // Convert to DB format
+  const dbChunks = semanticChunks.map((sc, index) => ({
+    documentId,
+    content: sc.content,
+    index,
+    tokens: estimateTokens(sc.content),
+    metadata: {
+      startChar: sc.metadata.startChar,
+      endChar: sc.metadata.endChar,
+      type: sc.metadata.type,
+      prevContext: sc.metadata.prevContext,
+      nextContext: sc.metadata.nextContext
+    }
+  }));
+
+  // Store in IndexedDB
+  const storedChunks = await createChunksBatch(dbChunks);
+
+  console.log(`✅ Stored ${storedChunks.length} chunks in IndexedDB`);
+
+  return storedChunks;
+}
+
+/**
+ * Estimate token count (rough approximation)
+ * ~1 token per 4 characters in English
+ */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Get chunk text with context for embedding
+ */
+export function getChunkTextForEmbedding(chunk: Chunk): string {
+  let text = chunk.content;
+
+  // Add context if available
+  if (chunk.metadata.prevContext) {
+    text = `${chunk.metadata.prevContext} ${text}`;
+  }
+
+  if (chunk.metadata.nextContext) {
+    text = `${text} ${chunk.metadata.nextContext}`;
+  }
+
+  return text;
+}

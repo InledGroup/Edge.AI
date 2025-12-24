@@ -1,0 +1,100 @@
+// Message Component - Individual chat message
+
+import { User, Bot, FileText } from 'lucide-preact';
+import type { Message as MessageType } from '@/types';
+import { cn } from '@/lib/utils';
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
+import { WebSources } from './WebSources';
+import type { WebSource } from './WebSources';
+
+export interface MessageProps {
+  message: MessageType;
+}
+
+export function Message({ message }: MessageProps) {
+  const isUser = message.role === 'user';
+
+  // Detectar si hay fuentes web (metadata con webSources)
+  const webSources = (message as any).metadata?.webSources as WebSource[] | undefined;
+  const hasWebSources = webSources && webSources.length > 0;
+
+  // Fuentes RAG regulares (documentos locales)
+  const hasLocalSources = message.sources && message.sources.length > 0;
+
+  return (
+    <div
+      className={cn(
+        'flex gap-3 group animate-slideUp',
+        isUser ? 'justify-end' : 'justify-start'
+      )}
+    >
+      {!isUser && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center shadow-[0_0_15px_rgba(40,229,24,0.3)]">
+          <Bot size={18} color="black" />
+        </div>
+      )}
+
+      <div className={cn('flex flex-col gap-1 max-w-[80%]', isUser && 'items-end')}>
+        <div
+          className={cn(
+            'rounded-2xl px-4 py-2.5 text-sm',
+            'transition-all duration-200',
+            isUser
+              ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-[0_0_15px_rgba(40,229,24,0.2)]'
+              : 'bg-[var(--color-bg-secondary)] text-[var(--color-text)] border border-[var(--color-border)]'
+          )}
+        >
+          {isUser ? (
+            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          ) : (
+            <MarkdownRenderer content={message.content} className="leading-relaxed" />
+          )}
+        </div>
+
+        {/* Web sources (if web search was used) */}
+        {!isUser && hasWebSources && (
+          <WebSources sources={webSources!} className="px-2" />
+        )}
+
+        {/* Local document sources (if RAG was used) */}
+        {!isUser && hasLocalSources && !hasWebSources && (
+          <div className="flex flex-col gap-1 mt-1">
+            <span className="text-xs text-[var(--color-text-tertiary)] px-2">
+              {message.sources!.length} fuente{message.sources!.length > 1 ? 's' : ''}
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {message.sources!.map((source, idx) => (
+                <div
+                  key={idx}
+                  className="text-xs px-2 py-1 bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] rounded-md border border-[var(--color-border)] flex items-center gap-1.5 hover:border-[var(--color-primary)] transition-colors"
+                  title={source.chunk.content.substring(0, 100)}
+                >
+                  <FileText size={12} />
+                  <span className="truncate max-w-[120px]">
+                    {source.document.name}
+                  </span>
+                  <span className="text-[var(--color-primary)]">
+                    {(source.score * 100).toFixed(0)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <span className="text-xs text-[var(--color-text-tertiary)] px-2">
+          {new Date(message.timestamp).toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
+        </span>
+      </div>
+
+      {isUser && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--color-bg-tertiary)] flex items-center justify-center border border-[var(--color-border)]">
+          <User size={18} />
+        </div>
+      )}
+    </div>
+  );
+}

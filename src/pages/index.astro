@@ -1,0 +1,36 @@
+---
+// Edge.AI - Local-first AI Platform (ChatGPT-style Design)
+import { AppLayout } from '@/components/AppLayout';
+import '@/styles/global.css';
+---
+
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge.AI - 100% Local AI Platform</title>
+    <meta name="description" content="Plataforma de IA conversacional 100% local - Sin backend, sin cuentas, sin envío de datos">
+    <link rel="icon" href="https://hosted.inled.es/inledai.png">
+</head>
+<body>
+    <!-- Main App Layout -->
+    <AppLayout client:load />
+
+    <!-- Initialize stores -->
+    <script>
+        import { initializeStores } from '@/lib/stores';
+
+        // Initialize on client side
+        if (typeof window !== 'undefined') {
+            initializeStores().catch(console.error);
+        }
+    </script>
+
+    <!-- Background glow effect -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div class="absolute top-0 left-1/4 w-96 h-96 bg-[var(--color-primary)] opacity-5 blur-[120px] rounded-full"></div>
+        <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-[var(--color-primary)] opacity-5 blur-[120px] rounded-full"></div>
+    </div>
+</body>
+</html>

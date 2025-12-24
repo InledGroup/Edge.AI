@@ -1,0 +1,41 @@
+{
+  "name": "edge.ai",
+  "version": "0.1.0",
+  "description": "100% local-first conversational AI platform with RAG",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astrojs/preact": "^3.0.1",
+    "@mlc-ai/web-llm": "^0.2.54",
+    "@preact/signals": "^1.2.2",
+    "@wllama/wllama": "^1.5.2",
+    "astro": "^4.0.8",
+    "clsx": "^2.1.1",
+    "idb": "^8.0.0",
+    "lucide-preact": "^0.562.0",
+    "marked": "^11.2.0",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^4.0.379",
+    "preact": "^10.19.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@astrojs/tailwind": "^6.0.2",
+    "@types/marked": "^5.0.2",
+    "@types/node": "^20.10.6",
+    "@types/pdf-parse": "^1.1.4",
+    "autoprefixer": "^10.4.23",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.3.3"
+  }
+}

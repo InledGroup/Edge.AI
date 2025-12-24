@@ -1,2 +1,100 @@
-# Edge.AI
-Una plataforma de IA que realmente es privada
+# <img src="https://hosted.inled.es/inledai.png" width="48" height="48" align="center" /> Edge.AI
+
+**Edge.AI** es una plataforma de inteligencia artificial conversacional **100% local-first**. Ejecuta modelos de lenguaje avanzados directamente en tu navegador, garantizando privacidad absoluta, sin necesidad de servidores externos ni cuentas de usuario.
+
+![Edge.AI Architecture](https://img.shields.io/badge/Privacy-100%25-green?style=for-the-badge)
+![Astro](https://img.shields.io/badge/Astro-4.0-ff5d01?style=for-the-badge&logo=astro)
+![Preact](https://img.shields.io/badge/Preact-10.19-673ab8?style=for-the-badge&logo=preact)
+![WebLLM](https://img.shields.io/badge/WebLLM-Driven-blue?style=for-the-badge)
+
+---
+
+## ✨ Características Principales
+
+### 🧠 Inteligencia 100% Local
+Aprovecha el poder de **WebLLM** y **Wllama** para ejecutar modelos como Llama 3, Phi-3 o Gemma directamente en tu tarjeta gráfica (WebGPU) o CPU (WASM) sin que tus datos salgan nunca de tu dispositivo.
+
+### 📂 RAG Local (Chat con Documentos)
+Sube tus archivos **PDF, TXT o Markdown** y chatea con ellos. Todo el procesamiento de texto (chunking), generación de embeddings y búsqueda vectorial ocurre localmente en el navegador.
+- **Chunking Semántico**: División inteligente de documentos para mejor contexto.
+- **Búsqueda Vectorial**: Recuperación precisa de información relevante.
+
+### 🌐 Búsqueda Web Inteligente
+Integración con motores de búsqueda para enriquecer las respuestas de la IA con información actualizada, manteniendo la orquestación y el filtrado de datos dentro de tu entorno local.
+
+### 🛡️ Privacidad por Diseño
+- **Sin Servidores**: No hay backend que guarde tus conversaciones.
+- **Sin Cuentas**: No necesitas registrarte ni iniciar sesión.
+- **Persistencia Local**: Tus conversaciones y documentos se guardan en **IndexedDB**, cifrados por el propio navegador.
+
+---
+
+## 🚀 Tecnologías
+
+| Herramienta | Uso |
+| :--- | :--- |
+| **Astro** | Framework principal y optimización de estáticos. |
+| **Preact** | Interfaz reactiva ultraligera. |
+| **WebLLM** | Motor de IA para aceleración por hardware (WebGPU). |
+| **Wllama** | Motor de IA basado en WASM para compatibilidad universal. |
+| **TailwindCSS** | Diseño moderno, adaptable y oscuro. |
+| **Lucide Icons** | Iconografía minimalista y elegante. |
+| **IndexedDB** | Base de datos local de alto rendimiento. |
+
+---
+
+## 🛠️ Instalación y Despliegue
+
+### Desarrollo Local
+1. **Clona el repositorio**
+   ```bash
+   git clone https://github.com/tu-usuario/edge.ai.git
+   cd edge.ai
+   ```
+
+2. **Instala las dependencias**
+   ```bash
+   npm install
+   ```
+
+3. **Inicia el servidor de desarrollo**
+   ```bash
+   npm run dev
+   ```
+
+### Despliegue en Producción
+Para instrucciones detalladas sobre cómo desplegar en **Cloudflare Pages**, **Vercel** o servidores estáticos, consulta nuestra:
+
+👉 **[Guía de Despliegue (DEPLOYMENT.md)](./DEPLOYMENT.md)**
+
+---
+
+## 📐 Arquitectura
+
+El proyecto utiliza una arquitectura de **Web Workers** para mantener la interfaz fluida mientras se realizan tareas pesadas:
+- `embedding.worker.ts`: Generación de vectores para documentos.
+- `chunking.worker.ts`: Procesamiento de texto en segundo plano.
+- `search.worker.ts`: Motor de búsqueda y filtrado.
+
+---
+
+## 🔒 Privacidad
+
+En Edge.AI, creemos que la privacidad no es una opción, sino un derecho.
+- **Cero Telemetría**: No rastreamos tu uso.
+- **Cero Almacenamiento**: Tus datos son tuyos y residen en tu navegador.
+- **Código Abierto**: Transparencia total en el procesamiento de datos.
+
+---
+
+## ✒️ Autor
+
+Proyecto desarrollado con pasión por **Jaime González Herráiz**, enfocado en la creación de soluciones de IA "edge" y centradas en la privacidad.
+
+- **Inled Group**: [inled.es](https://inled.es)
+
+---
+
+<p align="center">
+  Hecho por <a href="https://inled.es">Inled Group</a> con ❤️ Jaime González Herráiz
+</p>
