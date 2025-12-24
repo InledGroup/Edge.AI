@@ -4,6 +4,7 @@
 
 import { getDB } from './schema';
 import type { Conversation, Message } from '@/types';
+import { generateUUID } from '../utils';
 
 /**
  * Create a new conversation
@@ -15,7 +16,7 @@ export async function createConversation(
   const db = await getDB();
 
   const conversation: Conversation = {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     title,
     messages: [],
     createdAt: Date.now(),
@@ -95,7 +96,7 @@ export async function addMessage(
 
   const newMessage: Message = {
     ...message,
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     timestamp: Date.now()
   };
 

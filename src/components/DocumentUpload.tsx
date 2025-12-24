@@ -5,7 +5,7 @@ import { FileText, Trash2, UploadCloud } from 'lucide-preact';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { ProgressBar } from './ui/ProgressBar';
-import { documentsStore, processingStore } from '@/lib/stores';
+import { documentsStore, processingStore, modelsReady } from '@/lib/stores';
 import { parseDocument, validateFile } from '@/lib/parsers';
 import { createDocument } from '@/lib/db/documents';
 import { processDocument } from '@/lib/rag/rag-pipeline';
@@ -57,6 +57,12 @@ export function DocumentUpload() {
   async function processFile(file: File) {
     try {
       console.log(`📄 Processing file: ${file.name}`);
+
+      // CRITICAL: Check if models are ready before processing
+      if (!modelsReady.value) {
+        alert('⚠️ Los modelos de IA aún no están cargados. Por favor, espera a que se completen antes de subir documentos.');
+        return;
+      }
 
       // Validate file
       const validation = validateFile(file);
@@ -200,11 +206,15 @@ export function DocumentUpload() {
             variant="default"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
+            disabled={!modelsReady.value}
           >
-            Seleccionar archivos
+            {modelsReady.value ? 'Seleccionar archivos' : 'Esperando modelos...'}
           </Button>
           <p className="text-xs text-[var(--color-text-tertiary)]">
-            PDF, TXT, MD (máx. 50MB)
+            {modelsReady.value
+              ? 'PDF, TXT, MD (máx. 50MB)'
+              : '⏳ Los modelos deben cargarse primero'
+            }
           </p>
         </div>
       </div>

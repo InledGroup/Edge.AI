@@ -56,3 +56,28 @@ export function truncate(text: string, maxLength: number): string {
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+/**
+ * Generate a UUID v4
+ * Uses crypto.randomUUID() if available (modern browsers, secure context)
+ * Falls back to a polyfill for older browsers or non-secure contexts (HTTP)
+ */
+export function generateUUID(): string {
+  // Try native crypto.randomUUID() first (available in modern browsers with HTTPS)
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch (error) {
+      // Fall through to polyfill if it fails
+      console.warn('crypto.randomUUID() failed, using fallback');
+    }
+  }
+
+  // Polyfill for older browsers or HTTP contexts
+  // This implementation follows RFC 4122 version 4 UUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}

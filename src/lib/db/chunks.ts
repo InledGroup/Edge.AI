@@ -4,6 +4,7 @@
 
 import { getDB } from './schema';
 import type { Chunk } from '@/types';
+import { generateUUID } from '../utils';
 
 /**
  * Create a new chunk
@@ -15,7 +16,7 @@ export async function createChunk(
 
   const newChunk: Chunk = {
     ...chunk,
-    id: crypto.randomUUID()
+    id: generateUUID()
   };
 
   await db.add('chunks', newChunk);
@@ -36,7 +37,7 @@ export async function createChunksBatch(
   for (const chunk of chunks) {
     const newChunk: Chunk = {
       ...chunk,
-      id: crypto.randomUUID()
+      id: generateUUID()
     };
 
     await tx.store.add(newChunk);

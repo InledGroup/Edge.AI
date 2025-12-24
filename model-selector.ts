@@ -21,19 +21,36 @@ export function selectOptimalModel(
   hasWebGPU: boolean,
   gpuConfig: GPUTierConfig | null
 ): ModelRecommendation {
-  // Critical: < 2GB RAM - use smallest model
+  // CRITICAL: Mobile detection - if < 4GB RAM, assume mobile device
+  const isMobile = memoryGB < 4 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  // Critical: < 2GB RAM - use smallest model (old mobile devices)
   if (memoryGB < 2) {
+    console.log('📱 Detected device with < 2GB RAM, using ultra-light model');
     return {
       modelName: 'SmolLM2-135M-Instruct-q0f16-MLC',
       displayName: 'SmolLM2 135M',
       size: '135MB',
       quantization: 'Q0_F16',
-      reason: 'Dispositivo con muy poca RAM (<2GB)',
+      reason: 'Dispositivo móvil con muy poca RAM (<2GB)',
+    };
+  }
+
+  // Mobile with 2-4GB RAM: Use small model optimized for mobile
+  if (isMobile && memoryGB < 4) {
+    console.log('📱 Detected mobile device with 2-4GB RAM, using mobile-optimized model');
+    return {
+      modelName: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
+      displayName: 'SmolLM2 360M',
+      size: '200MB',
+      quantization: 'Q4_F16',
+      reason: 'Dispositivo móvil con RAM limitada (2-4GB)',
     };
   }
 
   // No WebGPU: CPU-only, prioritize speed over quality
   if (!hasWebGPU) {
+    console.log('💻 No WebGPU detected, using CPU-optimized model');
     if (memoryGB >= 4) {
       return {
         modelName: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',

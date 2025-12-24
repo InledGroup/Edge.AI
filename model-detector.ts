@@ -111,8 +111,12 @@ function recommendBackend(
     return 'webllm-gpu';
   }
 
-  // Default fallback: Wllama with CPU (works on any device, no API key needed)
-  // NOTE: This will be slow but universal. HuggingFace API requires explicit user opt-in.
+  // CRITICAL: If no WebGPU or insufficient memory, ALWAYS fallback to Wllama CPU
+  // This handles:
+  // - Desktop without GPU (uses wllama)
+  // - Mobile with low memory (uses wllama with small model)
+  // - Any device where WebGPU is not available
+  console.log('⚠️ No WebGPU available or insufficient memory, using Wllama (CPU/WASM)');
   return 'wllama-cpu';
 }
 

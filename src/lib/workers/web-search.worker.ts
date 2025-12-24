@@ -72,7 +72,7 @@ async function fetchPage(
       signal: controller.signal,
       headers: {
         Accept: 'text/html,application/xhtml+xml',
-        'User-Agent': 'EdgeAI/1.0 (Local Browser Agent; +https://github.com/yourusername/edge-ai)',
+        'User-Agent': 'EdgeAI/1.0 (Local Browser Agent; +https://github.com/InledGroup/Edge.AI)',
         ...headers,
       },
       redirect: followRedirects ? 'follow' : 'manual',

@@ -1,18 +1,22 @@
 // Message Component - Individual chat message
 
-import { User, Bot, FileText } from 'lucide-preact';
+import { User, Bot, FileText, Copy, FileEdit } from 'lucide-preact';
+import { useState } from 'preact/hooks';
 import type { Message as MessageType } from '@/types';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { WebSources } from './WebSources';
 import type { WebSource } from './WebSources';
+import { Button } from '../ui/Button';
 
 export interface MessageProps {
   message: MessageType;
+  onOpenInCanvas?: (content: string) => void;
 }
 
-export function Message({ message }: MessageProps) {
+export function Message({ message, onOpenInCanvas }: MessageProps) {
   const isUser = message.role === 'user';
+  const [copied, setCopied] = useState(false);
 
   // Detectar si hay fuentes web (metadata con webSources)
   const webSources = (message as any).metadata?.webSources as WebSource[] | undefined;
@@ -20,6 +24,22 @@ export function Message({ message }: MessageProps) {
 
   // Fuentes RAG regulares (documentos locales)
   const hasLocalSources = message.sources && message.sources.length > 0;
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  }
+
+  function handleOpenInCanvas() {
+    if (onOpenInCanvas) {
+      onOpenInCanvas(message.content);
+    }
+  }
 
   return (
     <div
@@ -88,6 +108,30 @@ export function Message({ message }: MessageProps) {
             minute: '2-digit'
           })}
         </span>
+
+        {/* Action buttons for assistant messages */}
+        {!isUser && (
+          <div className="flex items-center gap-2 px-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopy}
+              className="h-7 px-2 text-xs"
+            >
+              <Copy size={14} className="mr-1" />
+              {copied ? 'Copiado!' : 'Copiar'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleOpenInCanvas}
+              className="h-7 px-2 text-xs"
+            >
+              <FileEdit size={14} className="mr-1" />
+              Abrir en canvas
+            </Button>
+          </div>
+        )}
       </div>
 
       {isUser && (

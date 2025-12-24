@@ -4,6 +4,7 @@
 
 import { getDB } from './schema';
 import type { Embedding, StoredEmbedding, Chunk } from '@/types';
+import { generateUUID } from '../utils';
 
 /**
  * Convert Float32Array to regular array for storage
@@ -37,7 +38,7 @@ export async function createEmbedding(
   const db = await getDB();
 
   const embedding: Embedding = {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     chunkId,
     documentId,
     vector,
@@ -67,7 +68,7 @@ export async function createEmbeddingsBatch(
 
   for (const emb of embeddings) {
     const embedding: Embedding = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       chunkId: emb.chunkId,
       documentId: emb.documentId,
       vector: emb.vector,

@@ -4,6 +4,7 @@
 
 import { getDB } from './schema';
 import type { Document } from '@/types';
+import { generateUUID } from '../utils';
 
 /**
  * Create a new document
@@ -15,7 +16,7 @@ export async function createDocument(
 
   const newDoc: Document = {
     ...document,
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     uploadedAt: Date.now(),
     status: 'pending'
   };

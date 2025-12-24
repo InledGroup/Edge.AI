@@ -11,6 +11,7 @@ import { semanticChunkText, formatChunkWithContext, type SemanticChunk } from '.
 import { multiLevelCache, type RAGDocument as CachedRAGDocument } from '../cache/multi-level-cache';
 import { memoryMonitor, type MemoryPressure } from '../monitoring/memory-monitor';
 import { executionScheduler } from './execution-scheduler';
+import { generateUUID } from '../utils';
 
 export type RAGBackend = 'huggingface' | 'webllm-gpu' | 'wllama-cpu';
 
@@ -115,6 +116,21 @@ export class HybridRAGSystem {
         console.log(`🎯 AUTOMATIC MODEL SELECTION: Using ${this.deviceCapabilities.recommendedModel}`);
         console.log(`   Reason: ${this.deviceCapabilities.modelRecommendation?.reason}`);
 
+        // Validate that the recommended model can run on this device
+        const validation = await this.validateModelMemory(
+          this.deviceCapabilities.recommendedModel,
+          this.deviceCapabilities.estimatedMemoryGB,
+          this.deviceCapabilities.gpuConfig
+        );
+
+        if (!validation.canRun) {
+          console.error(`❌ Recommended model validation failed: ${validation.reason}`);
+          throw new Error(
+            `Dispositivo con memoria insuficiente para ejecutar modelos. ` +
+            `Necesitas al menos 1GB RAM libre. ${validation.reason}`
+          );
+        }
+
         // Override config with recommended model
         config.modelName = this.deviceCapabilities.recommendedModel;
         this.config = config;
@@ -139,6 +155,63 @@ export class HybridRAGSystem {
         `Failed to initialize RAG system: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
+  }
+
+  /**
+   * Validate if a model can run on the device based on memory constraints
+   */
+  private async validateModelMemory(
+    modelName: string,
+    memoryGB: number,
+    gpuConfig: any
+  ): Promise<{ canRun: boolean; reason?: string }> {
+    // Import validation function from model-selector
+    const { validateModelForDevice } = await import('./model-selector');
+    return validateModelForDevice(modelName, memoryGB, gpuConfig);
+  }
+
+  /**
+   * Convert MLC model name to GGUF model URL for Wllama
+   * Maps WebLLM model names to their GGUF equivalents
+   */
+  private convertToGGUFModel(mlcModelName: string): string {
+    // Map of MLC models to GGUF URLs
+    const modelMap: Record<string, string> = {
+      // SmolLM2 models
+      'SmolLM2-135M-Instruct-q0f16-MLC':
+        'https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct-GGUF/resolve/main/smollm2-135m-instruct-q4_k_m.gguf',
+      'SmolLM2-360M-Instruct-q4f16_1-MLC':
+        'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf',
+
+      // Qwen models
+      'Qwen2.5-0.5B-Instruct-q4f16_1-MLC':
+        'https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf',
+      'Qwen2.5-1.5B-Instruct-q4f16_1-MLC':
+        'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+
+      // TinyLlama
+      'TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC':
+        'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf',
+
+      // Llama models
+      'Llama-3.2-1B-Instruct-q4f16_1-MLC':
+        'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
+      'Llama-3.2-3B-Instruct-q4f16_1-MLC':
+        'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+
+      // Phi models
+      'Phi-3.5-mini-instruct-q4f16_1-MLC':
+        'https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf',
+    };
+
+    // If we have a direct mapping, use it
+    if (modelMap[mlcModelName]) {
+      return modelMap[mlcModelName];
+    }
+
+    // Default fallback: Qwen2-0.5B (smallest, fastest)
+    console.warn(`⚠️ No GGUF mapping for ${mlcModelName}, using default Qwen2-0.5B`);
+    return 'https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf';
   }
 
   /**
@@ -170,8 +243,8 @@ export class HybridRAGSystem {
     if (config.preferredBackend) {
       // Validate if the preferred backend is available
       if (config.preferredBackend === 'webllm-gpu' && !capabilities.hasWebGPU) {
-        console.warn('⚠️ Parece que este dispositivo no soporta WebGPU o ya no tiene GPU per se. Bueno, usaremos su CPU.');
-        return 'webllm-cpu';
+        console.warn('⚠️ Parece que este dispositivo no soporta WebGPU. Usando Wllama con CPU.');
+        return 'wllama-cpu';
       }
       return config.preferredBackend;
     }
@@ -215,17 +288,17 @@ export class HybridRAGSystem {
       try {
         const isValid = await this.hfClient.testAPIKey();
         if (!isValid) {
-          console.warn('⚠️ HuggingFace API key validation failed, falling back to WebLLM');
-          // Fallback to WebLLM
-          this.backend = this.deviceCapabilities?.hasWebGPU ? 'webllm-gpu' : 'webllm-cpu';
+          console.warn('⚠️ HuggingFace API key validation failed, falling back to local inference');
+          // Fallback to local inference (WebLLM GPU or Wllama CPU)
+          this.backend = this.deviceCapabilities?.hasWebGPU ? 'webllm-gpu' : 'wllama-cpu';
           console.log(`🔄 Vaya, parece que vamos a tener que usar ${this.backend}`);
           // Recursively initialize with the new backend
           return this.initializeBackend(config, progressCallback);
         }
       } catch (error) {
-        console.warn('⚠️ Error testing HuggingFace API key, falling back to WebLLM:', error);
-        // Fallback to WebLLM
-        this.backend = this.deviceCapabilities?.hasWebGPU ? 'webllm-gpu' : 'webllm-cpu';
+        console.warn('⚠️ Error testing HuggingFace API key, falling back to local inference:', error);
+        // Fallback to local inference (WebLLM GPU or Wllama CPU)
+        this.backend = this.deviceCapabilities?.hasWebGPU ? 'webllm-gpu' : 'wllama-cpu';
         console.log(`🔄 Vaya, parece que vamos usar ${this.backend}`);
         // Recursively initialize with the new backend
         return this.initializeBackend(config, progressCallback);
@@ -303,8 +376,9 @@ export class HybridRAGSystem {
       try {
         this.wllamaEngine = new WllamaEngine();
 
-        // Use Qwen2-0.5B-Instruct Q4_K_M - very small and fast for CPU, about 350MB
-        const wasmModelUrl = 'https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf';
+        // Convert MLC model name to GGUF model URL for Wllama
+        const wasmModelUrl = this.convertToGGUFModel(config.modelName);
+        console.log(`📦 Using GGUF model: ${wasmModelUrl}`);
 
         await this.wllamaEngine.initialize(wasmModelUrl, (progress, status) => {
           // Map progress (0-100) to our progress (30-100)
@@ -343,7 +417,7 @@ export class HybridRAGSystem {
       const doc = documents[i];
 
       this.documents.push({
-        id: doc.metadata?.id || crypto.randomUUID(),
+        id: doc.metadata?.id || generateUUID(),
         content: doc.content,
         embedding: doc.embedding,
         metadata: doc.metadata,
@@ -408,7 +482,7 @@ export class HybridRAGSystem {
       // Add all documents with embeddings
       documents.forEach((doc, i) => {
         this.documents.push({
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           content: doc.content,
           embedding: embeddings[i],
           metadata: doc.metadata,
@@ -432,7 +506,7 @@ export class HybridRAGSystem {
 
       documents.forEach((doc, i) => {
         this.documents.push({
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           content: doc.content,
           embedding: embeddings[i],
           metadata: doc.metadata,
@@ -473,7 +547,7 @@ export class HybridRAGSystem {
           const embedding = await this.generateEmbedding(doc.content);
 
           this.documents.push({
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             content: doc.content,
             embedding: embedding,
             metadata: doc.metadata,

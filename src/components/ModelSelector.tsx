@@ -26,13 +26,75 @@ const capabilities = signal<{
   gpuTier?: string;
 } | null>(null);
 
+/**
+ * Convert MLC model name to GGUF model URL for Wllama
+ * Maps WebLLM model names to their GGUF equivalents
+ */
+function convertToGGUFModel(mlcModelName: string): string {
+  // Map of MLC models to GGUF URLs
+  const modelMap: Record<string, string> = {
+    // SmolLM2 models
+    'SmolLM2-135M-Instruct-q0f16-MLC':
+      'https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct-GGUF/resolve/main/smollm2-135m-instruct-q4_k_m.gguf',
+    'SmolLM2-360M-Instruct-q4f16_1-MLC':
+      'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf',
+
+    // Qwen models
+    'Qwen2.5-0.5B-Instruct-q4f16_1-MLC':
+      'https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf',
+    'Qwen2.5-1.5B-Instruct-q4f16_1-MLC':
+      'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+
+    // TinyLlama
+    'TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC':
+      'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf',
+
+    // Llama models
+    'Llama-3.2-1B-Instruct-q4f16_1-MLC':
+      'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
+    'Llama-3.2-3B-Instruct-q4f16_1-MLC':
+      'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+
+    // Phi models
+    'Phi-3.5-mini-instruct-q4f16_1-MLC':
+      'https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf',
+  };
+
+  // If we have a direct mapping, use it
+  if (modelMap[mlcModelName]) {
+    return modelMap[mlcModelName];
+  }
+
+  // Default fallback: Qwen2-0.5B (smallest, fastest)
+  console.warn(`⚠️ No GGUF mapping for ${mlcModelName}, using default Qwen2-0.5B`);
+  return 'https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf';
+}
+
 export function ModelSelector() {
   const [initialized, setInitialized] = useState(false);
+  const [autoLoadAttempted, setAutoLoadAttempted] = useState(false);
 
   useEffect(() => {
     detectCapabilities();
     setInitialized(true);
   }, []);
+
+  // Auto-load models after capabilities are detected
+  useEffect(() => {
+    if (initialized && capabilities.value && !autoLoadAttempted) {
+      setAutoLoadAttempted(true);
+      console.log('🚀 Auto-loading models...');
+
+      // Load both models automatically
+      loadChatModel().catch(err => {
+        console.error('Failed to auto-load chat model:', err);
+      });
+
+      loadEmbeddingModel().catch(err => {
+        console.error('Failed to auto-load embedding model:', err);
+      });
+    }
+  }, [initialized, capabilities.value, autoLoadAttempted]);
 
   async function detectCapabilities() {
     try {
@@ -77,11 +139,35 @@ export function ModelSelector() {
 
       console.log('🎯 Recommended chat model:', recommended);
 
-      const engine = new WebLLMEngine();
+      // CRITICAL: Choose engine based on WebGPU availability
+      let engine: WebLLMEngine | WllamaEngine;
+      let engineName: string;
+      let modelUrl: string;
 
-      await engine.initialize(recommended.modelName, (progress, status) => {
-        chatLoadingState.value = { progress, message: status };
-      });
+      if (capabilities.value.hasWebGPU) {
+        // Use WebLLM with GPU
+        console.log('🚀 Using WebLLM (GPU acceleration)');
+        engine = new WebLLMEngine();
+        engineName = 'webllm';
+        modelUrl = recommended.modelName;
+
+        await engine.initialize(modelUrl, (progress, status) => {
+          chatLoadingState.value = { progress, message: status };
+        });
+      } else {
+        // Use Wllama with CPU (no WebGPU)
+        console.log('🚀 Using Wllama (CPU, no WebGPU available)');
+        engine = new WllamaEngine();
+        engineName = 'wllama';
+
+        // Convert MLC model name to GGUF URL
+        modelUrl = convertToGGUFModel(recommended.modelName);
+        console.log(`📦 Loading GGUF model: ${modelUrl}`);
+
+        await engine.initialize(modelUrl, (progress, status) => {
+          chatLoadingState.value = { progress, message: status };
+        });
+      }
 
       // Register engine instance in global manager
       EngineManager.setChatEngine(engine, recommended.modelName);
@@ -90,9 +176,9 @@ export function ModelSelector() {
         id: recommended.modelName,
         name: recommended.displayName,
         type: 'chat',
-        engine: 'webllm',
+        engine: engineName,
         contextSize: 2048,
-        requiresGPU: true,
+        requiresGPU: capabilities.value.hasWebGPU,
         sizeGB: parseFloat(recommended.size) / 1000
       });
 
