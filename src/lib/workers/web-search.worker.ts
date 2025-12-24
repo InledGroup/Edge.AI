@@ -26,19 +26,11 @@ interface FetchPagesMessage {
 // ============================================================================
 
 /**
- * Detecta si estamos en localhost (para usar proxy CORS)
- */
-function isLocalhost(): boolean {
-  if (typeof self === 'undefined') return false;
-  // En workers, self.location existe
-  return self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
-}
-
-/**
- * Obtiene el proxy CORS si es necesario
+ * Obtiene el proxy CORS para todas las peticiones web
+ * Siempre usa el proxy de InLed para evitar problemas CORS
  */
 function getCorsProxy(): string {
-  return isLocalhost() ? 'https://corsproxy.io/?' : '';
+  return 'https://aiproxy.inled.es/?url=';
 }
 
 /**
