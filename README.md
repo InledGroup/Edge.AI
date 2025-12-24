@@ -1,4 +1,4 @@
-# <img src="https://hosted.inled.es/inledai.png" width="48" height="48" align="center" /> Edge.AI
+# <img src="/inledai.png" width="48" height="48" align="center" /> Edge.AI
 
 **Edge.AI** es una plataforma de inteligencia artificial conversacional **100% local-first**. Ejecuta modelos de lenguaje avanzados directamente en tu navegador, garantizando privacidad absoluta, sin necesidad de servidores externos ni cuentas de usuario.
 

@@ -52,14 +52,25 @@ export class WllamaEngine {
 
       // Create Wllama instance with optimized WASM build
       // Point to WASM files in public directory
-      const basePath = recommendedBuild.path.includes('multi-thread')
+      const isMultiThread = recommendedBuild.path.includes('multi-thread');
+      const basePath = isMultiThread
         ? '/wllama/multi-thread/wllama'
         : '/wllama/single-thread/wllama';
 
-      this.wllama = new Wllama({
+      // Configure paths for both single-thread and multi-thread variants
+      const config: Record<string, string> = {
         'single-thread/wllama.wasm': basePath + '.wasm',
         'single-thread/wllama.js': basePath + '.js',
-      });
+      };
+
+      // Add multi-thread worker if using multi-thread build
+      if (isMultiThread) {
+        config['multi-thread/wllama.wasm'] = basePath + '.wasm';
+        config['multi-thread/wllama.js'] = basePath + '.js';
+        config['multi-thread/wllama.worker.mjs'] = '/wllama/multi-thread/wllama.worker.mjs';
+      }
+
+      this.wllama = new Wllama(config);
 
       onProgress?.(10, 'Descargando modelo (se guardará en caché)...');
 

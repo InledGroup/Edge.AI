@@ -227,7 +227,7 @@ export function ChatInterface() {
             <div className="h-[calc(100vh-12rem)] flex items-center justify-center">
               <div className="text-center max-w-md space-y-4">
                 <div className="w-16 h-16 mx-auto flex items-center justify-center">
-                  <img src="https://hosted.inled.es/inledai.svg" alt="InLed AI" width={64} height={64} />
+                  <img src="/inledai.svg" alt="InLed AI" width={64} height={64} />
                 </div>
                 <h3 className="text-2xl font-semibold">Hola, ¿en qué puedo ayudarte?</h3>
                 <p className="text-sm text-[var(--color-text-secondary)]">

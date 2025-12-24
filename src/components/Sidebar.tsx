@@ -118,7 +118,7 @@ export function Sidebar({ onDocumentClick, onShowModelSelector, onShowDocumentUp
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2">
-            <img src="https://hosted.inled.es/inledai.svg" width={28} height={28} />
+            <img src="/inledai.svg" width={28} height={28} />
             <span className="font-semibold text-sm">Edge.AI</span>
           </div>
           <button
