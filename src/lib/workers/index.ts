@@ -3,6 +3,11 @@
 
 import { WorkerManager } from './worker-manager';
 
+// Import workers using Vite's ?worker syntax for proper bundling
+import EmbeddingWorkerUrl from './embedding.worker.ts?worker&url';
+import ChunkingWorkerUrl from './chunking.worker.ts?worker&url';
+import WebSearchWorkerUrl from './web-search.worker.ts?worker&url';
+
 /**
  * Embedding Worker Manager
  */
@@ -10,7 +15,7 @@ export class EmbeddingWorkerManager {
   private manager: WorkerManager;
 
   constructor() {
-    this.manager = new WorkerManager('./embedding.worker.ts');
+    this.manager = new WorkerManager(EmbeddingWorkerUrl);
   }
 
   async init(modelUrl?: string): Promise<void> {
@@ -58,7 +63,7 @@ export class ChunkingWorkerManager {
   private manager: WorkerManager;
 
   constructor() {
-    this.manager = new WorkerManager('./chunking.worker.ts');
+    this.manager = new WorkerManager(ChunkingWorkerUrl);
   }
 
   async init(): Promise<void> {
@@ -154,7 +159,8 @@ export class WebSearchWorkerManager {
   private manager: WorkerManager;
 
   constructor() {
-    this.manager = new WorkerManager('./web-search.worker.ts');
+    // Use the imported worker URL
+    this.manager = new WorkerManager(WebSearchWorkerUrl);
   }
 
   async init(): Promise<void> {

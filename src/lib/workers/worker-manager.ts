@@ -31,7 +31,12 @@ export class WorkerManager<TRequest = any, TResponse = any> {
 
     try {
       // Create worker using module syntax
-      this.worker = new Worker(new URL(this.workerPath, import.meta.url), {
+      // Si workerPath ya es una URL completa, usarla directamente
+      const workerUrl = this.workerPath.startsWith('http') || this.workerPath.startsWith('blob:')
+        ? this.workerPath
+        : new URL(this.workerPath, import.meta.url).href;
+
+      this.worker = new Worker(workerUrl, {
         type: 'module'
       });
 
