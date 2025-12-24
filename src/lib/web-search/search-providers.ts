@@ -40,7 +40,9 @@ export class WikipediaSearchProvider implements SearchProvider {
    * Obtiene el proxy CORS si es necesario
    */
   private getCorsProxy(): string {
-    return this.isLocalhost() ? 'https://corsproxy.io/?' : '';
+    // Siempre usar proxy CORS en el navegador (tanto localhost como producción)
+    // Wikipedia API soporta origin=* pero algunos navegadores lo bloquean
+    return 'https://corsproxy.io/?';
   }
 
   /**
@@ -125,25 +127,8 @@ export class WikipediaSearchProvider implements SearchProvider {
    * Verifica si Wikipedia está disponible
    */
   async isAvailable(): Promise<boolean> {
-    // Si estamos usando proxy CORS, asumimos que está disponible
-    if (this.isLocalhost()) {
-      return true; // En localhost siempre usamos proxy
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-      const response = await fetch(this.baseUrls.es, {
-        method: 'HEAD',
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      return response.ok;
-    } catch {
-      return false;
-    }
+    // Siempre está disponible ya que usamos proxy CORS
+    return true;
   }
 }
 
@@ -175,7 +160,8 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
    * Obtiene el proxy CORS si es necesario
    */
   private getCorsProxy(): string {
-    return this.isLocalhost() ? 'https://corsproxy.io/?' : '';
+    // Siempre usar proxy CORS en el navegador (tanto localhost como producción)
+    return 'https://corsproxy.io/?';
   }
 
   /**
@@ -314,28 +300,8 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
    * Verifica si DuckDuckGo está disponible
    */
   async isAvailable(): Promise<boolean> {
-    // Si estamos usando proxy CORS, asumimos que está disponible
-    if (this.isLocalhost()) {
-      return true; // En localhost siempre usamos proxy
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-      // Intentar GET simple (no POST completo)
-      const response = await fetch('https://duckduckgo.com', {
-        method: 'HEAD',
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      return response.ok;
-    } catch {
-      // Es probable que falle por CORS, pero el servicio puede estar disponible
-      // Retornar true optimistamente
-      return true;
-    }
+    // Siempre está disponible ya que usamos proxy CORS
+    return true;
   }
 }
 
