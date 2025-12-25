@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'auto',
   // Web search defaults
   enableWebSearch: true, // Enabled by default - show the toggle
-  webSearchSources: ['wikipedia', 'duckduckgo'], // Both providers
+  webSearchSources: ['extension'], // Use browser extension
   webSearchMaxUrls: 3, // Max 3 URLs to fetch
 };
 
@@ -192,7 +192,7 @@ export async function getWebSearchSettings() {
 
   return {
     enableWebSearch: enableWebSearch ?? false,
-    webSearchSources: webSearchSources ?? ['wikipedia'],
+    webSearchSources: webSearchSources ?? ['extension'],
     webSearchMaxUrls: webSearchMaxUrls ?? 3
   };
 }
@@ -202,8 +202,43 @@ export async function getWebSearchSettings() {
  */
 export async function updateWebSearchSettings(settings: {
   enableWebSearch?: boolean;
-  webSearchSources?: ('wikipedia' | 'duckduckgo')[];
+  webSearchSources?: ('wikipedia' | 'duckduckgo' | 'extension')[];
   webSearchMaxUrls?: number;
 }): Promise<void> {
   await updateSettings(settings);
+}
+
+/**
+ * Get browser extension settings
+ */
+export async function getExtensionSettings() {
+  const [extensionId, extensionEnabled] = await Promise.all([
+    getSetting('extensionId'),
+    getSetting('extensionEnabled')
+  ]);
+
+  return {
+    extensionId: extensionId ?? '',
+    enabled: extensionEnabled ?? false
+  };
+}
+
+/**
+ * Save browser extension settings
+ */
+export async function saveExtensionSettings(settings: {
+  extensionId?: string;
+  enabled?: boolean;
+}): Promise<void> {
+  const updates: Partial<Settings> = {};
+
+  if (settings.extensionId !== undefined) {
+    updates.extensionId = settings.extensionId;
+  }
+
+  if (settings.enabled !== undefined) {
+    updates.extensionEnabled = settings.enabled;
+  }
+
+  await updateSettings(updates);
 }

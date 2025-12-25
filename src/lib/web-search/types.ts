@@ -12,7 +12,7 @@
 /**
  * Fuentes de búsqueda soportadas
  */
-export type SearchSource = 'wikipedia' | 'duckduckgo';
+export type SearchSource = 'wikipedia' | 'duckduckgo' | 'extension';
 
 /**
  * Resultado individual de búsqueda web
@@ -382,6 +382,9 @@ export interface WebRAGOptions {
 
   /** Callback de progreso */
   onProgress?: (step: WebSearchStep, progress: number, message?: string) => void;
+
+  /** Callback para streaming de tokens durante la generación de respuesta */
+  onToken?: (token: string) => void;
 }
 
 /**

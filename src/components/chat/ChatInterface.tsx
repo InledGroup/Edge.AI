@@ -265,29 +265,57 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
         // ============================================================
         const webSearchSettings = await getWebSearchSettings();
 
-        // Create orchestrator
-        const orchestrator = new WebRAGOrchestrator(
+        // Create orchestrator with extension support
+        const orchestrator = await WebRAGOrchestrator.create(
           chatEngine,
           embeddingEngine
         );
 
-        // Perform web search + RAG
+        // Create temporary assistant message for streaming
+        const tempAssistantId = generateUUID();
+        let streamedContent = '';
+
+        const tempMessage: MessageType = {
+          id: tempAssistantId,
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          model: 'webllm',
+          streaming: true,
+        };
+
+        // Add temp message to show streaming progress
+        setMessages(prev => [...prev, tempMessage]);
+
+        // Perform web search + RAG with streaming
         const webResult = await orchestrator.search(content, {
           sources: webSearchSettings.webSearchSources,
           maxUrlsToFetch: webSearchSettings.webSearchMaxUrls,
           topK: 10, // Aumentado a 10 para mejor contexto (chunks de ~600 chars = ~6000 chars total)
           onProgress: (step, progress, message) => {
             setWebSearchProgress({ step, progress, message });
+          },
+          onToken: (token: string) => {
+            streamedContent += token;
+            // Update the streaming message
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === tempAssistantId
+                  ? { ...msg, content: streamedContent }
+                  : msg
+              )
+            );
           }
         });
 
-        // Create assistant message with web sources
+        // Update with final message including sources
         assistantMessage = {
-          id: generateUUID(),
+          id: tempAssistantId,
           role: 'assistant',
           content: webResult.answer,
           timestamp: Date.now(),
           model: 'webllm',
+          streaming: false,
           metadata: {
             webSources: webResult.cleanedContents.map(c => ({
               title: c.title,
@@ -298,6 +326,15 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
             totalTime: webResult.metadata.totalTime
           }
         } as any;
+
+        // Update the message with final content and sources
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempAssistantId
+              ? assistantMessage
+              : msg
+          )
+        );
 
       } else if (effectiveMode === 'local') {
         // ============================================================
@@ -392,7 +429,10 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
         };
       }
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // Only add message if it wasn't already added (web mode adds it during streaming)
+      if (effectiveMode !== 'web') {
+        setMessages(prev => [...prev, assistantMessage]);
+      }
       setCurrentResponse('');
       setWebSearchProgress(null);
 

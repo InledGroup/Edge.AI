@@ -67,10 +67,23 @@ export class WebRAGOrchestrator {
   constructor(
     private llmEngine: LLMEngine,
     private embeddingEngine: WllamaEngine,
-    webSearchService?: WebSearchService
+    webSearchService: WebSearchService
   ) {
-    this.webSearchService = webSearchService || new WebSearchService();
+    this.webSearchService = webSearchService;
     this.contentExtractor = new ContentExtractor();
+  }
+
+  /**
+   * Create and initialize a WebRAGOrchestrator with extension support
+   */
+  static async create(
+    llmEngine: LLMEngine,
+    embeddingEngine: WllamaEngine
+  ): Promise<WebRAGOrchestrator> {
+    const { initializeWebSearch } = await import('./index');
+    const webSearchService = await initializeWebSearch();
+    console.log('[WebRAG] ✅ Initialized with extension support');
+    return new WebRAGOrchestrator(llmEngine, embeddingEngine, webSearchService);
   }
 
   /**
@@ -139,40 +152,69 @@ export class WebRAGOrchestrator {
       );
       timestamps.urlSelection = Date.now() - selectionStart;
 
-      const selectedUrls = selectedIndices.map((i) => searchResults[i].url);
-      console.log(`[WebRAG] Selected ${selectedUrls.length} URLs to fetch`);
+      const selectedResults = selectedIndices.map((i) => searchResults[i]);
+      const selectedUrls = selectedResults.map((r) => r.url);
+      console.log(`[WebRAG] Selected ${selectedResults.length} URLs to fetch`);
 
       // ====================================================================
-      // PASO 4: Fetch controlado (worker)
+      // PASO 4: Obtener contenido (ya sea desde extensión o fetching)
       // ====================================================================
       onProgress?.(
         'page_fetch',
         40,
-        `Descargando ${selectedUrls.length} páginas...`
+        `Obteniendo contenido de ${selectedResults.length} páginas...`
       );
       const fetchStart = Date.now();
 
-      const fetchedPages = await this.fetchPages(selectedUrls);
-      timestamps.pageFetch = Date.now() - fetchStart;
-
-      console.log(`[WebRAG] Successfully fetched ${fetchedPages.length} pages`);
-
-      if (fetchedPages.length === 0) {
-        throw new Error('No se pudo descargar ninguna página');
-      }
-
-      // ====================================================================
-      // PASO 5: Limpieza de contenido
-      // ====================================================================
-      onProgress?.('content_extraction', 50, 'Extrayendo contenido limpio...');
-      const extractionStart = Date.now();
-
-      const cleanedContents = fetchedPages.map((page) =>
-        this.contentExtractor.extract(page.html, page.url, {
-          maxWords: 2000 // Aumentado a 2000 palabras (~8000 chars) para capturar más contexto
-        })
+      // Check if we have content from extension (fullContent in metadata)
+      const hasExtensionContent = selectedResults.some(
+        (r: any) => r.metadata?.fullContent
       );
-      timestamps.contentExtraction = Date.now() - extractionStart;
+
+      let cleanedContents: CleanedContent[];
+      let sourcesUsed = 0;
+
+      if (hasExtensionContent) {
+        // Use content already extracted by extension
+        console.log(`[WebRAG] Using content extracted by browser extension`);
+        cleanedContents = selectedResults
+          .filter((r: any) => r.metadata?.fullContent)
+          .map((r: any) => ({
+            text: r.metadata.fullContent,
+            title: r.title,
+            url: r.url,
+            extractedAt: r.fetchedAt || Date.now(),
+            wordCount: r.metadata.wordCount || 0,
+          }));
+        timestamps.pageFetch = Date.now() - fetchStart;
+        sourcesUsed = cleanedContents.length;
+        console.log(`[WebRAG] Using ${cleanedContents.length} pre-extracted pages from extension`);
+      } else {
+        // Fallback to traditional fetch + extraction
+        const fetchedPages = await this.fetchPages(selectedUrls);
+        timestamps.pageFetch = Date.now() - fetchStart;
+
+        console.log(`[WebRAG] Successfully fetched ${fetchedPages.length} pages`);
+
+        if (fetchedPages.length === 0) {
+          throw new Error('No se pudo descargar ninguna página');
+        }
+
+        sourcesUsed = fetchedPages.length;
+
+        // ====================================================================
+        // PASO 5: Limpieza de contenido
+        // ====================================================================
+        onProgress?.('content_extraction', 50, 'Extrayendo contenido limpio...');
+        const extractionStart = Date.now();
+
+        cleanedContents = fetchedPages.map((page) =>
+          this.contentExtractor.extract(page.html, page.url, {
+            maxWords: 2000 // Aumentado a 2000 palabras (~8000 chars) para capturar más contexto
+          })
+        );
+        timestamps.contentExtraction = Date.now() - extractionStart;
+      }
 
       console.log(
         `[WebRAG] Extracted content from ${cleanedContents.length} pages`
@@ -221,7 +263,7 @@ export class WebRAGOrchestrator {
       onProgress?.('answer_generation', 90, 'Generando respuesta...');
       const answerStart = Date.now();
 
-      const answer = await this.generateAnswer(userQuery, retrievedChunks);
+      const answer = await this.generateAnswer(userQuery, retrievedChunks, options.onToken);
       timestamps.answerGeneration = Date.now() - answerStart;
 
       console.log(`[WebRAG] Generated answer (${answer.length} characters)`);
@@ -248,7 +290,7 @@ export class WebRAGOrchestrator {
         answer,
         metadata: {
           totalTime,
-          sourcesUsed: fetchedPages.length,
+          sourcesUsed,
           timestamps: timestamps as any,
         },
       };
@@ -580,7 +622,8 @@ JSON:`;
 
   private async generateAnswer(
     query: string,
-    chunks: RetrievedWebChunk[]
+    chunks: RetrievedWebChunk[],
+    onToken?: (token: string) => void
   ): Promise<string> {
     // Formatear contexto RAG
     const context = chunks
@@ -617,6 +660,7 @@ RESPUESTA:`;
     const answer = await this.generateText(prompt, {
       temperature: 0.7,
       max_tokens: 1024, // Aumentado de 512 a 1024 para respuestas más completas
+      onToken, // Pass streaming callback
     });
 
     return answer.trim();
@@ -631,26 +675,49 @@ RESPUESTA:`;
    */
   private async generateText(
     prompt: string,
-    options: { temperature: number; max_tokens: number }
+    options: { temperature: number; max_tokens: number; onToken?: (token: string) => void }
   ): Promise<string> {
-    // WebLLM
+    // WebLLM with streaming support
     if ('generateText' in this.llmEngine) {
-      return await this.llmEngine.generateText(prompt, {
-        ...options,
-        stream: false,
-      });
+      if (options.onToken) {
+        // Stream mode - WebLLM uses 'onStream' parameter
+        return await this.llmEngine.generateText(prompt, {
+          temperature: options.temperature,
+          maxTokens: options.max_tokens,
+          onStream: options.onToken, // Map onToken to onStream for WebLLM
+        });
+      } else {
+        // Non-stream mode
+        return await this.llmEngine.generateText(prompt, {
+          temperature: options.temperature,
+          maxTokens: options.max_tokens,
+        });
+      }
     }
 
-    // Wllama (chat API)
+    // Wllama (chat API) - with streaming if callback provided
     if ('createChatCompletion' in this.llmEngine) {
-      const response = await this.llmEngine.createChatCompletion(
-        [{ role: 'user', content: prompt }],
-        {
-          temperature: options.temperature,
-          max_tokens: options.max_tokens,
-        }
-      );
-      return response;
+      if (options.onToken && 'createChatCompletionStream' in this.llmEngine) {
+        // Stream mode for Wllama
+        return await (this.llmEngine as any).createChatCompletionStream(
+          [{ role: 'user', content: prompt }],
+          {
+            temperature: options.temperature,
+            max_tokens: options.max_tokens,
+          },
+          options.onToken
+        );
+      } else {
+        // Non-stream mode
+        const response = await this.llmEngine.createChatCompletion(
+          [{ role: 'user', content: prompt }],
+          {
+            temperature: options.temperature,
+            max_tokens: options.max_tokens,
+          }
+        );
+        return response;
+      }
     }
 
     throw new Error('LLM engine does not support text generation');

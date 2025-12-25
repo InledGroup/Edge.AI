@@ -35,12 +35,13 @@ import { WebLLMEngine } from '@/lib/ai/webllm-engine';
 import { WllamaEngine } from '@/lib/ai/wllama-engine';
 import EngineManager from '@/lib/ai/engine-manager';
 import { modelsStore } from '@/lib/stores';
+import { ExtensionSetup } from './ExtensionSetup';
 
 interface FirstRunWizardProps {
   onComplete: () => void;
 }
 
-type WizardStep = 'welcome' | 'detecting' | 'model-selection' | 'loading' | 'complete';
+type WizardStep = 'welcome' | 'detecting' | 'model-selection' | 'loading' | 'extension-setup' | 'complete';
 
 interface LoadingProgress {
   chat: { progress: number; message: string } | null;
@@ -126,16 +127,8 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       saveDefaultChatModel(selectedChatModel.id);
       saveDefaultEmbeddingModel(selectedEmbeddingModel.id);
 
-      // Mark setup complete
-      markSetupCompleted();
-
-      // Move to complete
-      setStep('complete');
-
-      // Auto-close after 2 seconds
-      setTimeout(() => {
-        onComplete();
-      }, 2000);
+      // Move to extension setup
+      setStep('extension-setup');
     } catch (err) {
       console.error('Failed to load models:', err);
       setError(`Error al cargar modelos: ${err instanceof Error ? err.message : 'Error desconocido'}`);
@@ -481,6 +474,33 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
     );
   }
 
+  if (step === 'extension-setup') {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <Card className="max-w-2xl w-full">
+          <ExtensionSetup
+            onComplete={() => {
+              // Mark setup complete
+              markSetupCompleted();
+              // Move to complete step
+              setStep('complete');
+              // Auto-close after 2 seconds
+              setTimeout(() => onComplete(), 2000);
+            }}
+            onSkip={() => {
+              // Mark setup complete even if skipping extension
+              markSetupCompleted();
+              // Move to complete step
+              setStep('complete');
+              // Auto-close after 2 seconds
+              setTimeout(() => onComplete(), 2000);
+            }}
+          />
+        </Card>
+      </div>
+    );
+  }
+
   if (step === 'complete') {
     return (
       <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
@@ -492,7 +512,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
             <div>
               <h2 className="text-2xl font-bold mb-2">¡Todo listo!</h2>
               <p className="text-[var(--color-text-secondary)]">
-                Los modelos se han cargado correctamente
+                Edge.AI está configurado y listo para usar
               </p>
             </div>
           </div>

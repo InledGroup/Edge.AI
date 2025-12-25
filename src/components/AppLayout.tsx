@@ -7,6 +7,7 @@ import { DocumentViewer } from './DocumentViewer';
 import { DocumentUpload } from './DocumentUpload';
 import { FirstRunWizard } from './FirstRunWizard';
 import { ModelLoadingIndicator } from './ModelLoadingIndicator';
+import { ExtensionStatus } from './ExtensionStatus';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
 
@@ -101,6 +102,9 @@ export function AppLayout() {
 
       {/* Model Loading Indicator (bottom-right toast) */}
       <ModelLoadingIndicator />
+
+      {/* Extension Status Notification (top-right toast) */}
+      <ExtensionStatus />
     </>
   );
 }

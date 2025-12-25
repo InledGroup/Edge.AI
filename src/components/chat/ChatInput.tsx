@@ -123,6 +123,24 @@ export function ChatInput({
           <span className="text-lg"><FileSearchCorner size={20} /></span>
         </button>
 
+        {/* Web search button */}
+        <button
+          type="button"
+          onClick={() => setModeAndNotify('web')}
+          disabled={disabled || loading}
+          className={cn(
+            'flex-shrink-0 p-2 rounded-lg transition-all duration-200',
+            'hover:bg-[var(--color-bg-hover)] active:scale-95',
+            mode === 'web'
+              ? 'text-blue-600 dark:text-blue-400 bg-blue-500/10'
+              : 'text-[var(--color-text-secondary)]',
+            (disabled || loading) && 'opacity-50 cursor-not-allowed'
+          )}
+          title="Búsqueda web"
+        >
+          <Globe size={20} />
+        </button>
+
         <textarea
           ref={textareaRef}
           value={message}
