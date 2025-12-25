@@ -15,6 +15,22 @@ export interface WebSource {
   score?: number; // Relevance score 0-1
 }
 
+/**
+ * Remove aiproxy.inled.es from URLs for display
+ */
+function cleanProxyUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname === 'aiproxy.inled.es') {
+      const targetUrl = urlObj.searchParams.get('url');
+      return targetUrl ? decodeURIComponent(targetUrl) : url;
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 export interface WebSourcesProps {
   sources: WebSource[];
   className?: string;
@@ -35,33 +51,35 @@ export function WebSources({ sources, className }: WebSourcesProps) {
 
       {/* Sources list */}
       <div className="space-y-1.5">
-        {sources.map((source, index) => (
-          <a
-            key={index}
-            href={source.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              'group flex items-start gap-2 p-2.5 rounded-lg',
-              'bg-[var(--color-bg-secondary)] hover:bg-[var(--color-bg-hover)]',
-              'border border-[var(--color-border)]',
-              'transition-all duration-200',
-              'hover:scale-[1.02] active:scale-100'
-            )}
-          >
-            {/* Index */}
-            <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center text-xs font-medium text-blue-600 dark:text-blue-400">
-              {index + 1}
-            </div>
+        {sources.map((source, index) => {
+          const cleanUrl = cleanProxyUrl(source.url);
+          return (
+            <a
+              key={index}
+              href={cleanUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                'group flex items-start gap-2 p-2.5 rounded-lg',
+                'bg-[var(--color-bg-secondary)] hover:bg-[var(--color-bg-hover)]',
+                'border border-[var(--color-border)]',
+                'transition-all duration-200',
+                'hover:scale-[1.02] active:scale-100'
+              )}
+            >
+              {/* Index */}
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center text-xs font-medium text-blue-600 dark:text-blue-400">
+                {index + 1}
+              </div>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-[var(--color-text)] line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                {source.title}
-              </div>
-              <div className="mt-0.5 text-xs text-[var(--color-text-secondary)] truncate">
-                {new URL(source.url).hostname}
-              </div>
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-[var(--color-text)] line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  {source.title}
+                </div>
+                <div className="mt-0.5 text-xs text-[var(--color-text-secondary)] truncate">
+                  {new URL(cleanUrl).hostname}
+                </div>
               {source.wordCount && (
                 <div className="mt-1 text-xs text-[var(--color-text-tertiary)]">
                   {source.wordCount.toLocaleString()} palabras
@@ -74,14 +92,15 @@ export function WebSources({ sources, className }: WebSourcesProps) {
               <ExternalLink size={14} />
             </div>
 
-            {/* Relevance indicator (if score available) */}
-            {source.score !== undefined && (
-              <div className="absolute top-2 right-2 text-xs font-mono text-[var(--color-text-tertiary)]">
-                {(source.score * 100).toFixed(0)}%
-              </div>
-            )}
-          </a>
-        ))}
+              {/* Relevance indicator (if score available) */}
+              {source.score !== undefined && (
+                <div className="absolute top-2 right-2 text-xs font-mono text-[var(--color-text-tertiary)]">
+                  {(source.score * 100).toFixed(0)}%
+                </div>
+              )}
+            </a>
+          );
+        })}
       </div>
 
       {/* Footer - transparency message */}

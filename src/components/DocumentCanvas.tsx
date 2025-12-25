@@ -129,7 +129,7 @@ export function DocumentCanvas({ initialContent = '', onClose, onContentChange }
 
   /**
    * Export as Word (DOCX)
-   * Uses html-docx-js from CDN
+   * Uses html-docx-js from CDN with multiple fallbacks
    */
   async function exportAsWord() {
     if (!isClient || !quillRef.current) return;
@@ -158,17 +158,49 @@ export function DocumentCanvas({ initialContent = '', onClose, onContentChange }
 
       // Load html-docx-js from CDN if not already loaded
       if (!(window as any).htmlDocx) {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-docx-js/0.3.1/html-docx.min.js';
+        // Try multiple CDN sources
+        const cdnUrls = [
+          'https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js',
+          'https://unpkg.com/html-docx-js@0.3.1/dist/html-docx.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/html-docx-js/0.3.1/html-docx.min.js'
+        ];
 
-        await new Promise<void>((resolve, reject) => {
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error('Failed to load html-docx-js'));
-          document.head.appendChild(script);
-        });
+        let loaded = false;
+        let lastError: Error | null = null;
+
+        for (const cdnUrl of cdnUrls) {
+          try {
+            const script = document.createElement('script');
+            script.src = cdnUrl;
+
+            await new Promise<void>((resolve, reject) => {
+              script.onload = () => resolve();
+              script.onerror = () => reject(new Error(`Failed to load from ${cdnUrl}`));
+              document.head.appendChild(script);
+            });
+
+            // Verify the library loaded correctly
+            if ((window as any).htmlDocx) {
+              loaded = true;
+              console.log(`Successfully loaded html-docx-js from ${cdnUrl}`);
+              break;
+            }
+          } catch (error) {
+            lastError = error as Error;
+            console.warn(`Failed to load from ${cdnUrl}:`, error);
+          }
+        }
+
+        if (!loaded) {
+          throw new Error(`No se pudo cargar html-docx-js desde ningún CDN. Último error: ${lastError?.message}`);
+        }
       }
 
       const htmlDocx = (window as any).htmlDocx;
+      if (!htmlDocx || typeof htmlDocx.asBlob !== 'function') {
+        throw new Error('html-docx-js se cargó pero no está funcionando correctamente');
+      }
+
       const converted = htmlDocx.asBlob(fullHtml);
 
       // Manual download

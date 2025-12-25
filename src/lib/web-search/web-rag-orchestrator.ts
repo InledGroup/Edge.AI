@@ -30,6 +30,22 @@ import { semanticChunkText } from '../rag/semantic-chunking';
 import { getWorkerPool } from '../workers';
 
 /**
+ * Remove aiproxy.inled.es from URLs for display
+ */
+function cleanProxyUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname === 'aiproxy.inled.es') {
+      const targetUrl = urlObj.searchParams.get('url');
+      return targetUrl ? decodeURIComponent(targetUrl) : url;
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Motor de LLM (puede ser WebLLM o Wllama)
  */
 type LLMEngine = WebLLMEngine | WllamaEngine;
@@ -494,8 +510,9 @@ JSON:`;
     const context = chunks
       .map((chunk, i) => {
         const score = (chunk.score * 100).toFixed(1);
+        const cleanUrl = cleanProxyUrl(chunk.document.url);
         return `[Fuente ${i + 1}: ${chunk.document.title} (${score}% relevancia)]
-URL: ${chunk.document.url}
+URL: ${cleanUrl}
 
 ${chunk.content}`;
       })
