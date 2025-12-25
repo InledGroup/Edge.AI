@@ -105,44 +105,6 @@ export function ChatInput({
           <MessageCircle size={20} />
         </button>
 
-        {/* Smart mode button */}
-        <button
-          type="button"
-          onClick={() => setModeAndNotify('smart')}
-          disabled={disabled || loading}
-          className={cn(
-            'flex-shrink-0 p-2 rounded-lg transition-all duration-200',
-            'hover:bg-[var(--color-bg-hover)] active:scale-95',
-            mode === 'smart'
-              ? 'text-purple-600 dark:text-purple-400 bg-purple-500/10'
-              : 'text-[var(--color-text-secondary)]',
-            (disabled || loading) && 'opacity-50 cursor-not-allowed'
-          )}
-          title="Modo inteligente"
-        >
-          <Sparkles size={20} />
-        </button>
-
-        {/* Web search button (if enabled) */}
-        {webSearchEnabled && (
-          <button
-            type="button"
-            onClick={() => setModeAndNotify('web')}
-            disabled={disabled || loading}
-            className={cn(
-              'flex-shrink-0 p-2 rounded-lg transition-all duration-200',
-              'hover:bg-[var(--color-bg-hover)] active:scale-95',
-              mode === 'web'
-                ? 'text-blue-600 dark:text-blue-400 bg-blue-500/10'
-                : 'text-[var(--color-text-secondary)]',
-              (disabled || loading) && 'opacity-50 cursor-not-allowed'
-            )}
-            title="Búsqueda web"
-          >
-            <Globe size={20} />
-          </button>
-        )}
-
         {/* Local RAG button */}
         <button
           type="button"
