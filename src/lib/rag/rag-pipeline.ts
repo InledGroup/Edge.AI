@@ -234,41 +234,31 @@ function buildRAGPrompt(query: string, context: string, conversationHistory?: Ar
     historyText += '\n';
   }
 
-  // Enhanced prompt with chain-of-thought
-  return `Eres un asistente experto que analiza documentos y responde preguntas con razonamiento estructurado.
+  // Enhanced prompt - instruye al modelo internamente pero no le pide mostrar pasos
+  return `Eres un asistente experto que analiza documentos y responde preguntas de manera precisa y útil.
 
 ## CONTEXTO DE DOCUMENTOS:
 ${context}${historyText}
 ## PREGUNTA DEL USUARIO:
 ${query}
 
-## INSTRUCCIONES - Sigue este proceso paso a paso:
+## INSTRUCCIONES:
 
-### PASO 1: ANÁLISIS
-Analiza qué dice cada documento relevante sobre la pregunta. Identifica:
-- ¿Qué documentos contienen información directamente relevante?
-- ¿Qué puntos clave menciona cada uno?
-- ¿Hay información complementaria o contradictoria?
+Analiza el contexto proporcionado y responde la pregunta siguiendo este proceso mental:
+1. Identifica qué documentos contienen información relevante
+2. Sintetiza la información de múltiples fuentes cuando sea apropiado
+3. Proporciona una respuesta clara y directa
 
-### PASO 2: SÍNTESIS
-Combina la información de forma coherente:
-- Conecta ideas de múltiples fuentes cuando sea apropiado
-- Resuelve contradicciones priorizando fuentes más específicas o recientes
-- Haz inferencias razonables basadas en el contexto
+Tu respuesta debe:
+- Basarse PRINCIPALMENTE en el contexto proporcionado
+- Citar las fuentes usando formato [Doc N] cuando menciones información específica
+- Ser clara, completa pero concisa
+- Si usas conocimiento general además del contexto, indica claramente qué proviene de cada fuente
+- Solo si el contexto no tiene NINGUNA relación con la pregunta, indica que los documentos no contienen esa información
 
-### PASO 3: RESPUESTA FINAL
-Proporciona una respuesta clara y bien estructurada que:
-- Se base PRINCIPALMENTE en el contexto proporcionado
-- Cite las fuentes usando formato [Doc N]
-- Sea completa pero concisa
-- Indique claramente si alguna parte requiere conocimiento general
-- Solo si el contexto no tiene relación, mencione que los documentos no contienen esa información
+IMPORTANTE: Proporciona solo la respuesta final. NO muestres tu proceso de análisis ni pasos intermedios.
 
-No muestres estos pasos en tu respuesta final, solo responde.
-
-## TU RESPUESTA:
-
-[Escribe aquí tu análisis y respuesta siguiendo los 3 pasos]`;
+Respuesta:`;
 }
 
 /**
