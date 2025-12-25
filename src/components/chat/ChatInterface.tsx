@@ -275,7 +275,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
         const webResult = await orchestrator.search(content, {
           sources: webSearchSettings.webSearchSources,
           maxUrlsToFetch: webSearchSettings.webSearchMaxUrls,
-          topK: 3, // Reducido para evitar exceder el contexto de 4096 tokens
+          topK: 10, // Aumentado a 10 para mejor contexto (chunks de ~600 chars = ~6000 chars total)
           onProgress: (step, progress, message) => {
             setWebSearchProgress({ step, progress, message });
           }
@@ -493,7 +493,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
                 </div>
                 <h3 className="text-2xl font-semibold">Hola, ¿en qué puedo ayudarte?</h3>
                 <p className="text-sm text-[var(--color-text-secondary)]">
-                 Comencemos una sesión de conversación mútua
+                 Todo lo que hablemos, subas o busque no sale de tu ordenador.
                 </p>
 
                 {!canChat && (

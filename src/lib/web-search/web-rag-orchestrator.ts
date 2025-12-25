@@ -157,7 +157,7 @@ export class WebRAGOrchestrator {
 
       const cleanedContents = fetchedPages.map((page) =>
         this.contentExtractor.extract(page.html, page.url, {
-          maxWords: 500 // Limitar a 500 palabras por página (~2000 chars)
+          maxWords: 2000 // Aumentado a 2000 palabras (~8000 chars) para capturar más contexto
         })
       );
       timestamps.contentExtraction = Date.now() - extractionStart;
@@ -373,17 +373,27 @@ JSON:`;
 
       // Chunking semántico con chunks MÁS PEQUEÑOS para web
       // (el contenido web suele ser más denso que PDFs)
-      const chunks = await semanticChunkText(content.text, {
-        maxChunkSize: 400, // Reducido de 800 a 400 caracteres
-        overlapSize: 50,   // Reducido de 100 a 50
-      });
+      // semanticChunkText(text, targetSize, minSize)
+      const chunks = semanticChunkText(
+        content.text,
+        600,  // targetSize: chunks de ~600 chars (balance entre contexto y precisión)
+        300   // minSize: mínimo 300 chars para mantener contexto
+      );
+
+      // Log chunking results
+      console.log(`📝 [WebRAG] Document ${i + 1}: Created ${chunks.length} chunks from "${content.title}"`);
+      const chunkSizes = chunks.map(c => c.content.length);
+      const avgSize = chunkSizes.reduce((a, b) => a + b, 0) / chunkSizes.length;
+      console.log(`📊 [WebRAG] Chunk stats: avg=${Math.round(avgSize)}, count=${chunks.length}`);
 
       // Generar embeddings
       const texts = chunks.map((c) => c.content);
+      console.log(`🧮 [WebRAG] Generating ${texts.length} embeddings...`);
       const embeddings = await this.embeddingEngine.generateEmbeddingsBatch(
         texts,
         4 // maxConcurrent
       );
+      console.log(`✅ [WebRAG] Generated ${embeddings.length} embeddings`);
 
       // Crear chunks con embeddings
       const webChunks: WebDocumentChunk[] = chunks.map((chunk, j) => ({
@@ -519,25 +529,28 @@ ${chunk.content}`;
       .join('\n\n---\n\n');
 
     // Prompt para respuesta final
-    const prompt = `Eres un asistente útil que responde preguntas usando información obtenida de la web.
+    const prompt = `Eres un asistente experto que sintetiza información de múltiples fuentes web para proporcionar respuestas completas y precisas.
 
 CONTEXTO DE FUENTES WEB:
 ${context}
 
 PREGUNTA DEL USUARIO: ${query}
 
-Instrucciones:
-- Responde SOLO usando la información del contexto proporcionado
-- Si el contexto no contiene información suficiente, indícalo claramente
-- Cita las fuentes mencionando el título o número de fuente
-- Sé conciso y preciso
-- NO inventes información que no esté en el contexto
+INSTRUCCIONES:
+- Analiza y sintetiza la información de TODAS las fuentes proporcionadas
+- Combina información complementaria de diferentes fuentes cuando sea relevante
+- Cita las fuentes usando su número (ej: "Según la Fuente 1...")
+- Prioriza información de fuentes con mayor relevancia (%)
+- Si encuentras información contradictoria entre fuentes, menciónalo
+- Haz inferencias razonables basándote en la información disponible
+- Proporciona una respuesta completa y bien estructurada
+- Solo indica falta de información si NINGUNA fuente contiene datos relacionados
 
 RESPUESTA:`;
 
     const answer = await this.generateText(prompt, {
       temperature: 0.7,
-      max_tokens: 512,
+      max_tokens: 1024, // Aumentado de 512 a 1024 para respuestas más completas
     });
 
     return answer.trim();

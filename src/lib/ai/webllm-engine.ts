@@ -78,23 +78,48 @@ export class WebLLMEngine {
       // Create MLCEngine instance - requires WebGPU
       this.engine = new webllm.MLCEngine();
 
-      onProgress?.(20, `Cargando modelo ${modelName}...`);
+      onProgress?.(20, `Verificando caché del modelo...`);
 
       // Load the model with optimized configuration
-      console.log(`📥 Downloading WebLLM model: ${modelName}`);
+      // WebLLM automatically uses IndexedDB cache for models
+      console.log(`💾 [WebLLM] Checking IndexedDB cache for model: ${modelName}`);
+      const loadStartTime = Date.now();
+      let firstProgressTime = 0;
+
       await this.engine.reload(modelName, {
         context_window_size: webgpuConfig.max_window_size,
         // @ts-ignore - advanced options
         max_batch_size: webgpuConfig.max_batch_size,
         // @ts-ignore - initProgressCallback exists but might not be in types
         initProgressCallback: (report: webllm.InitProgressReport) => {
+          if (firstProgressTime === 0) {
+            firstProgressTime = Date.now();
+          }
+
           const progress = Math.round(report.progress * 70) + 20; // 20-90%
-          const status = report.text || 'Cargando...';
+          let status = report.text || 'Cargando...';
+
+          // Detect cache usage based on progress speed
+          const elapsed = Date.now() - loadStartTime;
+          const isLikelyFromCache = elapsed < 3000 && report.progress > 0.1;
+
+          if (isLikelyFromCache && !status.includes('caché')) {
+            status += ' (desde caché IndexedDB ⚡)';
+          } else if (!isLikelyFromCache && report.text?.includes('download')) {
+            status += ' (descargando...)';
+          }
+
           onProgress?.(progress, status);
-          console.log(`[WebLLM] ${Math.round(report.progress * 100)}% - ${status}`);
+          console.log(`[WebLLM] ${Math.round(report.progress * 100)}% - ${report.text}`);
         },
       });
 
+      const loadTime = Date.now() - loadStartTime;
+      if (loadTime < 10000) {
+        console.log(`⚡ [WebLLM] Model loaded in ${Math.round(loadTime / 1000)}s - likely from IndexedDB cache!`);
+      } else {
+        console.log(`📥 [WebLLM] Model downloaded and cached in ${Math.round(loadTime / 1000)}s`);
+      }
       console.log('✅ WebLLM model loaded successfully');
 
       // WARM-UP: Generate 1 token to initialize GPU pipeline

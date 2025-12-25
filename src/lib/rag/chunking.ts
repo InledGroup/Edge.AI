@@ -16,11 +16,25 @@ export async function chunkAndStoreDocument(
   overlap: number = 50
 ): Promise<Chunk[]> {
   console.log(`📄 Chunking document ${documentId}...`);
+  console.log(`📏 Document length: ${text.length} characters`);
+  console.log(`🎯 Target chunk size: ${chunkSize} characters`);
 
   // Use semantic chunking
   const semanticChunks = semanticChunkText(text, chunkSize);
 
   console.log(`✂️ Created ${semanticChunks.length} semantic chunks`);
+
+  // Log chunk statistics
+  const chunkSizes = semanticChunks.map(c => c.content.length);
+  const avgSize = chunkSizes.reduce((a, b) => a + b, 0) / chunkSizes.length;
+  const minSize = Math.min(...chunkSizes);
+  const maxSize = Math.max(...chunkSizes);
+  console.log(`📊 Chunk stats: avg=${Math.round(avgSize)}, min=${minSize}, max=${maxSize} chars`);
+
+  // Log context availability
+  const chunksWithPrevContext = semanticChunks.filter(c => c.metadata.prevContext).length;
+  const chunksWithNextContext = semanticChunks.filter(c => c.metadata.nextContext).length;
+  console.log(`🔗 Context: ${chunksWithPrevContext} have prev, ${chunksWithNextContext} have next`);
 
   // Convert to DB format
   const dbChunks = semanticChunks.map((sc, index) => ({

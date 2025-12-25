@@ -189,13 +189,19 @@ function buildRAGPrompt(query: string, context: string, conversationHistory?: Ar
     historyText += '\n';
   }
 
-  return `Eres un asistente útil que responde preguntas basándote en el contexto proporcionado. Mantén coherencia con las conversaciones anteriores.
+  return `Eres un asistente experto que analiza documentos y responde preguntas de manera precisa y útil.
 
 CONTEXTO DE DOCUMENTOS:
 ${context}${historyText}
 PREGUNTA ACTUAL: ${query}
 
-Responde la pregunta usando la información del contexto. Si necesitas referirte a algo mencionado antes, usa el historial de conversación. Si el contexto no contiene información suficiente, di "No tengo suficiente información en los documentos para responder esta pregunta."
+INSTRUCCIONES:
+- Usa PRINCIPALMENTE la información del contexto proporcionado
+- Combina información de múltiples fragmentos cuando sea relevante
+- Haz inferencias razonables basándote en el contexto disponible
+- Si mencionas información del contexto, cita el documento fuente (ej: "Según el Documento 1...")
+- Si el contexto no contiene información directa pero puedes responder usando conocimiento general relacionado con el tema de los documentos, hazlo indicando claramente qué proviene del contexto y qué es conocimiento general
+- Solo si el contexto no tiene NINGUNA relación con la pregunta, indica que los documentos no contienen esa información específica
 
 RESPUESTA:`;
 }

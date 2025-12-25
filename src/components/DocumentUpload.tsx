@@ -5,7 +5,7 @@ import { FileText, Trash2, UploadCloud } from 'lucide-preact';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { ProgressBar } from './ui/ProgressBar';
-import { documentsStore, processingStore, modelsReady } from '@/lib/stores';
+import { documentsStore, processingStore, modelsReady, modelsStore } from '@/lib/stores';
 import { parseDocument, validateFile } from '@/lib/parsers';
 import { createDocument } from '@/lib/db/documents';
 import { processDocument } from '@/lib/rag/rag-pipeline';
@@ -39,9 +39,23 @@ export function DocumentUpload() {
   async function handleFileSelect(e: Event) {
     const target = e.target as HTMLInputElement;
     const files = Array.from(target.files || []);
+
+    console.log('📁 Files selected:', files.length);
+
     if (files.length > 0) {
+      // Check if models are ready before processing
+      if (!modelsReady.value) {
+        alert('⏳ Los modelos aún se están cargando. Por favor espera un momento e inténtalo de nuevo.');
+        // Reset input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+
       await processFiles(files);
     }
+
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -179,12 +193,17 @@ export function DocumentUpload() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`
-          border-2 border-dashed rounded-lg p-6 text-center transition-colors
+          border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
           ${isDragging
             ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
             : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'
           }
         `}
+        onClick={() => {
+          // Always allow clicking to open file selector
+          console.log('📂 Zone clicked, opening file selector');
+          fileInputRef.current?.click();
+        }}
       >
         <input
           ref={fileInputRef}
@@ -193,29 +212,48 @@ export function DocumentUpload() {
           multiple
           onChange={handleFileSelect}
           className="hidden"
+          id="file-upload-input"
         />
 
-        <div className="space-y-2">
+        <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
           <div className="text-[var(--color-primary)] flex justify-center">
             <UploadCloud size={48} strokeWidth={1.5} />
           </div>
           <p className="text-sm font-medium">
-            Arrastra archivos aquí o
+            Arrastra archivos aquí o haz click para seleccionar
           </p>
           <Button
             variant="default"
             size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={!modelsReady.value}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent double trigger
+              console.log('🔘 Button clicked, opening file selector');
+              fileInputRef.current?.click();
+            }}
           >
-            {modelsReady.value ? 'Seleccionar archivos' : 'Esperando modelos...'}
+            Seleccionar archivos
           </Button>
           <p className="text-xs text-[var(--color-text-tertiary)]">
-            {modelsReady.value
-              ? 'PDF, TXT, MD (máx. 50MB)'
-              : '⏳ Los modelos deben cargarse primero'
-            }
+            PDF, TXT, MD (máx. 50MB)
           </p>
+
+          {/* Show loading status */}
+          {!modelsReady.value && (
+            <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-600">
+              ⏳ Los modelos se están cargando. Puedes seleccionar archivos pero espera a que terminen.
+              <div className="mt-1">
+                Chat: {modelsStore.chat ? '✓' : '⏳'}
+                {' · '}
+                Embedding: {modelsStore.embedding ? '✓' : '⏳'}
+              </div>
+            </div>
+          )}
+
+          {modelsReady.value && (
+            <div className="mt-2 text-xs text-green-600">
+              ✓ Modelos listos
+            </div>
+          )}
         </div>
       </div>
 

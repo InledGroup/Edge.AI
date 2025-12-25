@@ -97,6 +97,9 @@ export class ContentExtractor {
     url: string,
     options: ContentExtractionOptions = {}
   ): CleanedContent {
+    console.log(`🌐 [ContentExtractor] Extracting content from: ${url}`);
+    console.log(`📄 [ContentExtractor] HTML size: ${html.length} characters`);
+
     // Crear DOM temporal (scripts NO se ejecutan)
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -110,6 +113,7 @@ export class ContentExtractor {
 
     // Extraer título
     const title = this.extractTitle(doc);
+    console.log(`📌 [ContentExtractor] Title: ${title}`);
 
     // Extraer metadata
     const metadata = this.extractMetadata(doc);
@@ -119,6 +123,8 @@ export class ContentExtractor {
 
     // Contar palabras
     const wordCount = this.countWords(text);
+    console.log(`📊 [ContentExtractor] Extracted ${wordCount} words (${text.length} chars)`);
+    console.log(`✂️ [ContentExtractor] First 200 chars: ${text.substring(0, 200)}...`);
 
     return {
       text,
@@ -304,27 +310,55 @@ export class ContentExtractor {
     const text = element.textContent?.trim() || '';
     const wordCount = this.countWords(text);
 
-    // Al menos 50 palabras para considerar significativo
-    return wordCount >= 50;
+    // Al menos 100 palabras para considerar significativo
+    // (aumentado de 50 para filtrar mejor sidebars y headers)
+    return wordCount >= 100;
   }
 
   /**
    * Encuentra el elemento con más contenido de texto
    */
   private findElementWithMostText(root: Element): Element | null {
-    let maxWords = 0;
+    let maxScore = 0;
     let bestElement: Element | null = null;
 
     // Buscar en elementos potencialmente relevantes
     const candidates = root.querySelectorAll('div, section, article, main');
 
     candidates.forEach((element) => {
-      // Calcular texto solo del elemento (sin hijos profundos que puedan incluir sidebar, etc.)
+      // Calcular score basado en múltiples factores
       const text = this.getDirectText(element);
       const wordCount = this.countWords(text);
 
-      if (wordCount > maxWords) {
-        maxWords = wordCount;
+      // Factores de calificación
+      let score = wordCount;
+
+      // Bonus por elementos semánticos importantes
+      const tagName = element.tagName.toLowerCase();
+      if (tagName === 'article') score *= 1.5;
+      if (tagName === 'main') score *= 1.4;
+
+      // Bonus por clases de contenido
+      const className = element.className.toLowerCase();
+      if (className.includes('content') || className.includes('article') || className.includes('post')) {
+        score *= 1.3;
+      }
+
+      // Penalizar elementos que parecen sidebars o complementarios
+      if (className.includes('sidebar') || className.includes('aside') || className.includes('widget')) {
+        score *= 0.3;
+      }
+
+      // Penalizar elementos muy estrechos (probablemente sidebars)
+      if (element instanceof HTMLElement) {
+        const width = element.offsetWidth;
+        if (width > 0 && width < 300) {
+          score *= 0.5;
+        }
+      }
+
+      if (score > maxScore) {
+        maxScore = score;
         bestElement = element;
       }
     });

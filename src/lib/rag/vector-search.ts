@@ -5,6 +5,7 @@ import { getAllEmbeddings } from '@/lib/db/embeddings';
 import { getChunk } from '@/lib/db/chunks';
 import { getDocument } from '@/lib/db/documents';
 import type { RetrievedChunk, Embedding } from '@/types';
+import { formatChunkWithContext } from './semantic-chunking';
 
 /**
  * Calculate cosine similarity between two vectors
@@ -91,6 +92,7 @@ export async function searchSimilarChunks(
 
 /**
  * Create context from retrieved chunks for RAG
+ * Now includes previous/next context for better coherence
  */
 export function createRAGContext(chunks: RetrievedChunk[]): string {
   if (chunks.length === 0) {
@@ -101,10 +103,28 @@ export function createRAGContext(chunks: RetrievedChunk[]): string {
     const docName = rc.document.name;
     const score = (rc.score * 100).toFixed(1);
 
-    return `[Documento ${index + 1}: ${docName} (${score}% relevancia)]\n${rc.chunk.content}`;
+    // Build enhanced chunk content with context
+    let chunkContent = rc.chunk.content;
+
+    // Add previous context if available
+    if (rc.chunk.metadata?.prevContext) {
+      chunkContent = `[Contexto anterior]: ${rc.chunk.metadata.prevContext}\n\n${chunkContent}`;
+      console.log(`🔗 [RAG] Added prev context to chunk ${index + 1}`);
+    }
+
+    // Add next context if available
+    if (rc.chunk.metadata?.nextContext) {
+      chunkContent = `${chunkContent}\n\n[Continúa]: ${rc.chunk.metadata.nextContext}`;
+      console.log(`🔗 [RAG] Added next context to chunk ${index + 1}`);
+    }
+
+    return `[Documento ${index + 1}: ${docName} (${score}% relevancia)]\n${chunkContent}`;
   });
 
-  return contextParts.join('\n\n---\n\n');
+  const context = contextParts.join('\n\n---\n\n');
+  console.log(`📚 [RAG] Created context with ${chunks.length} chunks, total length: ${context.length} chars`);
+
+  return context;
 }
 
 /**

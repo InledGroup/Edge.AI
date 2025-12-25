@@ -23,14 +23,15 @@ import {
   generateTitle
 } from '@/lib/db/conversations';
 import type { Conversation } from '@/types';
+import { ModelConfigMenu } from './ModelConfigMenu';
 
 interface SidebarProps {
   onDocumentClick?: (documentId: string) => void;
-  onShowModelSelector?: () => void;
   onShowDocumentUpload?: () => void;
+  onShowModelWizard?: () => void;
 }
 
-export function Sidebar({ onDocumentClick, onShowModelSelector, onShowDocumentUpload }: SidebarProps) {
+export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWizard }: SidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [showDocuments, setShowDocuments] = useState(false);
@@ -254,13 +255,15 @@ export function Sidebar({ onDocumentClick, onShowModelSelector, onShowDocumentUp
             <Upload size={16} />
             <span>Subir documentos</span>
           </button>
-          <button
-            onClick={onShowModelSelector}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
-          >
-            <Brain size={16} />
-            <span>Configurar modelos</span>
-          </button>
+
+          {/* Model Config Menu inline */}
+          <div className="w-full">
+            <ModelConfigMenu
+              onOpenWizard={() => {
+                onShowModelWizard?.();
+              }}
+            />
+          </div>
         </div>
       </aside>
     </>

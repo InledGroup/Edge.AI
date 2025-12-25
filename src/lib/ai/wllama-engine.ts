@@ -72,23 +72,47 @@ export class WllamaEngine {
 
       this.wllama = new Wllama(config);
 
-      onProgress?.(10, 'Descargando modelo (se guardará en caché)...');
+      onProgress?.(10, 'Verificando caché...');
 
       // Use Wllama's built-in cache manager (OPFS)
       // This will cache the model locally and avoid re-downloading
+      console.log('💾 [Wllama] Checking OPFS cache for model...');
+      const loadStartTime = Date.now();
+      let isLoadingFromCache = false;
+      let lastLoaded = 0;
+
       await this.wllama.loadModelFromUrl(this.modelUrl, {
         n_ctx: 2048,
         embeddings: true, // Enable embeddings support
         n_threads: optimalThreads, // Use optimal thread count
         progressCallback: ({ loaded, total }) => {
           if (total > 0) {
+            // Detect if loading from cache (instant progress jumps)
+            if (loaded > lastLoaded + 50 * 1024 * 1024 && Date.now() - loadStartTime < 1000) {
+              isLoadingFromCache = true;
+            }
+            lastLoaded = loaded;
+
             const percent = Math.round((loaded / total) * 70);
             const loadedMB = Math.round(loaded / 1024 / 1024);
             const totalMB = Math.round(total / 1024 / 1024);
-            onProgress?.(10 + percent, `Descargando: ${loadedMB}MB / ${totalMB}MB`);
+
+            const cacheStatus = isLoadingFromCache ? ' (desde caché OPFS ⚡)' : ' (descargando...)';
+            onProgress?.(10 + percent, `${loadedMB}MB / ${totalMB}MB${cacheStatus}`);
+
+            if (loaded === total && isLoadingFromCache) {
+              console.log('✅ [Wllama] Model loaded from OPFS cache (no download needed!)');
+            }
           }
         },
       });
+
+      const loadTime = Date.now() - loadStartTime;
+      if (loadTime < 5000) {
+        console.log(`⚡ [Wllama] Model loaded in ${loadTime}ms - likely from cache!`);
+      } else {
+        console.log(`📥 [Wllama] Model downloaded and cached in ${Math.round(loadTime / 1000)}s`);
+      }
 
       onProgress?.(95, 'Modelo procesado...');
 
