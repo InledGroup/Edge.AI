@@ -264,6 +264,8 @@ Proporciona una respuesta clara y bien estructurada que:
 - Indique claramente si alguna parte requiere conocimiento general
 - Solo si el contexto no tiene relación, mencione que los documentos no contienen esa información
 
+No muestres estos pasos en tu respuesta final, solo responde.
+
 ## TU RESPUESTA:
 
 [Escribe aquí tu análisis y respuesta siguiendo los 3 pasos]`;
