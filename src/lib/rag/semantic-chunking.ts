@@ -2,11 +2,31 @@
 // Chunks text by semantic structure (paragraphs, sections) instead of fixed character count
 
 export interface ChunkMetadata {
-  type: 'paragraph' | 'list' | 'heading' | 'mixed';
+  type: 'paragraph' | 'list' | 'heading' | 'mixed' | 'code';
   index: number;
   totalChunks: number;
   prevContext?: string; // Last sentence of previous chunk
   nextContext?: string; // First sentence of next chunk
+}
+
+/**
+ * Document type for adaptive chunking
+ */
+export type DocumentType =
+  | 'code'           // Source code, needs larger chunks
+  | 'technical'      // Technical documentation
+  | 'article'        // Articles, blog posts
+  | 'general'        // General text
+  | 'web'            // Web content
+  | 'auto';          // Auto-detect
+
+/**
+ * Chunk size configuration based on document type
+ */
+export interface ChunkSizeConfig {
+  targetSize: number;
+  minSize: number;
+  overlapRatio: number; // 0-1
 }
 
 export interface SemanticChunk {
@@ -15,14 +35,110 @@ export interface SemanticChunk {
 }
 
 /**
+ * Get optimal chunk size configuration based on document type
+ */
+export function getOptimalChunkSize(
+  documentType: DocumentType,
+  text: string
+): ChunkSizeConfig {
+  // Auto-detect document type if needed
+  if (documentType === 'auto') {
+    documentType = detectDocumentType(text);
+    console.log(`📋 [Chunking] Auto-detected document type: ${documentType}`);
+  }
+
+  switch (documentType) {
+    case 'code':
+      // Code needs larger chunks to preserve context (functions, classes)
+      return { targetSize: 1200, minSize: 600, overlapRatio: 0.20 };
+
+    case 'technical':
+      // Technical docs need substantial context
+      return { targetSize: 1000, minSize: 500, overlapRatio: 0.15 };
+
+    case 'article':
+      // Articles: balanced approach
+      return { targetSize: 800, minSize: 400, overlapRatio: 0.10 };
+
+    case 'web':
+      // Web content: smaller chunks (denser info)
+      return { targetSize: 600, minSize: 300, overlapRatio: 0.10 };
+
+    case 'general':
+    default:
+      // Default: moderate size
+      return { targetSize: 800, minSize: 400, overlapRatio: 0.10 };
+  }
+}
+
+/**
+ * Auto-detect document type from content
+ */
+export function detectDocumentType(text: string): DocumentType {
+  const sample = text.substring(0, 2000).toLowerCase();
+
+  // Check for code patterns
+  const codePatterns = [
+    /function\s+\w+\s*\(/,
+    /class\s+\w+/,
+    /import\s+.*from/,
+    /const\s+\w+\s*=/,
+    /def\s+\w+\s*\(/,
+    /public\s+(class|interface|enum)/,
+    /<\?php/,
+    /```[\w]*\n/
+  ];
+
+  const codeMatches = codePatterns.filter(pattern => pattern.test(sample)).length;
+  if (codeMatches >= 2) {
+    return 'code';
+  }
+
+  // Check for technical documentation
+  const technicalKeywords = ['api', 'algorithm', 'implementation', 'parameter', 'configuration', 'dependency'];
+  const technicalCount = technicalKeywords.filter(kw => sample.includes(kw)).length;
+  if (technicalCount >= 3) {
+    return 'technical';
+  }
+
+  // Check for article/blog patterns
+  const articlePatterns = [
+    /^\s*#\s+/m,  // Markdown headers
+    /\n\n.*\n\n/, // Multiple paragraphs
+    /published|author|posted/i
+  ];
+
+  const articleMatches = articlePatterns.filter(pattern => pattern.test(sample)).length;
+  if (articleMatches >= 2) {
+    return 'article';
+  }
+
+  // Default to general
+  return 'general';
+}
+
+/**
  * Split text into semantic chunks with intelligent overlap
  * Better than fixed-size chunking because it preserves meaning
+ * Now supports adaptive chunking based on document type
  */
 export function semanticChunkText(
   text: string,
   targetSize = 800, // Target size (will vary based on structure)
-  minSize = 400 // Minimum chunk size
+  minSize = 400, // Minimum chunk size
+  documentType: DocumentType = 'auto'
 ): SemanticChunk[] {
+  // Get optimal chunk size for this document type
+  const config = getOptimalChunkSize(documentType, text);
+
+  // Override with provided values if specified
+  const actualTargetSize = targetSize !== 800 ? targetSize : config.targetSize;
+  const actualMinSize = minSize !== 400 ? minSize : config.minSize;
+
+  console.log(`✂️ [Chunking] Using targetSize=${actualTargetSize}, minSize=${actualMinSize}, type=${documentType}`);
+
+  targetSize = actualTargetSize;
+  minSize = actualMinSize;
   // Normalize line breaks
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
@@ -131,8 +247,24 @@ function createChunk(paragraphs: string[], index: number): SemanticChunk {
 /**
  * Detect paragraph type
  */
-function detectParagraphType(text: string): 'paragraph' | 'list' | 'heading' | 'mixed' {
+function detectParagraphType(text: string): 'paragraph' | 'list' | 'heading' | 'mixed' | 'code' {
   const lines = text.split('\n').filter((l) => l.trim().length > 0);
+
+  // Code block: contains code markers or patterns
+  const codeMarkers = [
+    /^```/,
+    /^\s*(function|class|const|let|var|def|public|private)\s/,
+    /^\s*[{}\[\];]/,
+    /^\s*(if|for|while|switch)\s*\(/
+  ];
+
+  const codeLineCount = lines.filter(line =>
+    codeMarkers.some(marker => marker.test(line))
+  ).length;
+
+  if (codeLineCount > lines.length * 0.3) { // 30% of lines look like code
+    return 'code';
+  }
 
   // Heading: short line (< 100 chars) ending without period
   if (lines.length === 1 && lines[0].length < 100 && !lines[0].endsWith('.')) {

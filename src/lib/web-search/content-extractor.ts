@@ -317,6 +317,7 @@ export class ContentExtractor {
 
   /**
    * Encuentra el elemento con más contenido de texto
+   * MEJORADO: Más factores de scoring para mejor precisión
    */
   private findElementWithMostText(root: Element): Element | null {
     let maxScore = 0;
@@ -330,30 +331,88 @@ export class ContentExtractor {
       const text = this.getDirectText(element);
       const wordCount = this.countWords(text);
 
-      // Factores de calificación
+      if (wordCount < 50) {
+        return; // Skip elements with very little content
+      }
+
+      // === BASE SCORE ===
       let score = wordCount;
 
-      // Bonus por elementos semánticos importantes
+      // === SEMANTIC TAGS BONUS ===
       const tagName = element.tagName.toLowerCase();
       if (tagName === 'article') score *= 1.5;
       if (tagName === 'main') score *= 1.4;
+      if (tagName === 'section') score *= 1.1;
 
-      // Bonus por clases de contenido
+      // === CLASS/ID BONUS ===
       const className = element.className.toLowerCase();
-      if (className.includes('content') || className.includes('article') || className.includes('post')) {
+      const id = element.id.toLowerCase();
+
+      const contentIndicators = ['content', 'article', 'post', 'entry', 'body', 'text'];
+      const hasContentClass = contentIndicators.some(ind =>
+        className.includes(ind) || id.includes(ind)
+      );
+      if (hasContentClass) {
         score *= 1.3;
       }
 
-      // Penalizar elementos que parecen sidebars o complementarios
-      if (className.includes('sidebar') || className.includes('aside') || className.includes('widget')) {
-        score *= 0.3;
+      // === SIDEBAR/NAV PENALTY ===
+      const noiseIndicators = ['sidebar', 'aside', 'widget', 'navigation', 'menu', 'footer', 'header'];
+      const isNoise = noiseIndicators.some(ind =>
+        className.includes(ind) || id.includes(ind)
+      );
+      if (isNoise) {
+        score *= 0.2;
       }
 
-      // Penalizar elementos muy estrechos (probablemente sidebars)
+      // === LINK DENSITY PENALTY ===
+      // Real content has low link density
+      const links = element.querySelectorAll('a');
+      const linkText = Array.from(links).reduce((sum, link) =>
+        sum + (link.textContent?.length || 0), 0
+      );
+      const textLength = text.length;
+      const linkDensity = textLength > 0 ? linkText / textLength : 0;
+
+      if (linkDensity > 0.5) {
+        score *= 0.3; // Heavy penalty for link-heavy content
+      } else if (linkDensity > 0.3) {
+        score *= 0.7;
+      }
+
+      // === TEXT/HTML RATIO BONUS ===
+      // Real content has high text-to-HTML ratio
+      const htmlLength = element.innerHTML.length;
+      const textRatio = htmlLength > 0 ? textLength / htmlLength : 0;
+
+      if (textRatio > 0.3) {
+        score *= 1.2; // Bonus for text-heavy content
+      }
+
+      // === PARAGRAPH DENSITY BONUS ===
+      // Real content has many paragraphs
+      const paragraphs = element.querySelectorAll('p');
+      const paragraphCount = paragraphs.length;
+
+      if (paragraphCount > 3) {
+        score *= 1.1;
+      }
+
+      // === TABLE BONUS ===
+      // Tables often contain important structured data
+      const tables = element.querySelectorAll('table');
+      if (tables.length > 0 && tables.length < 5) {
+        score *= 1.15; // Moderate bonus for tables
+      }
+
+      // === WIDTH PENALTY ===
+      // Penalize very narrow elements (sidebars)
       if (element instanceof HTMLElement) {
         const width = element.offsetWidth;
         if (width > 0 && width < 300) {
-          score *= 0.5;
+          score *= 0.4;
+        } else if (width > 0 && width < 500) {
+          score *= 0.8;
         }
       }
 
@@ -362,6 +421,8 @@ export class ContentExtractor {
         bestElement = element;
       }
     });
+
+    console.log(`📊 [ContentExtractor] Best element score: ${maxScore.toFixed(0)}`);
 
     // Si no encontramos nada bueno, usar body
     return bestElement || root;
@@ -404,10 +465,26 @@ export class ContentExtractor {
 
   /**
    * Convierte un nodo DOM a texto plano estructurado
+   * MEJORADO: Soporte para tablas y mejor preservación de estructura
    */
   private nodeToText(node: Node): string {
     const parts: string[] = [];
     let lastWasBlock = false;
+
+    // First, extract tables separately for better formatting
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as Element;
+      const tables = element.querySelectorAll('table');
+
+      tables.forEach(table => {
+        const tableText = this.extractTableContent(table);
+        if (tableText) {
+          parts.push('\n\n[TABLA]\n' + tableText + '\n[FIN TABLA]\n\n');
+          // Remove table from DOM to avoid double-processing
+          table.replaceWith(document.createTextNode('[tabla procesada]'));
+        }
+      });
+    }
 
     const walker = document.createTreeWalker(
       node,
@@ -423,7 +500,7 @@ export class ContentExtractor {
             const tag = el.tagName.toLowerCase();
 
             // Skip elementos específicos
-            if (tag === 'script' || tag === 'style') {
+            if (tag === 'script' || tag === 'style' || tag === 'table') {
               return NodeFilter.FILTER_REJECT;
             }
 
@@ -474,6 +551,34 @@ export class ContentExtractor {
     result = result.replace(/\n{3,}/g, '\n\n'); // Múltiples newlines → dos
 
     return result.trim();
+  }
+
+  /**
+   * Extrae contenido de tabla en formato legible
+   */
+  private extractTableContent(table: Element): string {
+    const rows: string[] = [];
+
+    const tableRows = table.querySelectorAll('tr');
+
+    tableRows.forEach((row, rowIndex) => {
+      const cells = row.querySelectorAll('td, th');
+      const cellTexts = Array.from(cells).map(cell =>
+        cell.textContent?.trim() || ''
+      ).filter(text => text.length > 0);
+
+      if (cellTexts.length > 0) {
+        // Format: Column1 | Column2 | Column3
+        rows.push(cellTexts.join(' | '));
+
+        // Add separator after header row
+        if (rowIndex === 0 && row.querySelector('th')) {
+          rows.push('-'.repeat(50));
+        }
+      }
+    });
+
+    return rows.join('\n');
   }
 
   /**

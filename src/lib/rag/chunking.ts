@@ -69,18 +69,35 @@ function estimateTokens(text: string): number {
 
 /**
  * Get chunk text with context for embedding
+ * MEJORADO: Mejor integración de contexto
  */
 export function getChunkTextForEmbedding(chunk: Chunk): string {
   let text = chunk.content;
 
-  // Add context if available
+  // Add context with special markers for better embedding
   if (chunk.metadata.prevContext) {
-    text = `${chunk.metadata.prevContext} ${text}`;
+    text = `[Previous context: ${chunk.metadata.prevContext}] ${text}`;
   }
 
   if (chunk.metadata.nextContext) {
-    text = `${text} ${chunk.metadata.nextContext}`;
+    text = `${text} [Next context: ${chunk.metadata.nextContext}]`;
   }
 
   return text;
+}
+
+/**
+ * Get weighted embedding text (for future multi-vector approach)
+ * Returns main chunk + separate context strings
+ */
+export function getWeightedEmbeddingTexts(chunk: Chunk): {
+  mainText: string;
+  prevContext?: string;
+  nextContext?: string;
+} {
+  return {
+    mainText: chunk.content,
+    prevContext: chunk.metadata.prevContext,
+    nextContext: chunk.metadata.nextContext
+  };
 }

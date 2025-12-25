@@ -28,6 +28,13 @@ import { WebSearchService } from './web-search';
 import { ContentExtractor } from './content-extractor';
 import { semanticChunkText } from '../rag/semantic-chunking';
 import { getWorkerPool } from '../workers';
+import {
+  getCachedWebPage,
+  cacheWebPage,
+  getCachedWebEmbeddings,
+  cacheWebEmbeddings,
+  cleanupExpiredPages
+} from '../db/web-cache';
 
 /**
  * Remove aiproxy.inled.es from URLs for display
@@ -68,6 +75,7 @@ export class WebRAGOrchestrator {
 
   /**
    * Ejecuta búsqueda web + RAG completo
+   * MEJORADO: Con caché de páginas y embeddings
    */
   async search(
     userQuery: string,
@@ -85,6 +93,10 @@ export class WebRAGOrchestrator {
     const timestamps: Record<string, number> = {};
 
     try {
+      // Cleanup expired cache entries (async, don't wait)
+      cleanupExpiredPages().catch(err =>
+        console.warn('Failed to cleanup web cache:', err)
+      );
       // ====================================================================
       // PASO 1: LLM genera query de búsqueda
       // ====================================================================
@@ -359,6 +371,7 @@ JSON:`;
 
   // ==========================================================================
   // PASO 6: Procesar documentos web (chunking + embeddings)
+  // MEJORADO: Usa caché para evitar re-procesar páginas
   // ==========================================================================
 
   private async processWebDocuments(
@@ -371,43 +384,96 @@ JSON:`;
     for (let i = 0; i < contents.length; i++) {
       const content = contents[i];
 
-      // Chunking semántico con chunks MÁS PEQUEÑOS para web
-      // (el contenido web suele ser más denso que PDFs)
-      // semanticChunkText(text, targetSize, minSize)
-      const chunks = semanticChunkText(
-        content.text,
-        600,  // targetSize: chunks de ~600 chars (balance entre contexto y precisión)
-        300   // minSize: mínimo 300 chars para mantener contexto
-      );
+      console.log(`📄 [WebRAG] Processing: ${content.url}`);
 
-      // Log chunking results
-      console.log(`📝 [WebRAG] Document ${i + 1}: Created ${chunks.length} chunks from "${content.title}"`);
-      const chunkSizes = chunks.map(c => c.content.length);
-      const avgSize = chunkSizes.reduce((a, b) => a + b, 0) / chunkSizes.length;
-      console.log(`📊 [WebRAG] Chunk stats: avg=${Math.round(avgSize)}, count=${chunks.length}`);
+      // Check cache first
+      const cachedPage = await getCachedWebPage(content.url);
+      const cachedEmbeddings = cachedPage
+        ? await getCachedWebEmbeddings(content.url)
+        : [];
 
-      // Generar embeddings
-      const texts = chunks.map((c) => c.content);
-      console.log(`🧮 [WebRAG] Generating ${texts.length} embeddings...`);
-      const embeddings = await this.embeddingEngine.generateEmbeddingsBatch(
-        texts,
-        4 // maxConcurrent
-      );
-      console.log(`✅ [WebRAG] Generated ${embeddings.length} embeddings`);
+      let webChunks: WebDocumentChunk[];
 
-      // Crear chunks con embeddings
-      const webChunks: WebDocumentChunk[] = chunks.map((chunk, j) => ({
-        content: chunk.content,
-        index: chunk.index,
-        embedding: new Float32Array(embeddings[j]),
-        metadata: {
-          startChar: chunk.metadata.startChar,
-          endChar: chunk.metadata.endChar,
-          type: chunk.metadata.type as any,
-          prevContext: chunk.metadata.prevContext,
-          nextContext: chunk.metadata.nextContext,
-        },
-      }));
+      if (cachedPage && cachedEmbeddings.length > 0) {
+        // === CACHE HIT ===
+        console.log(`⚡ [WebCache] Using cached data for: ${content.url}`);
+
+        webChunks = cachedEmbeddings.map(cached => ({
+          content: cached.chunkContent,
+          index: cached.chunkIndex,
+          embedding: cached.embedding,
+          metadata: {
+            startChar: 0,
+            endChar: cached.chunkContent.length,
+            type: 'paragraph' as any,
+          },
+        }));
+
+      } else {
+        // === CACHE MISS: Process normally ===
+        console.log(`🔄 [WebRAG] Cache miss, processing: ${content.url}`);
+
+        // Chunking semántico con tipo de documento 'web'
+        const chunks = semanticChunkText(
+          content.text,
+          600,  // targetSize: chunks de ~600 chars
+          300,  // minSize: mínimo 300 chars
+          'web' // Document type
+        );
+
+        // Log chunking results
+        console.log(`📝 [WebRAG] Created ${chunks.length} chunks from "${content.title}"`);
+        const chunkSizes = chunks.map(c => c.content.length);
+        const avgSize = chunkSizes.reduce((a, b) => a + b, 0) / chunkSizes.length;
+        console.log(`📊 [WebRAG] Chunk stats: avg=${Math.round(avgSize)}, count=${chunks.length}`);
+
+        // Generar embeddings
+        const texts = chunks.map((c) => c.content);
+        console.log(`🧮 [WebRAG] Generating ${texts.length} embeddings...`);
+        const embeddings = await this.embeddingEngine.generateEmbeddingsBatch(
+          texts,
+          4 // maxConcurrent
+        );
+        console.log(`✅ [WebRAG] Generated ${embeddings.length} embeddings`);
+
+        // Crear chunks con embeddings
+        webChunks = chunks.map((chunk, j) => ({
+          content: chunk.content,
+          index: chunk.index,
+          embedding: new Float32Array(embeddings[j]),
+          metadata: {
+            startChar: chunk.metadata.startChar,
+            endChar: chunk.metadata.endChar,
+            type: chunk.metadata.type as any,
+            prevContext: chunk.metadata.prevContext,
+            nextContext: chunk.metadata.nextContext,
+          },
+        }));
+
+        // Store in cache
+        const ttl = 3600000; // 1 hour
+        await cacheWebPage({
+          url: content.url,
+          title: content.title,
+          content: content.text,
+          cleanedAt: Date.now(),
+          fetchedAt: content.extractedAt,
+          ttl,
+          metadata: content.metadata
+        });
+
+        await cacheWebEmbeddings(
+          content.url,
+          webChunks.map((chunk, index) => ({
+            chunkIndex: index,
+            chunkContent: chunk.content,
+            embedding: chunk.embedding,
+            model: 'wllama-embedding'
+          }))
+        );
+
+        console.log(`💾 [WebCache] Cached page and embeddings for: ${content.url}`);
+      }
 
       // Crear documento web temporal
       const webDoc: WebDocument = {

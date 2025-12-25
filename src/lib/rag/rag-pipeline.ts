@@ -6,6 +6,8 @@ import { searchSimilarChunks, createRAGContext } from './vector-search';
 import { createEmbeddingsBatch } from '@/lib/db/embeddings';
 import { getChunksByDocument } from '@/lib/db/chunks';
 import { updateDocumentStatus } from '@/lib/db/documents';
+import { expandQuery, rewriteQuery } from './query-expansion';
+import { calculateRAGMetrics, assessRAGQuality, calculateFaithfulness } from './rag-metrics';
 import type { WllamaEngine } from '@/lib/ai/wllama-engine';
 import type { WebLLMEngine } from '@/lib/ai/webllm-engine';
 import type { RAGResult, ProcessingStatus } from '@/types';
@@ -110,24 +112,66 @@ export async function processDocument(
 }
 
 /**
- * Query with RAG: embed query → search → create context
+ * Query with RAG: expand query → embed → hybrid search → create context
  */
 export async function queryWithRAG(
   query: string,
   embeddingEngine: WllamaEngine,
   topK: number = 5,
-  documentIds?: string[]
+  documentIds?: string[],
+  chatEngine?: WebLLMEngine | WllamaEngine,
+  options?: {
+    useQueryExpansion?: boolean;
+    useQueryRewriting?: boolean;
+  }
 ): Promise<RAGResult> {
   const startTime = Date.now();
 
   console.log(`🔍 RAG Query: "${query}"`);
 
+  let searchQuery = query;
+
+  // Optional: Rewrite query for clarity
+  if (options?.useQueryRewriting && chatEngine) {
+    try {
+      searchQuery = await rewriteQuery(query, chatEngine);
+      console.log(`✍️ Rewritten query: "${searchQuery}"`);
+    } catch (error) {
+      console.warn('⚠️ Query rewriting failed, using original');
+    }
+  }
+
+  // Optional: Expand query for better recall
+  let expandedText = searchQuery;
+  if (options?.useQueryExpansion && chatEngine) {
+    try {
+      const expanded = await expandQuery(searchQuery, chatEngine, {
+        maxVariations: 2,
+        includeOriginal: true
+      });
+      expandedText = expanded.combined;
+      console.log(`🔍 Using expanded query (${expanded.expanded.length} variations)`);
+    } catch (error) {
+      console.warn('⚠️ Query expansion failed, using original');
+    }
+  }
+
   // Step 1: Generate embedding for query
   console.log('🔢 Generating query embedding...');
-  const queryEmbedding = await embeddingEngine.generateEmbedding(query);
+  const queryEmbedding = await embeddingEngine.generateEmbedding(expandedText);
 
-  // Step 2: Search for similar chunks
-  const chunks = await searchSimilarChunks(queryEmbedding, topK, documentIds);
+  // Step 2: Hybrid search with BM25 + semantic
+  const chunks = await searchSimilarChunks(
+    queryEmbedding,
+    topK,
+    documentIds,
+    searchQuery, // Use original query for BM25
+    {
+      semanticWeight: 0.7,
+      lexicalWeight: 0.3,
+      useReranking: true
+    }
+  );
 
   const searchTime = Date.now() - startTime;
 
@@ -169,6 +213,7 @@ export async function generateRAGAnswer(
 
 /**
  * Build RAG prompt with context and conversation history
+ * MEJORADO: Chain-of-thought reasoning + mejor estructura
  */
 function buildRAGPrompt(query: string, context: string, conversationHistory?: Array<{role: string, content: string}>): string {
   if (!context) {
@@ -178,36 +223,55 @@ function buildRAGPrompt(query: string, context: string, conversationHistory?: Ar
   // Build conversation history if provided
   let historyText = '';
   if (conversationHistory && conversationHistory.length > 0) {
-    historyText = '\n\nHISTORIAL DE CONVERSACIÓN:\n';
+    historyText = '\n\n## HISTORIAL DE CONVERSACIÓN:\n';
     conversationHistory.forEach((msg) => {
       if (msg.role === 'user') {
-        historyText += `Usuario: ${msg.content}\n`;
+        historyText += `👤 Usuario: ${msg.content}\n`;
       } else if (msg.role === 'assistant') {
-        historyText += `Asistente: ${msg.content}\n`;
+        historyText += `🤖 Asistente: ${msg.content}\n`;
       }
     });
     historyText += '\n';
   }
 
-  return `Eres un asistente experto que analiza documentos y responde preguntas de manera precisa y útil.
+  // Enhanced prompt with chain-of-thought
+  return `Eres un asistente experto que analiza documentos y responde preguntas con razonamiento estructurado.
 
-CONTEXTO DE DOCUMENTOS:
+## CONTEXTO DE DOCUMENTOS:
 ${context}${historyText}
-PREGUNTA ACTUAL: ${query}
+## PREGUNTA DEL USUARIO:
+${query}
 
-INSTRUCCIONES:
-- Usa PRINCIPALMENTE la información del contexto proporcionado
-- Combina información de múltiples fragmentos cuando sea relevante
-- Haz inferencias razonables basándote en el contexto disponible
-- Si mencionas información del contexto, cita el documento fuente (ej: "Según el Documento 1...")
-- Si el contexto no contiene información directa pero puedes responder usando conocimiento general relacionado con el tema de los documentos, hazlo indicando claramente qué proviene del contexto y qué es conocimiento general
-- Solo si el contexto no tiene NINGUNA relación con la pregunta, indica que los documentos no contienen esa información específica
+## INSTRUCCIONES - Sigue este proceso paso a paso:
 
-RESPUESTA:`;
+### PASO 1: ANÁLISIS
+Analiza qué dice cada documento relevante sobre la pregunta. Identifica:
+- ¿Qué documentos contienen información directamente relevante?
+- ¿Qué puntos clave menciona cada uno?
+- ¿Hay información complementaria o contradictoria?
+
+### PASO 2: SÍNTESIS
+Combina la información de forma coherente:
+- Conecta ideas de múltiples fuentes cuando sea apropiado
+- Resuelve contradicciones priorizando fuentes más específicas o recientes
+- Haz inferencias razonables basadas en el contexto
+
+### PASO 3: RESPUESTA FINAL
+Proporciona una respuesta clara y bien estructurada que:
+- Se base PRINCIPALMENTE en el contexto proporcionado
+- Cite las fuentes usando formato [Doc N]
+- Sea completa pero concisa
+- Indique claramente si alguna parte requiere conocimiento general
+- Solo si el contexto no tiene relación, mencione que los documentos no contienen esa información
+
+## TU RESPUESTA:
+
+[Escribe aquí tu análisis y respuesta siguiendo los 3 pasos]`;
 }
 
 /**
  * Complete RAG flow: query → retrieve → generate
+ * MEJORADO: Incluye métricas de calidad
  */
 export async function completeRAGFlow(
   query: string,
@@ -216,17 +280,58 @@ export async function completeRAGFlow(
   topK: number = 5,
   documentIds?: string[],
   conversationHistory?: Array<{role: string, content: string}>,
-  onStream?: (chunk: string) => void
-): Promise<{ answer: string; ragResult: RAGResult }> {
-  // Step 1: Retrieve relevant chunks
-  const ragResult = await queryWithRAG(query, embeddingEngine, topK, documentIds);
+  onStream?: (chunk: string) => void,
+  options?: {
+    useQueryExpansion?: boolean;
+    useQueryRewriting?: boolean;
+    calculateMetrics?: boolean;
+  }
+): Promise<{
+  answer: string;
+  ragResult: RAGResult;
+  metrics?: ReturnType<typeof calculateRAGMetrics>;
+  quality?: ReturnType<typeof assessRAGQuality>;
+  faithfulness?: number;
+}> {
+  // Step 1: Retrieve relevant chunks with enhanced options
+  const ragResult = await queryWithRAG(
+    query,
+    embeddingEngine,
+    topK,
+    documentIds,
+    chatEngine,
+    {
+      useQueryExpansion: options?.useQueryExpansion,
+      useQueryRewriting: options?.useQueryRewriting
+    }
+  );
 
   console.log(`📊 Retrieved ${ragResult.chunks.length} chunks in ${ragResult.searchTime}ms`);
 
-  // Step 2: Generate answer with conversation history
+  // Step 2: Calculate quality metrics (if enabled)
+  let metrics, quality;
+  if (options?.calculateMetrics !== false) {
+    const context = createRAGContext(ragResult.chunks);
+    metrics = calculateRAGMetrics(query, ragResult.chunks, context);
+    quality = assessRAGQuality(metrics);
+
+    console.log(`✅ [RAG Quality] Overall: ${quality.overall}`);
+    if (quality.warnings.length > 0) {
+      console.log(`⚠️ [RAG Quality] Warnings:`, quality.warnings);
+    }
+  }
+
+  // Step 3: Generate answer with conversation history
   const answer = await generateRAGAnswer(query, ragResult, chatEngine, conversationHistory, onStream);
 
-  return { answer, ragResult };
+  // Step 4: Calculate answer faithfulness (if metrics enabled)
+  let faithfulness;
+  if (options?.calculateMetrics !== false) {
+    const context = createRAGContext(ragResult.chunks);
+    faithfulness = calculateFaithfulness(answer, context);
+  }
+
+  return { answer, ragResult, metrics, quality, faithfulness };
 }
 
 /**
