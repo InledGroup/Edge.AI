@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS: Settings = {
   temperature: 0.7,
   maxTokens: 2048,
   theme: 'auto',
+  language: 'es',
   // Web search defaults
   enableWebSearch: true, // Enabled by default - show the toggle
   webSearchSources: ['extension'], // Use browser extension

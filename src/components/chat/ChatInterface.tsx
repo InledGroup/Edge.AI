@@ -9,6 +9,7 @@ import { DocumentCanvas } from '../DocumentCanvas';
 import { Card } from '../ui/Card';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import { conversationsStore, modelsReady, hasReadyDocuments } from '@/lib/stores';
+import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import type { Message as MessageType } from '@/types';
 import { completeRAGFlow } from '@/lib/rag/rag-pipeline';
 import EngineManager from '@/lib/ai/engine-manager';
@@ -32,6 +33,9 @@ export function ChatInterface() {
   const [documentContent, setDocumentContent] = useState('');
   const [canvasContent, setCanvasContent] = useState(''); // Track current canvas content
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Subscribe to language changes
+  const lang = languageSignal.value;
 
   // Load web search settings on mount
   useEffect(() => {
@@ -218,7 +222,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
   async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation') {
     // Verification check if models are ready
     if (!modelsReady.value) {
-      alert('Debes cargar los modelos de IA antes de chatear');
+      alert(i18nStore.t('chat.loadModelsFirst'));
       return;
     }
 
@@ -235,7 +239,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
 
     // Validate based on mode
     if (effectiveMode === 'local' && !hasReadyDocuments.value) {
-      alert('No hay documentos cargados. Usa otro modo o sube documentos.');
+      alert(i18nStore.t('chat.noDocumentsLoaded'));
       return;
     }
 
@@ -531,9 +535,9 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
                 <div className="w-16 h-16 mx-auto flex items-center justify-center">
                   <img src="/inledai.svg" alt="InLed AI" width={64} height={64} />
                 </div>
-                <h3 className="text-2xl font-semibold">Hola, ¿en qué puedo ayudarte?</h3>
+                <h3 className="text-2xl font-semibold">{i18nStore.t('chat.welcome')}</h3>
                 <p className="text-sm text-[var(--color-text-secondary)]">
-                 Todo lo que hablemos, subas o busque no sale de tu ordenador.
+                 {i18nStore.t('chat.privacyNotice')}
                 </p>
 
                 {!canChat && (
@@ -541,10 +545,10 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
                     <div className="flex gap-2">
                       <AlertCircle size={16} className="text-[var(--color-warning)] flex-shrink-0 mt-0.5" />
                       <div className="text-sm text-[var(--color-text-secondary)]">
-                        <p className="font-medium text-[var(--color-warning)] mb-1">Debes completar estos pasos para poder comenzar:</p>
+                        <p className="font-medium text-[var(--color-warning)] mb-1">{i18nStore.t('chat.stepsRequired')}</p>
                         <ul className="list-disc list-inside space-y-1">
-                          {!modelsReady.value && <li>Cargar los modelos de IA pulsando en <strong>configurar modelos</strong></li>}
-                          {!hasReadyDocuments.value && <li>Sube y procesa al menos un documento pulsando en <strong>subir documentos</strong></li>}
+                          {!modelsReady.value && <li>Cargar los modelos de IA pulsando en <strong>{i18nStore.t('chat.configureModels')}</strong></li>}
+                          {!hasReadyDocuments.value && <li>Sube y procesa al menos un documento pulsando en <strong>{i18nStore.t('chat.uploadDocs')}</strong></li>}
                         </ul>
                       </div>
                     </div>
@@ -616,13 +620,13 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
             webSearchEnabled={webSearchEnabled}
             placeholder={
               !canChat
-                ? 'Carga modelos primero...'
-                : 'Envía un mensaje...'
+                ? i18nStore.t('chat.placeholderNoModel')
+                : i18nStore.t('chat.placeholder')
             }
           />
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-[var(--color-text-tertiary)]">
-              Edge.AI procesa todo localmente. Tus datos nunca salen del navegador.
+              {i18nStore.t('chat.footerPrivacy')}
             </p>
             {/* Temporary test button */}
             <button
@@ -634,7 +638,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
               }}
               className="text-xs text-blue-500 hover:text-blue-600 underline"
             >
-              Probar Canvas
+              {i18nStore.t('chat.testCanvas')}
             </button>
           </div>
         </div>

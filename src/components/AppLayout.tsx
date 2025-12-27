@@ -10,6 +10,7 @@ import { ModelLoadingIndicator } from './ModelLoadingIndicator';
 import { ExtensionStatus } from './ExtensionStatus';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
+import { i18nStore } from '@/lib/stores/i18n';
 
 export function AppLayout() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export function AppLayout() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl shadow-2xl">
             <div className="sticky top-0 bg-[var(--color-bg)] border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between z-10">
-              <h2 className="text-lg font-semibold">Subir Documentos</h2>
+              <h2 className="text-lg font-semibold">{i18nStore.t('documents.title')}</h2>
               <button
                 onClick={() => setShowDocumentUpload(false)}
                 className="w-8 h-8 rounded-lg hover:bg-[var(--color-bg-secondary)] flex items-center justify-center transition-colors"

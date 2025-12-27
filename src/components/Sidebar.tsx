@@ -12,9 +12,11 @@ import {
   Settings,
   Upload,
   Brain,
-  Check
+  Check,
+  Languages
 } from 'lucide-preact';
 import { conversationsStore, documentsStore, uiStore } from '@/lib/stores';
+import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import {
   createConversation,
   deleteConversation,
@@ -35,6 +37,9 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [showDocuments, setShowDocuments] = useState(false);
+  
+  // Subscribe to language changes for re-rendering
+  const lang = languageSignal.value;
 
   // Load conversations
   useEffect(() => {
@@ -47,7 +52,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
   }
 
   async function handleNewChat() {
-    const conversation = await createConversation('Nueva conversación');
+    const conversation = await createConversation(i18nStore.t('common.newConversation'));
     conversationsStore.add(conversation);
     conversationsStore.setActive(conversation.id);
     await loadConversations();
@@ -56,7 +61,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
   async function handleDeleteConversation(id: string, e: Event) {
     e.stopPropagation();
 
-    if (!confirm('¿Estás seguro de que quieres borrar esta conversación?')) {
+    if (!confirm(i18nStore.t('common.confirmDelete'))) {
       return;
     }
 
@@ -77,15 +82,15 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
     const diffInDays = diffInHours / 24;
 
     if (diffInHours < 24) {
-      return 'Hoy';
+      return i18nStore.t('common.today');
     } else if (diffInDays < 2) {
-      return 'Ayer';
+      return i18nStore.t('common.yesterday');
     } else if (diffInDays < 7) {
-      return 'Esta semana';
+      return i18nStore.t('common.thisWeek');
     } else if (diffInDays < 30) {
-      return 'Este mes';
+      return i18nStore.t('common.thisMonth');
     } else {
-      return date.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+      return date.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', { month: 'short', year: 'numeric' });
     }
   }
 
@@ -138,7 +143,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[var(--color-primary)] text-black font-medium text-sm hover:bg-[var(--color-primary)]/90 transition-colors shadow-[0_0_20px_rgba(40,229,24,0.3)]"
           >
             <Plus size={18} />
-            <span>Nueva conversación</span>
+            <span>{i18nStore.t('common.newConversation')}</span>
           </button>
         </div>
 
@@ -152,7 +157,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
               }`}
           >
             <MessageSquare size={14} />
-            <span>Chats</span>
+            <span>{i18nStore.t('common.conversations')}</span>
           </button>
           <button
             onClick={() => setShowDocuments(true)}
@@ -162,7 +167,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
               }`}
           >
             <FileText size={14} />
-            <span>Docs ({documentsStore.all.length})</span>
+            <span>{i18nStore.t('common.documents')} ({documentsStore.all.length})</span>
           </button>
         </div>
 
@@ -172,8 +177,8 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
             {Object.keys(groupedConversations).length === 0 ? (
               <div className="text-center py-8 text-sm text-[var(--color-text-secondary)]">
                 <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
-                <p>No hay conversaciones</p>
-                <p className="text-xs mt-1">Crea una nueva para empezar</p>
+                <p>{i18nStore.t('common.noConversations')}</p>
+                <p className="text-xs mt-1">{i18nStore.t('common.createToStart')}</p>
               </div>
             ) : (
               Object.entries(groupedConversations).map(([label, convs]) => (
@@ -215,8 +220,8 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
             {documentsStore.all.length === 0 ? (
               <div className="text-center py-8 text-sm text-[var(--color-text-secondary)]">
                 <FileText size={32} className="mx-auto mb-2 opacity-50" />
-                <p>No hay documentos</p>
-                <p className="text-xs mt-1">Sube documentos para empezar</p>
+                <p>{i18nStore.t('common.noDocuments')}</p>
+                <p className="text-xs mt-1">{i18nStore.t('common.uploadToStart')}</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -233,9 +238,9 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                         {doc.status === 'ready' ? (
                           <>
                             <Check size={10} className="text-[var(--color-success)]" />
-                            <span>Listo</span>
+                            <span>{i18nStore.t('common.ready')}</span>
                           </>
-                        ) : 'Procesando...'}
+                        ) : i18nStore.t('common.processing')}
                       </p>
                     </div>
                     <ChevronRight size={14} className="flex-shrink-0 text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -253,7 +258,16 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
           >
             <Upload size={16} />
-            <span>Subir documentos</span>
+            <span>{i18nStore.t('common.uploadDocuments')}</span>
+          </button>
+          
+          {/* Language Switcher */}
+          <button
+            onClick={() => i18nStore.setLanguage(lang === 'es' ? 'en' : 'es')}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          >
+            <Languages size={16} />
+            <span>{lang === 'es' ? 'English' : 'Español'}</span>
           </button>
 
           {/* Model Config Menu inline */}

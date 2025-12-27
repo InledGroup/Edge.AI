@@ -36,6 +36,7 @@ import { WllamaEngine } from '@/lib/ai/wllama-engine';
 import EngineManager from '@/lib/ai/engine-manager';
 import { modelsStore } from '@/lib/stores';
 import { ExtensionSetup } from './ExtensionSetup';
+import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 
 interface FirstRunWizardProps {
   onComplete: () => void;
@@ -60,6 +61,9 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
     embedding: null
   });
   const [error, setError] = useState<string | null>(null);
+
+  // Subscribe to language changes
+  const lang = languageSignal.value;
 
   // Auto-detect device on mount when step changes to detecting
   useEffect(() => {
@@ -103,13 +107,13 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       setTimeout(() => setStep('model-selection'), 500);
     } catch (err) {
       console.error('Device detection failed:', err);
-      setError('Error al detectar las capacidades del dispositivo');
+      setError(i18nStore.t('wizard.errorDetection'));
     }
   }
 
   async function handleLoadModels() {
     if (!selectedChatModel || !selectedEmbeddingModel) {
-      alert('Selecciona ambos modelos');
+      alert(i18nStore.t('wizard.selectBoth'));
       return;
     }
 
@@ -131,7 +135,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       setStep('extension-setup');
     } catch (err) {
       console.error('Failed to load models:', err);
-      setError(`Error al cargar modelos: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+      setError(`${i18nStore.t('wizard.errorLoading')}: ${err instanceof Error ? err.message : 'Error unknown'}`);
       setStep('model-selection'); // Go back
     }
   }
@@ -234,35 +238,35 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
             </div>
 
             <div className="space-y-3">
-              <h1 className="text-3xl font-bold">Bienvenido a Edge.AI</h1>
+              <h1 className="text-3xl font-bold">{i18nStore.t('wizard.welcome')}</h1>
               <p className="text-lg text-[var(--color-text-secondary)]">
-                IA 100% local en tu navegador
+                {i18nStore.t('wizard.subtitle')}
               </p>
             </div>
 
             <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-6 text-left space-y-4">
               <h2 className="font-semibold text-lg flex items-center gap-2">
                 <Info size={20} className="text-[var(--color-primary)]" />
-                Configuración inicial
+                {i18nStore.t('wizard.configTitle')}
               </h2>
               <ul className="space-y-2 text-sm text-[var(--color-text-secondary)]">
                 <li className="flex items-start gap-2">
                   <span className="text-[var(--color-primary)] mt-0.5">•</span>
-                  <span>Analizaremos tu dispositivo para recomendar los mejores modelos</span>
+                  <span>{i18nStore.t('wizard.step1')}</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[var(--color-primary)] mt-0.5">•</span>
-                  <span>Cargaremos modelos de IA optimizados para tu hardware</span>
+                  <span>{i18nStore.t('wizard.step2')}</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[var(--color-primary)] mt-0.5">•</span>
-                  <span>Todo se ejecuta localmente, tus datos nunca salen del navegador</span>
+                  <span>{i18nStore.t('wizard.step3')}</span>
                 </li>
               </ul>
             </div>
 
             <Button onClick={() => setStep('detecting')} size="lg" className="w-full">
-              Comenzar configuración
+              {i18nStore.t('wizard.startConfig')}
             </Button>
           </div>
         </Card>
@@ -278,9 +282,9 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
             <div className="w-16 h-16 mx-auto flex items-center justify-center">
               <div className="spinner text-[var(--color-primary)]" />
             </div>
-            <h2 className="text-2xl font-bold">Analizando tu dispositivo</h2>
+            <h2 className="text-2xl font-bold">{i18nStore.t('wizard.detectingTitle')}</h2>
             <p className="text-[var(--color-text-secondary)]">
-              Detectando capacidades de hardware...
+              {i18nStore.t('wizard.detectingSubtitle')}
             </p>
           </div>
         </Card>
@@ -294,9 +298,9 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
         <Card className="max-w-4xl w-full my-8">
           <div className="space-y-6 p-6">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold">Selecciona tus modelos</h2>
+              <h2 className="text-2xl font-bold">{i18nStore.t('wizard.selectModelsTitle')}</h2>
               <p className="text-sm text-[var(--color-text-secondary)]">
-                Modelos recomendados según las capacidades de tu dispositivo
+                {i18nStore.t('wizard.selectModelsSubtitle')}
               </p>
             </div>
 
@@ -314,7 +318,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                       {getDeviceSummary(deviceProfile)}
                     </div>
                     <div className="text-xs text-[var(--color-text-tertiary)]">
-                      Clase: {deviceProfile.deviceClass}
+                      {i18nStore.t('wizard.deviceClass')}: {deviceProfile.deviceClass}
                     </div>
                   </div>
                 </div>
@@ -323,7 +327,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
 
             {/* Chat Models */}
             <div className="space-y-3">
-              <h3 className="font-semibold">Modelo de Chat</h3>
+              <h3 className="font-semibold">{i18nStore.t('wizard.chatModel')}</h3>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {chatScores.map(score => (
                   <button
@@ -357,7 +361,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                           {formatScore(score.score)}
                         </div>
                         <div className="text-xs text-[var(--color-text-tertiary)]">
-                          compatibilidad
+                          {i18nStore.t('wizard.compatibility')}
                         </div>
                       </div>
                     </div>
@@ -379,7 +383,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
 
             {/* Embedding Model */}
             <div className="space-y-3">
-              <h3 className="font-semibold">Modelo de Embeddings</h3>
+              <h3 className="font-semibold">{i18nStore.t('wizard.embeddingModel')}</h3>
               <div className="space-y-2">
                 {embeddingScores.slice(0, 1).map(score => (
                   <div
@@ -390,7 +394,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                       <div>
                         <div className="font-medium">{score.model.displayName}</div>
                         <div className="text-xs text-[var(--color-text-secondary)] mt-1">
-                          {score.model.sizeGB.toFixed(2)}GB • Para búsqueda semántica
+                          {score.model.sizeGB.toFixed(2)}GB • {i18nStore.t('wizard.semanticSearch')}
                         </div>
                       </div>
                       <div className={`text-lg font-bold ${getScoreColor(score.score)}`}>
@@ -416,7 +420,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                 onClick={() => setStep('welcome')}
                 className="flex-1"
               >
-                Atrás
+                {i18nStore.t('wizard.back')}
               </Button>
               <Button
                 onClick={handleLoadModels}
@@ -424,7 +428,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                 className="flex-1"
               >
                 <Download size={16} />
-                Cargar modelos seleccionados
+                {i18nStore.t('wizard.loadSelected')}
               </Button>
             </div>
           </div>
@@ -439,16 +443,16 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
         <Card className="max-w-lg w-full">
           <div className="space-y-6 p-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold mb-2">Cargando modelos</h2>
+              <h2 className="text-2xl font-bold mb-2">{i18nStore.t('wizard.loadingTitle')}</h2>
               <p className="text-sm text-[var(--color-text-secondary)]">
-                Esto puede tardar unos minutos la primera vez
+                {i18nStore.t('wizard.loadingSubtitle')}
               </p>
             </div>
 
             {/* Chat Model Progress */}
             {loadingProgress.chat && (
               <div className="space-y-2">
-                <div className="text-sm font-medium">Modelo de Chat</div>
+                <div className="text-sm font-medium">{i18nStore.t('wizard.chatModel')}</div>
                 <ProgressBar
                   progress={loadingProgress.chat.progress}
                   label={loadingProgress.chat.message}
@@ -460,7 +464,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
             {/* Embedding Model Progress */}
             {loadingProgress.embedding && (
               <div className="space-y-2">
-                <div className="text-sm font-medium">Modelo de Embeddings</div>
+                <div className="text-sm font-medium">{i18nStore.t('wizard.embeddingModel')}</div>
                 <ProgressBar
                   progress={loadingProgress.embedding.progress}
                   label={loadingProgress.embedding.message}
@@ -510,9 +514,9 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
               <CheckCircle2 size={64} className="text-[var(--color-success)]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold mb-2">¡Todo listo!</h2>
+              <h2 className="text-2xl font-bold mb-2">{i18nStore.t('wizard.allReady')}</h2>
               <p className="text-[var(--color-text-secondary)]">
-                Edge.AI está configurado y listo para usar
+                {i18nStore.t('wizard.readySubtitle')}
               </p>
             </div>
           </div>

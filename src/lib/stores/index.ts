@@ -248,6 +248,10 @@ export async function initializeStores() {
     const { getAllDocuments } = await import('@/lib/db/documents');
     const { getConversationsSorted } = await import('@/lib/db/conversations');
     const { getSetting } = await import('@/lib/db/settings');
+    const { i18nStore } = await import('@/lib/stores/i18n');
+
+    // Initialize language
+    await i18nStore.init();
 
     // Load documents
     const documents = await getAllDocuments();

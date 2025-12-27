@@ -1,0 +1,100 @@
+import { signal, computed } from '@preact/signals';
+import { translations, type Language } from '@/lib/i18n/translations';
+import { setSetting, getSetting } from '@/lib/db/settings';
+
+// Default language
+const DEFAULT_LANG: Language = 'es';
+
+// Helper to get browser language
+function getBrowserLanguage(): Language {
+  if (typeof navigator === 'undefined') return DEFAULT_LANG;
+  const lang = navigator.language.split('-')[0];
+  return (lang === 'en' || lang === 'es') ? lang : DEFAULT_LANG;
+}
+
+// Current language signal
+export const languageSignal = signal<Language>(DEFAULT_LANG);
+
+export const i18nStore = {
+  get current() {
+    return languageSignal.value;
+  },
+
+  /**
+   * Initialize language from settings or browser
+   */
+  async init() {
+    try {
+      // First check DB
+      const storedLang = await getSetting('language');
+      if (storedLang && (storedLang === 'es' || storedLang === 'en')) {
+        languageSignal.value = storedLang;
+        console.log('🗣️ Language loaded from settings:', storedLang);
+        updateHtmlLang(storedLang);
+        return;
+      }
+
+      // If not in DB, use browser detection
+      const browserLang = getBrowserLanguage();
+      languageSignal.value = browserLang;
+      console.log('🗣️ Language detected from browser:', browserLang);
+      
+      // Save detected preference
+      await setSetting('language', browserLang);
+      updateHtmlLang(browserLang);
+      
+    } catch (error) {
+      console.error('Failed to initialize language:', error);
+    }
+  },
+
+  /**
+   * Change language
+   */
+  async setLanguage(lang: Language) {
+    languageSignal.value = lang;
+    updateHtmlLang(lang);
+    await setSetting('language', lang);
+  },
+  
+  /**
+   * Get translation
+   * Usage: t('common.appName')
+   */
+  t(key: string): string {
+    const keys = key.split('.');
+    let value: any = translations[languageSignal.value];
+    
+    for (const k of keys) {
+      if (value === undefined) break;
+      value = value[k];
+    }
+    
+    if (value === undefined) {
+      console.warn(`Translation missing for key: ${key} (${languageSignal.value})`);
+      return key;
+    }
+    
+    return value;
+  }
+};
+
+/**
+ * Helper to update HTML lang attribute
+ */
+function updateHtmlLang(lang: Language) {
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = lang;
+  }
+}
+
+/**
+ * Reactive translation helper
+ * Usage: const t = useTranslations(); t('key')
+ */
+export function useTranslations() {
+  return (key: string) => i18nStore.t(key);
+}
+
+// Export a direct reference for non-reactive usage (careful, won't update on change)
+export const t = i18nStore.t;

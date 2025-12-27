@@ -129,6 +129,7 @@ export interface Settings {
   temperature: number;
   maxTokens: number;
   theme: 'light' | 'dark' | 'auto';
+  language: 'es' | 'en';
   // Web search settings
   enableWebSearch?: boolean; // Enable web search by default
   webSearchSources?: ('wikipedia' | 'duckduckgo')[]; // Search providers to use

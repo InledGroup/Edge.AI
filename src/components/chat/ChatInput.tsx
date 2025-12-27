@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'preact/hooks';
 import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner } from 'lucide-preact';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
+import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 
 export interface ChatInputProps {
   onSend: (message: string, mode: 'web' | 'local' | 'smart' | 'conversation') => void;
@@ -25,6 +26,9 @@ export function ChatInput({
   const [message, setMessage] = useState('');
   const [mode, setMode] = useState<'web' | 'local' | 'smart' | 'conversation'>('conversation');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Subscribe to language changes
+  const lang = languageSignal.value;
 
   // Auto-resize textarea
   useEffect(() => {
@@ -80,10 +84,10 @@ export function ChatInput({
           borderStyle: 'solid'
         }}
       >
-        {mode === 'conversation' && <><MessageCircle size={14} /><span>Conversación pura - Sin RAG ni búsqueda</span></>}
-        {mode === 'smart' && <><Sparkles size={14} /><span>Modo inteligente - IA decide estrategia</span></>}
-        {mode === 'web' && <><Globe size={14} /><span>Búsqueda web activa</span></>}
-        {mode === 'local' && <><span><FileSearchCorner size={14} /></span><span>Búsqueda en documentos locales</span></>}
+        {mode === 'conversation' && <><MessageCircle size={14} /><span>{i18nStore.t('chat.strategies.conversation')}</span></>}
+        {mode === 'smart' && <><Sparkles size={14} /><span>{i18nStore.t('chat.strategies.smart')}</span></>}
+        {mode === 'web' && <><Globe size={14} /><span>{i18nStore.t('chat.strategies.web')}</span></>}
+        {mode === 'local' && <><span><FileSearchCorner size={14} /></span><span>{i18nStore.t('chat.strategies.local')}</span></>}
       </div>
 
       <div className="relative flex items-end gap-2 p-3 bg-[var(--color-bg-secondary)] rounded-2xl transition-all duration-200">
@@ -100,7 +104,7 @@ export function ChatInput({
               : 'text-[var(--color-text-secondary)]',
             (disabled || loading) && 'opacity-50 cursor-not-allowed'
           )}
-          title="Modo conversacional puro"
+          title={i18nStore.t('chat.modeConversation')}
         >
           <MessageCircle size={20} />
         </button>
@@ -118,7 +122,7 @@ export function ChatInput({
               : 'text-[var(--color-text-secondary)]',
             (disabled || loading) && 'opacity-50 cursor-not-allowed'
           )}
-          title="Búsqueda en documentos"
+          title={i18nStore.t('chat.localSearch')}
         >
           <span className="text-lg"><FileSearchCorner size={20} /></span>
         </button>
@@ -136,7 +140,7 @@ export function ChatInput({
               : 'text-[var(--color-text-secondary)]',
             (disabled || loading) && 'opacity-50 cursor-not-allowed'
           )}
-          title="Búsqueda web"
+          title={i18nStore.t('chat.webSearch')}
         >
           <Globe size={20} />
         </button>

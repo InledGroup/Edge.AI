@@ -15,6 +15,7 @@ import {
   saveDefaultEmbeddingModel
 } from '@/lib/ai/model-settings';
 import EngineManager from '@/lib/ai/engine-manager';
+import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 
 interface ModelConfigMenuProps {
   onOpenWizard: () => void;
@@ -23,6 +24,9 @@ interface ModelConfigMenuProps {
 export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  
+  // Subscribe to language changes
+  const lang = languageSignal.value;
 
   async function handleReload() {
     try {
@@ -40,16 +44,16 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
         console.log('✅ Embedding model reloaded');
       }
 
-      alert('Modelos recargados correctamente');
+      alert(i18nStore.t('models.reloaded'));
     } catch (error) {
       console.error('Failed to reload models:', error);
-      alert('Error al recargar modelos');
+      alert(i18nStore.t('models.reloadError'));
     }
   }
 
   async function handleReset() {
     const confirmed = confirm(
-      'Esto borrará la configuración actual y reiniciará el asistente. ¿Continuar?'
+      i18nStore.t('models.confirmReset')
     );
 
     if (!confirmed) return;
@@ -78,7 +82,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
       }, 500);
     } catch (error) {
       console.error('Failed to reset:', error);
-      alert('Error al resetear configuración');
+      alert(i18nStore.t('models.resetError'));
     } finally {
       setIsResetting(false);
     }
@@ -95,10 +99,10 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
         variant="secondary"
         size="sm"
         onClick={() => setShowMenu(true)}
-        title="Configurar modelos"
+        title={i18nStore.t('models.configure')}
       >
         <Settings size={16} />
-        Configurar modelos
+        {i18nStore.t('models.configure')}
       </Button>
     );
   }
@@ -108,7 +112,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
       <Card className="max-w-md w-full">
         <div className="space-y-4 p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">Configuración de Modelos</h2>
+            <h2 className="text-xl font-bold">{i18nStore.t('models.configure')}</h2>
             <button
               onClick={() => setShowMenu(false)}
               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
@@ -120,20 +124,20 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
           {/* Current Models Status */}
           <div className="space-y-3">
             <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-4">
-              <h3 className="font-medium mb-3">Modelos actuales</h3>
+              <h3 className="font-medium mb-3">{i18nStore.t('models.currentModels')}</h3>
 
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--color-text-secondary)]">Chat:</span>
+                  <span className="text-[var(--color-text-secondary)]">{i18nStore.t('models.chat')}:</span>
                   <span className={modelsStore.chat ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
-                    {modelsStore.chat ? modelsStore.chat.name : 'No cargado'}
+                    {modelsStore.chat ? modelsStore.chat.name : i18nStore.t('models.notLoaded')}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--color-text-secondary)]">Embeddings:</span>
+                  <span className="text-[var(--color-text-secondary)]">{i18nStore.t('models.embeddings')}:</span>
                   <span className={modelsStore.embedding ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
-                    {modelsStore.embedding ? modelsStore.embedding.name : 'No cargado'}
+                    {modelsStore.embedding ? modelsStore.embedding.name : i18nStore.t('models.notLoaded')}
                   </span>
                 </div>
               </div>
@@ -142,7 +146,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
                 <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
                   <div className="flex items-center gap-2 text-xs text-[var(--color-success)]">
                     <span className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
-                    Todos los modelos listos
+                    {i18nStore.t('models.allReady')}
                   </div>
                 </div>
               )}
@@ -152,7 +156,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-2 text-sm">
               <Info size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
               <div className="text-blue-500">
-                Los modelos se descargan una sola vez y se cachean en tu navegador para futuras sesiones.
+                {i18nStore.t('models.cacheInfo')}
               </div>
             </div>
           </div>
@@ -165,7 +169,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
               className="w-full"
             >
               <Download size={16} />
-              Cambiar modelos
+              {i18nStore.t('models.change')}
             </Button>
 
             <Button
@@ -175,7 +179,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
               className="w-full"
             >
               <RefreshCw size={16} />
-              Recargar modelos actuales
+              {i18nStore.t('models.reload')}
             </Button>
 
             <Button
@@ -185,7 +189,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
               className="w-full text-red-500 hover:text-red-600 hover:bg-red-500/10"
             >
               <Trash2 size={16} />
-              Resetear configuración
+              {i18nStore.t('models.reset')}
             </Button>
           </div>
 
@@ -195,7 +199,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
               onClick={() => setShowMenu(false)}
               className="w-full"
             >
-              Cerrar
+              {i18nStore.t('common.close')}
             </Button>
           </div>
         </div>

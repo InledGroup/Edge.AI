@@ -138,6 +138,17 @@ import {
     </head>
     <body>
         <div class="min-h-screen bg-[var(--color-bg)] grid-pattern">
+            <!-- Language Switcher -->
+            <div class="fixed top-6 right-6 z-50">
+                <button
+                    id="langSwitcher"
+                    class="px-4 py-2 glass hover:bg-[var(--color-primary)]/10 text-[var(--color-text)] font-semibold rounded-xl transition-all duration-300 border border-white/10 flex items-center gap-2"
+                >
+                    <Globe size={18} />
+                    <span id="langLabel">English</span>
+                </button>
+            </div>
+
             <!-- Hero Section -->
             <section class="relative overflow-hidden">
                 <!-- Animated Background Effects -->
@@ -184,10 +195,11 @@ import {
                             >
                                 <span
                                     class="block mb-3 gradient-text animate-gradient"
+                                    data-i18n="landing.heroTitle1"
                                 >
                                     IA
                                 </span>
-                                <span class="block text-[var(--color-text)]">
+                                <span class="block text-[var(--color-text)]" data-i18n="landing.heroTitle2">
                                     que no sale de tu ordenador
                                 </span>
                             </h1>
@@ -196,12 +208,17 @@ import {
                                 class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)] max-w-3xl mx-auto leading-relaxed px-4 opacity-0 fade-in-up"
                                 style="animation-delay: 0.2s;"
                             >
+                                <span data-i18n="landing.heroSubtitle">
                                 Chatea con modelos de IA que se ejecutan en tu
                                 ordenador, buscan en internet y leen tus
-                                documentos sin subirlos a la nube. <br /> Hasta puedes
-                                desactivar la Wifi una vez descargado el modelo
+                                documentos sin subirlos a la nube.
+                                </span>
+                                <br />
+                                <span data-i18n="landing.heroNote">Hasta puedes
+                                desactivar la Wifi una vez descargado el modelo</span>
                                 <span
                                     class="block mt-2 text-[var(--color-primary)] font-bold"
+                                    data-i18n="landing.heroBadges"
                                 >
                                     Privado · Local · Ilimitado
                                 </span>
@@ -220,7 +237,7 @@ import {
                                 <span
                                     class="relative z-10 flex items-center justify-center gap-2"
                                 >
-                                    Probar Ahora
+                                    <span data-i18n="landing.tryNow">Probar Ahora</span>
                                     <ChevronRight
                                         size={20}
                                         className="group-hover:translate-x-1 transition-transform"
@@ -239,7 +256,7 @@ import {
                                 <span
                                     class="flex items-center justify-center gap-2"
                                 >
-                                    Ver Características
+                                    <span data-i18n="landing.viewFeatures">Ver Características</span>
                                     <ChevronDown
                                         size={20}
                                         className="group-hover:translate-y-1 transition-transform"
@@ -260,7 +277,7 @@ import {
                                     size={20}
                                     className="text-[var(--color-primary)]"
                                 />
-                                <span class="font-medium">Sin servidores</span>
+                                <span class="font-medium" data-i18n="landing.noServers">Sin servidores</span>
                             </div>
                             <div
                                 class="flex items-center gap-3 px-4 py-2 glass rounded-full"
@@ -269,7 +286,7 @@ import {
                                     size={20}
                                     className="text-[var(--color-primary)]"
                                 />
-                                <span class="font-medium">Sin registro</span>
+                                <span class="font-medium" data-i18n="landing.noRegistration">Sin registro</span>
                             </div>
                             <div
                                 class="flex items-center gap-3 px-4 py-2 glass rounded-full"
@@ -278,7 +295,7 @@ import {
                                     size={20}
                                     className="text-[var(--color-primary)]"
                                 />
-                                <span class="font-medium">Sin costos</span>
+                                <span class="font-medium" data-i18n="landing.noCosts">Sin costos</span>
                             </div>
                         </div>
                     </div>
@@ -309,12 +326,13 @@ import {
                         <h2
                             class="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight"
                         >
-                            <span class="gradient-text animate-gradient">
+                            <span class="gradient-text animate-gradient" data-i18n="landing.featuresTitle">
                                 Nunca antes desarrollado, novedoso
                             </span>
                         </h2>
                         <p
                             class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)] max-w-3xl mx-auto px-4"
+                            data-i18n="landing.featuresSubtitle"
                         >
                             Todo el poder de la IA sin comprometer tu privacidad
                         </p>
@@ -341,11 +359,13 @@ import {
                             </div>
                             <h3
                                 class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                                data-i18n="landing.feature1Title"
                             >
                                 Privacidad Total
                             </h3>
                             <p
                                 class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                                data-i18n="landing.feature1Desc"
                             >
                                 Las conversaciones se almacenan en tu navegador usando IndexedDB. No se envían a ningún servidor, se quedan en tu dispositivo.
                             </p>
@@ -368,11 +388,13 @@ import {
                             </div>
                             <h3
                                 class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                                data-i18n="landing.feature2Title"
                             >
                                 Modelos Potentes
                             </h3>
                             <p
                                 class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                                data-i18n="landing.feature2Desc"
                             >
                                 Gracias a potentes algoritmos de detección, Edge AI escoge el modelo de IA que mejor se adapta a las especificaciones de tu dispositivo.
                             </p>
@@ -395,11 +417,13 @@ import {
                             </div>
                             <h3
                                 class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                                data-i18n="landing.feature3Title"
                             >
                                 Añade documentos sin comprometer la privacidad
                             </h3>
                             <p
                                 class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                                data-i18n="landing.feature3Desc"
                             >
                                 Con novedosos sistemas de tecnología RAG, Edge.AI puede responder a tus preguntas sobre documentos que tú le añadas que nunca saldrán de tu dispositivo.
                             </p>
@@ -422,11 +446,13 @@ import {
                             </div>
                             <h3
                                 class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                                data-i18n="landing.feature4Title"
                             >
                                 Rápido y Eficiente
                             </h3>
                             <p
                                 class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                                data-i18n="landing.feature4Desc"
                             >
                                 Optimizado con WebGPU y WebAssembly para máximo
                                 rendimiento. Funciona offline una vez descargado
@@ -451,11 +477,13 @@ import {
                             </div>
                             <h3
                                 class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                                data-i18n="landing.feature5Title"
                             >
                                 Búsqueda en internet
                             </h3>
                             <p
                                 class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                                data-i18n="landing.feature5Desc"
                             >
                                 Si necesitas que Edge.AI busque en internet: lo tienes. <br>
                                 Búsqueda en Wikipedia y DuckDuckGo, privada, sin relacionarte con la búsqueda. <br>
@@ -480,11 +508,13 @@ import {
                             </div>
                             <h3
                                 class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+                                data-i18n="landing.feature6Title"
                             >
                                 Interfaz Moderna
                             </h3>
                             <p
                                 class="text-[var(--color-text-secondary)] leading-relaxed text-base"
+                                data-i18n="landing.feature6Desc"
                             >
                                 Diseño limpio e intuitivo con modo oscuro.
                                 Experiencia de usuario fluida y profesional.
@@ -516,12 +546,13 @@ import {
                         <h2
                             class="text-4xl md:text-6xl font-bold mb-6 leading-tight"
                         >
-                            <span class="text-[var(--color-text)]">
+                            <span class="text-[var(--color-text)]" data-i18n="landing.ctaTitle1">
                                 Empieza hoy con Edge.AI
                             </span>
                             <br />
                             <span
                                 class="bg-gradient-to-r from-[var(--color-primary)] via-[#20b813] to-[var(--color-primary)] bg-clip-text text-transparent"
+                                data-i18n="landing.ctaTitle2"
                             >
                                 Solo con un clic
                             </span>
@@ -530,9 +561,11 @@ import {
                         <p
                             class="text-xl md:text-2xl text-[var(--color-text-secondary)] mb-12 max-w-2xl mx-auto leading-relaxed"
                         >
+                            <span data-i18n="landing.ctaSubtitle">
                             No necesitas registrarte, no hay planes de pago, no
                             hay límites.
-                            <span class="text-[var(--color-primary)]"
+                            </span>
+                            <span class="text-[var(--color-primary)]" data-i18n="landing.ctaHighlight"
                                 >Simplemente empieza a usar IA de forma privada.</span
                             >
                         </p>
@@ -545,7 +578,7 @@ import {
                                 href="/"
                                 class="group relative px-10 py-5 bg-gradient-to-r from-[var(--color-primary)] to-[#20b813] text-black font-bold rounded-xl text-xl transition-all duration-300 hover:shadow-2xl hover:shadow-[var(--color-primary)]/50 hover:scale-105 w-full sm:w-auto"
                             >
-                                <span class="relative z-10"
+                                <span class="relative z-10" data-i18n="landing.startFree"
                                     >Comenzar Gratis</span
                                 >
                                 <div
@@ -567,11 +600,13 @@ import {
                                 </div>
                                 <h3
                                     class="font-semibold text-lg text-[var(--color-text)]"
+                                    data-i18n="landing.benefit1Title"
                                 >
                                     Listo en Segundos
                                 </h3>
                                 <p
                                     class="text-sm text-[var(--color-text-secondary)]"
+                                    data-i18n="landing.benefit1Desc"
                                 >
                                     Solo abre el navegador, descarga los modelos y chatea
                                 </p>
@@ -585,11 +620,13 @@ import {
                                 </div>
                                 <h3
                                     class="font-semibold text-lg text-[var(--color-text)]"
+                                    data-i18n="landing.benefit2Title"
                                 >
                                     100% Privado
                                 </h3>
                                 <p
                                     class="text-sm text-[var(--color-text-secondary)]"
+                                    data-i18n="landing.benefit2Desc"
                                 >
                                     Tus datos nunca salen de tu dispositivo
                                 </p>
@@ -603,11 +640,13 @@ import {
                                 </div>
                                 <h3
                                     class="font-semibold text-lg text-[var(--color-text)]"
+                                    data-i18n="landing.benefit3Title"
                                 >
                                     Siempre Gratis
                                 </h3>
                                 <p
                                     class="text-sm text-[var(--color-text-secondary)]"
+                                    data-i18n="landing.benefit3Desc"
                                 >
                                     Sin tarifas ocultas ni suscripciones
                                 </p>
@@ -645,6 +684,7 @@ import {
 
                         <p
                             class="text-sm text-[var(--color-text-secondary)] max-w-md"
+                            data-i18n="landing.footerTagline"
                         >
                             ¿Desde cuando la IA es igual a preocupaciones?
                         </p>
@@ -671,6 +711,7 @@ import {
                         >
                             <p
                                 class="text-xs text-[var(--color-text-tertiary)]"
+                                data-i18n="landing.footerLicense"
                             >
                                 Licenciado bajo GNU General Public License v3.0 | Inled Group
                             </p>
@@ -679,5 +720,48 @@ import {
                 </div>
             </footer>
         </div>
+
+        <!-- Language script -->
+        <script>
+            import { i18nStore } from '@/lib/stores/i18n';
+
+            // Function to update landing page text
+            function updateLandingLanguage() {
+                const elements = document.querySelectorAll('[data-i18n]');
+                elements.forEach(el => {
+                    const key = el.getAttribute('data-i18n');
+                    if (key) {
+                        el.innerHTML = i18nStore.t(key);
+                    }
+                });
+
+                // Update switcher label
+                const langLabel = document.getElementById('langLabel');
+                if (langLabel) {
+                    langLabel.textContent = i18nStore.current === 'es' ? 'English' : 'Español';
+                }
+            }
+
+            // Init language
+            async function init() {
+                await i18nStore.init();
+                updateLandingLanguage();
+            }
+
+            // Handle switcher click
+            const langSwitcher = document.getElementById('langSwitcher');
+            if (langSwitcher) {
+                langSwitcher.addEventListener('click', async () => {
+                    const nextLang = i18nStore.current === 'es' ? 'en' : 'es';
+                    await i18nStore.setLanguage(nextLang);
+                    updateLandingLanguage();
+                });
+            }
+
+            // Initialize on load
+            if (typeof window !== 'undefined') {
+                init();
+            }
+        </script>
     </body>
 </html>
