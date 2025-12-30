@@ -504,7 +504,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
   if (step === 'complete') {
     return (
       <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-        <Card className="max-w-2xl w-full">
+        <Card className="max-w-lg w-full">
           <div className="text-center space-y-6 p-8">
             <div className="w-16 h-16 mx-auto flex items-center justify-center">
               <CheckCircle2 size={64} className="text-[var(--color-success)]" />
@@ -516,16 +516,18 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
               </p>
             </div>
 
-            <div className="w-full overflow-hidden rounded-lg border border-[var(--color-border)] bg-white">
-              <iframe
-                width="540"
-                height="305"
-                src="https://7c0cb458.sibforms.com/serve/MUIFAPqS4aMwyG9eiASS-LRNOT1zsY2xefVUxEuu2jAL8znxvos7hP7gQsASGgyC6FdUHJvi2SOr4NUmxUqmkcBOTRyGUZauKcn6dvP24DSLYDmXnHyIO3ZToBhJ6PGaE5JnYTdECW_d6ezFdrjwEmRihA2TkJsf8HueD3VesU8vkYGa_1iHNFWwq3yvrRD7gVXgiEj2l8rib1CL5A=="
-                frameBorder={0}
-                scrolling="auto"
-                allowFullScreen
-                style={{ display: 'block', marginLeft: 'auto', marginRight: 'auto', maxWidth: '100%' }}
-              ></iframe>
+            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-6 space-y-4">
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                {i18nStore.t('wizard.newsletterSubtitle')}
+              </p>
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => window.open('https://7c0cb458.sibforms.com/serve/MUIFAPqS4aMwyG9eiASS-LRNOT1zsY2xefVUxEuu2jAL8znxvos7hP7gQsASGgyC6FdUHJvi2SOr4NUmxUqmkcBOTRyGUZauKcn6dvP24DSLYDmXnHyIO3ZToBhJ6PGaE5JnYTdECW_d6ezFdrjwEmRihA2TkJsf8HueD3VesU8vkYGa_1iHNFWwq3yvrRD7gVXgiEj2l8rib1CL5A==', '_blank')}
+              >
+                <Info size={18} />
+                {i18nStore.t('wizard.subscribeNewsletter')}
+              </Button>
             </div>
 
             <Button onClick={() => onComplete()} size="lg" className="w-full">
