@@ -488,16 +488,12 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
               markSetupCompleted();
               // Move to complete step
               setStep('complete');
-              // Auto-close after 2 seconds
-              setTimeout(() => onComplete(), 2000);
             }}
             onSkip={() => {
               // Mark setup complete even if skipping extension
               markSetupCompleted();
               // Move to complete step
               setStep('complete');
-              // Auto-close after 2 seconds
-              setTimeout(() => onComplete(), 2000);
             }}
           />
         </Card>
@@ -508,7 +504,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
   if (step === 'complete') {
     return (
       <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-        <Card className="max-w-lg w-full">
+        <Card className="max-w-2xl w-full">
           <div className="text-center space-y-6 p-8">
             <div className="w-16 h-16 mx-auto flex items-center justify-center">
               <CheckCircle2 size={64} className="text-[var(--color-success)]" />
@@ -519,6 +515,22 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                 {i18nStore.t('wizard.readySubtitle')}
               </p>
             </div>
+
+            <div className="w-full overflow-hidden rounded-lg border border-[var(--color-border)] bg-white">
+              <iframe
+                width="540"
+                height="305"
+                src="https://7c0cb458.sibforms.com/serve/MUIFAPqS4aMwyG9eiASS-LRNOT1zsY2xefVUxEuu2jAL8znxvos7hP7gQsASGgyC6FdUHJvi2SOr4NUmxUqmkcBOTRyGUZauKcn6dvP24DSLYDmXnHyIO3ZToBhJ6PGaE5JnYTdECW_d6ezFdrjwEmRihA2TkJsf8HueD3VesU8vkYGa_1iHNFWwq3yvrRD7gVXgiEj2l8rib1CL5A=="
+                frameBorder={0}
+                scrolling="auto"
+                allowFullScreen
+                style={{ display: 'block', marginLeft: 'auto', marginRight: 'auto', maxWidth: '100%' }}
+              ></iframe>
+            </div>
+
+            <Button onClick={() => onComplete()} size="lg" className="w-full">
+              {i18nStore.t('wizard.startChatting')}
+            </Button>
           </div>
         </Card>
       </div>

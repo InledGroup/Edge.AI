@@ -108,6 +108,8 @@ export const translations = {
       loadingSubtitle: 'Esto puede tardar unos minutos la primera vez',
       allReady: '¡Todo listo!',
       readySubtitle: 'Edge.AI está configurado y listo para usar',
+      startChatting: 'Comenzar a chatear',
+      finish: 'Finalizar',
       errorDetection: 'Error al detectar las capacidades del dispositivo',
       errorLoading: 'Error al cargar modelos',
       selectBoth: 'Selecciona ambos modelos'
@@ -292,6 +294,8 @@ export const translations = {
       loadingSubtitle: 'This may take a few minutes the first time',
       allReady: 'All set!',
       readySubtitle: 'Edge.AI is configured and ready to use',
+      startChatting: 'Start Chatting',
+      finish: 'Finish',
       errorDetection: 'Error detecting device capabilities',
       errorLoading: 'Error loading models',
       selectBoth: 'Select both models'
