@@ -1,6 +1,6 @@
 // Message Component - Individual chat message
 
-import { User, Bot, FileText, Copy, FileEdit } from 'lucide-preact';
+import { User, Bot, FileText, Copy, FileEdit, Volume2, VolumeX } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import type { Message as MessageType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { WebSources } from './WebSources';
 import type { WebSource } from './WebSources';
 import { Button } from '../ui/Button';
+import { speechService, voiceState } from '@/lib/voice/speech-service';
 
 export interface MessageProps {
   message: MessageType;
@@ -17,6 +18,7 @@ export interface MessageProps {
 export function Message({ message, onOpenInCanvas }: MessageProps) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const vState = voiceState.value;
 
   // Detectar si hay fuentes web (metadata con webSources)
   const webSources = (message as any).metadata?.webSources as WebSource[] | undefined;
@@ -38,6 +40,14 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
   function handleOpenInCanvas() {
     if (onOpenInCanvas) {
       onOpenInCanvas(message.content);
+    }
+  }
+
+  function handleSpeak() {
+    if (vState === 'speaking') {
+      speechService.stopSpeaking();
+    } else {
+      speechService.speak(message.content);
     }
   }
 
@@ -112,6 +122,16 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
         {/* Action buttons for assistant messages */}
         {!isUser && (
           <div className="flex items-center gap-2 px-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSpeak}
+              className="h-7 px-2 text-xs"
+              title="Escuchar respuesta"
+            >
+              {vState === 'speaking' ? <VolumeX size={14} className="mr-1" /> : <Volume2 size={14} className="mr-1" />}
+              {vState === 'speaking' ? 'Parar' : 'Escuchar'}
+            </Button>
             <Button
               variant="ghost"
               size="sm"

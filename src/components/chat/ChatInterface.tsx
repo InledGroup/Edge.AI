@@ -18,6 +18,7 @@ import { getRAGSettings, getWebSearchSettings } from '@/lib/db/settings';
 import { WebRAGOrchestrator } from '@/lib/web-search';
 import type { WebSearchStep } from '@/lib/web-search/types';
 import { generateUUID } from '@/lib/utils';
+import { speechService, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<MessageType[]>([]);
@@ -33,6 +34,90 @@ export function ChatInterface() {
   const [documentContent, setDocumentContent] = useState('');
   const [canvasContent, setCanvasContent] = useState(''); // Track current canvas content
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Audio streaming state management
+  const streamingState = useRef<{
+    startTime: number;
+    spokenIndex: number;
+    timer: any;
+    buffer: string;
+    isStreamingAudio: boolean;
+  }>({
+    startTime: 0,
+    spokenIndex: 0,
+    timer: null,
+    buffer: '',
+    isStreamingAudio: false
+  });
+
+  const startAudioStreaming = () => {
+    // Reset state
+    if (streamingState.current.timer) clearTimeout(streamingState.current.timer);
+    
+    streamingState.current = {
+      startTime: Date.now(),
+      spokenIndex: 0,
+      buffer: '',
+      isStreamingAudio: false,
+      timer: setTimeout(() => {
+        streamingState.current.isStreamingAudio = true;
+        // Speak what we have so far if 4s passed
+        const { buffer, spokenIndex } = streamingState.current;
+        if (buffer.length > spokenIndex && isVoiceModeEnabled.value) {
+           const textToSpeak = buffer.substring(spokenIndex);
+           speechService.speakFragment(textToSpeak, false);
+           streamingState.current.spokenIndex = buffer.length;
+        }
+      }, 4000)
+    };
+  };
+
+  const processAudioChunk = (chunk: string) => {
+    streamingState.current.buffer += chunk;
+    
+    if (streamingState.current.isStreamingAudio && isVoiceModeEnabled.value) {
+       const { buffer, spokenIndex } = streamingState.current;
+       const newText = buffer.substring(spokenIndex);
+       
+       // Check for sentence boundary: . ? ! followed by whitespace
+       const sentenceEndRegex = /[.?!]\s/g;
+       let lastMatch = null;
+       let match;
+       while ((match = sentenceEndRegex.exec(newText)) !== null) {
+          lastMatch = match;
+       }
+       
+       if (lastMatch) {
+          const cutIndex = lastMatch.index + 1; // Include punctuation
+          const textChunk = newText.substring(0, cutIndex);
+          if (textChunk.trim()) {
+             speechService.speakFragment(textChunk, false);
+             streamingState.current.spokenIndex += textChunk.length;
+          }
+       }
+    }
+  };
+  
+  const finishAudioStreaming = (fullText: string) => {
+    if (streamingState.current.timer) clearTimeout(streamingState.current.timer);
+    
+    if (isVoiceModeEnabled.value) {
+      if (streamingState.current.isStreamingAudio) {
+         // We were streaming, speak the rest
+         const remaining = streamingState.current.buffer.substring(streamingState.current.spokenIndex);
+         if (remaining.trim()) {
+            speechService.speakFragment(remaining, true);
+         } else {
+            speechService.speakFragment('', true);
+         }
+      } else {
+         // Fast response (< 4s), speak normally
+         speechService.speak(fullText);
+      }
+    }
+    
+    streamingState.current.isStreamingAudio = false;
+  };
   
   // Subscribe to language changes
   const lang = languageSignal.value;
@@ -42,6 +127,11 @@ export function ChatInterface() {
     getWebSearchSettings().then(settings => {
       setWebSearchEnabled(settings.enableWebSearch);
     });
+    
+    // Cleanup speech on unmount
+    return () => {
+      speechService.stopSpeaking();
+    };
   }, []);
 
   /**
@@ -255,6 +345,9 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
     setIsGenerating(true);
     setCurrentResponse('');
     setWebSearchProgress(null);
+    
+    // Start tracking for delayed TTS
+    startAudioStreaming();
 
     try {
       // Get engines
@@ -301,6 +394,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           },
           onToken: (token: string) => {
             streamedContent += token;
+            processAudioChunk(token);
             // Update the streaming message
             setMessages(prev =>
               prev.map(msg =>
@@ -340,6 +434,11 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           )
         );
 
+        // Auto-speak if enabled
+        if (isVoiceModeEnabled.value) {
+          speechService.speak(webResult.answer);
+        }
+
       } else if (effectiveMode === 'local') {
         // ============================================================
         // LOCAL RAG MODE (with documents)
@@ -363,6 +462,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           conversationHistory,
           (chunk) => {
             streamedText += chunk;
+            processAudioChunk(chunk);
             setCurrentResponse(streamedText);
           }
         );
@@ -376,6 +476,10 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           sources: ragResult.chunks,
           model: 'webllm'
         };
+
+        // Auto-speak if enabled
+        finishAudioStreaming(answer);
+
       } else {
         // ============================================================
         // CONVERSATION MODE (no documents, no web search)
@@ -419,6 +523,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           maxTokens: 2048, // Increased for longer responses
           onStream: (chunk) => {
             streamedText += chunk;
+            processAudioChunk(chunk);
             setCurrentResponse(streamedText);
           }
         });
@@ -431,6 +536,9 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           timestamp: Date.now(),
           model: 'webllm'
         };
+
+        // Auto-speak if enabled
+        finishAudioStreaming(answer);
       }
 
       // Only add message if it wasn't already added (web mode adds it during streaming)

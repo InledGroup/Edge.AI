@@ -148,20 +148,46 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       let engineName: string;
       let modelUrl: string;
 
+      // Try WebLLM first if supported
       if (deviceProfile?.hasWebGPU && model.webllmModelId) {
-        // Use WebLLM
-        engine = new WebLLMEngine();
-        engineName = 'webllm';
-        modelUrl = model.webllmModelId;
+        try {
+          // Use WebLLM
+          engine = new WebLLMEngine();
+          engineName = 'webllm';
+          modelUrl = model.webllmModelId;
 
-        await engine.initialize(modelUrl, (progress, status) => {
-          setLoadingProgress(prev => ({
-            ...prev,
-            chat: { progress, message: status }
-          }));
-        });
+          await engine.initialize(modelUrl, (progress, status) => {
+            setLoadingProgress(prev => ({
+              ...prev,
+              chat: { progress, message: status }
+            }));
+          });
+        } catch (webLlmError) {
+          console.warn('⚠️ WebLLM initialization failed, trying fallback to Wllama:', webLlmError);
+          
+          // Fallback to Wllama if GGUF is available
+          if (model.ggufUrl) {
+            setLoadingProgress(prev => ({
+              ...prev,
+              chat: { progress: 0, message: 'WebGPU falló, intentando modo CPU...' }
+            }));
+
+            engine = new WllamaEngine();
+            engineName = 'wllama';
+            modelUrl = model.ggufUrl;
+
+            await engine.initialize(modelUrl, (progress, status) => {
+              setLoadingProgress(prev => ({
+                ...prev,
+                chat: { progress, message: status }
+              }));
+            });
+          } else {
+            throw webLlmError; // No fallback available
+          }
+        }
       } else if (model.ggufUrl) {
-        // Use Wllama
+        // Use Wllama directly
         engine = new WllamaEngine();
         engineName = 'wllama';
         modelUrl = model.ggufUrl;

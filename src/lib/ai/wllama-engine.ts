@@ -14,6 +14,7 @@ export class WllamaEngine {
   private wllama: Wllama | null = null;
   private modelUrl: string = '';
   private isInitialized: boolean = false;
+  private initializing: boolean = false;
 
   constructor() {
     console.log('🤖 Wllama Engine created (Pure WASM CPU backend)');
@@ -27,12 +28,31 @@ export class WllamaEngine {
     modelUrl?: string,
     onProgress?: ProgressCallback
   ): Promise<void> {
-    if (this.isInitialized && this.modelUrl === modelUrl) {
+    if (this.initializing) {
+      console.warn('⚠️ Wllama initialization already in progress, ignoring call.');
+      return;
+    }
+
+    if (this.isInitialized && this.modelUrl === modelUrl && this.wllama) {
       console.log('✅ Wllama already initialized');
       return;
     }
 
+    this.initializing = true;
+
     try {
+      // CLEANUP: Aggressively ensure no previous instance exists
+      if (this.wllama) {
+        console.log('♻️ Cleaning up previous Wllama instance...');
+        try {
+          await this.wllama.exit();
+        } catch (e) {
+          console.warn('Error closing previous instance (ignoring):', e);
+        }
+        this.wllama = null;
+        this.isInitialized = false;
+      }
+
       console.log('🚀 Initializing Wllama (WebAssembly CPU)...');
       onProgress?.(0, 'Inicializando motor WASM...');
 
@@ -50,27 +70,33 @@ export class WllamaEngine {
 
       this.modelUrl = defaultModelUrl;
 
-      // Create Wllama instance with optimized WASM build
-      // Point to WASM files in public directory
-      const isMultiThread = recommendedBuild.path.includes('multi-thread');
-      const basePath = isMultiThread
-        ? '/wllama/multi-thread/wllama'
-        : '/wllama/single-thread/wllama';
+      // FORCE SINGLE-THREAD MODE FOR STABILITY
+      // Multi-threading often causes "Module already initialized" or worker conflicts in some environments
+      console.log('🛡️ FORCE: Using single-thread mode for maximum stability');
+      
+      const basePath = '/wllama/single-thread/wllama';
 
-      // Configure paths for both single-thread and multi-thread variants
       const config: Record<string, string> = {
         'single-thread/wllama.wasm': basePath + '.wasm',
         'single-thread/wllama.js': basePath + '.js',
       };
 
-      // Add multi-thread worker if using multi-thread build
-      if (isMultiThread) {
-        config['multi-thread/wllama.wasm'] = basePath + '.wasm';
-        config['multi-thread/wllama.js'] = basePath + '.js';
-        config['multi-thread/wllama.worker.mjs'] = '/wllama/multi-thread/wllama.worker.mjs';
+      // GLOBAL CLEANUP: Attempt to remove any existing Emscripten Module global
+      if (typeof window !== 'undefined' && (window as any).Module) {
+        console.warn('🧹 Cleaning up lingering global Module object...');
+        try {
+          // @ts-ignore
+          delete (window as any).Module;
+        } catch (e) {}
       }
 
-      this.wllama = new Wllama(config);
+      try {
+        this.wllama = new Wllama(config);
+      } catch (err: any) {
+        // If "Module is already initialized", it implies global pollution from a previous run.
+        console.error('CRITICAL: Failed to create Wllama instance:', err);
+        throw new Error(`Wllama creation failed: ${err.message}`);
+      }
 
       onProgress?.(10, 'Verificando caché...');
 
@@ -81,31 +107,46 @@ export class WllamaEngine {
       let isLoadingFromCache = false;
       let lastLoaded = 0;
 
-      await this.wllama.loadModelFromUrl(this.modelUrl, {
-        n_ctx: 2048,
-        embeddings: true, // Enable embeddings support
-        n_threads: optimalThreads, // Use optimal thread count
-        progressCallback: ({ loaded, total }) => {
-          if (total > 0) {
-            // Detect if loading from cache (instant progress jumps)
-            if (loaded > lastLoaded + 50 * 1024 * 1024 && Date.now() - loadStartTime < 1000) {
-              isLoadingFromCache = true;
-            }
-            lastLoaded = loaded;
+      const loadModel = async (attempt: number) => {
+        try {
+          await this.wllama!.loadModelFromUrl(this.modelUrl, {
+            n_ctx: 2048,
+            embeddings: true, // Enable embeddings support
+            n_threads: 1, // FORCE 1 THREAD for stability
+            progressCallback: ({ loaded, total }) => {
+              if (total > 0) {
+                // Detect if loading from cache (instant progress jumps)
+                if (loaded > lastLoaded + 50 * 1024 * 1024 && Date.now() - loadStartTime < 1000) {
+                  isLoadingFromCache = true;
+                }
+                lastLoaded = loaded;
 
-            const percent = Math.round((loaded / total) * 70);
-            const loadedMB = Math.round(loaded / 1024 / 1024);
-            const totalMB = Math.round(total / 1024 / 1024);
+                const percent = Math.round((loaded / total) * 70);
+                const loadedMB = Math.round(loaded / 1024 / 1024);
+                const totalMB = Math.round(total / 1024 / 1024);
 
-            const cacheStatus = isLoadingFromCache ? ' (desde caché OPFS ⚡)' : ' (descargando...)';
-            onProgress?.(10 + percent, `${loadedMB}MB / ${totalMB}MB${cacheStatus}`);
+                const cacheStatus = isLoadingFromCache ? ' (desde caché OPFS ⚡)' : ' (descargando...)';
+                onProgress?.(10 + percent, `${loadedMB}MB / ${totalMB}MB${cacheStatus}`);
 
-            if (loaded === total && isLoadingFromCache) {
-              console.log('✅ [Wllama] Model loaded from OPFS cache (no download needed!)');
-            }
+                if (loaded === total && isLoadingFromCache) {
+                  console.log('✅ [Wllama] Model loaded from OPFS cache (no download needed!)');
+                }
+              }
+            },
+          });
+        } catch (err) {
+          if (attempt < 2) {
+            console.warn(`⚠️ Attempt ${attempt} failed, retrying in 1s...`, err);
+            onProgress?.(10, `Error, reintentando (${attempt}/2)...`);
+            await new Promise(r => setTimeout(r, 1000));
+            await loadModel(attempt + 1);
+          } else {
+            throw err;
           }
-        },
-      });
+        }
+      };
+
+      await loadModel(1);
 
       const loadTime = Date.now() - loadStartTime;
       if (loadTime < 5000) {
@@ -123,9 +164,20 @@ export class WllamaEngine {
     } catch (error) {
       console.error('❌ Failed to initialize Wllama:', error);
       this.isInitialized = false;
+      
+      // Cleanup partially initialized instance
+      if (this.wllama) {
+        try {
+          await this.wllama.exit();
+        } catch (e) { console.warn('Error cleaning up after failure:', e); }
+        this.wllama = null;
+      }
+      
       throw new Error(
         `Failed to initialize Wllama: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+    } finally {
+      this.initializing = false;
     }
   }
 

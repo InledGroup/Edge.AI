@@ -55,7 +55,11 @@ export const translations = {
         smart: 'Modo inteligente - IA decide estrategia',
         web: 'Búsqueda web activa',
         local: 'Búsqueda en documentos locales'
-      }
+      },
+      voiceModeActive: 'Modo Voz Activo',
+      listening: 'Escuchando...',
+      dictate: 'Dictar',
+      voiceModeContinuous: 'Modo Voz Continua'
     },
     documents: {
       title: 'Subir Documentos',
@@ -243,7 +247,11 @@ export const translations = {
         smart: 'Smart mode - AI decides strategy',
         web: 'Web search active',
         local: 'Search in local documents'
-      }
+      },
+      voiceModeActive: 'Voice Mode Active',
+      listening: 'Listening...',
+      dictate: 'Dictate',
+      voiceModeContinuous: 'Continuous Voice Mode'
     },
     documents: {
       title: 'Upload Documents',
