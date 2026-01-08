@@ -73,7 +73,8 @@ JSON:`;
   try {
     const response = await generateText(llmEngine, prompt, {
       temperature: 0.5,
-      maxTokens: 200
+      maxTokens: 200,
+      stop: ['CONSULTA ORIGINAL:', 'JSON:']
     });
 
     // Extract JSON from response
@@ -187,7 +188,8 @@ Pregunta reformulada:`;
   try {
     const rewritten = await generateText(llmEngine, prompt, {
       temperature: 0.3,
-      maxTokens: 100
+      maxTokens: 100,
+      stop: ['\n', 'PREGUNTA ORIGINAL:']
     });
 
     const cleaned = rewritten.trim().replace(/^["']|["']$/g, '');
@@ -231,14 +233,14 @@ export function extractKeyTerms(query: string): string[] {
 async function generateText(
   llmEngine: LLMEngine,
   prompt: string,
-  options: { temperature: number; maxTokens: number }
+  options: { temperature: number; maxTokens: number; stop?: string[] }
 ): Promise<string> {
   // WebLLM
   if ('generateText' in llmEngine) {
     return await llmEngine.generateText(prompt, {
       temperature: options.temperature,
       maxTokens: options.maxTokens,
-      stream: false,
+      stop: options.stop,
     });
   }
 
@@ -249,6 +251,7 @@ async function generateText(
       {
         temperature: options.temperature,
         max_tokens: options.maxTokens,
+        stop: options.stop,
       }
     );
     return response;

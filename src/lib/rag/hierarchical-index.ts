@@ -125,6 +125,7 @@ Resumen (máximo ${maxLength} palabras):`;
       summary = await llmEngine.generateText(prompt, {
         temperature: 0.3,
         maxTokens: Math.ceil(maxLength * 1.5),
+        stop: ['Resume el siguiente'],
         stream: false
       });
     } else if ('createChatCompletion' in llmEngine) {

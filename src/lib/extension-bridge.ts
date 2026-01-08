@@ -259,6 +259,71 @@ export class ExtensionBridge {
   }
 
   /**
+   * Request search only (no extraction yet)
+   */
+  async searchOnly(query: string, maxResults: number = 10): Promise<ExtensionSearchResponse> {
+    if (!this.isConnected()) {
+      throw new Error('Extension not connected. Please install and enable the Edge.AI browser extension.');
+    }
+
+    const requestId = `search_only_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    console.log('[ExtensionBridge] 🔍 Requesting search only:', query);
+
+    return new Promise((resolve, reject) => {
+      // Setup timeout
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(new Error('Search request timeout (30s)'));
+      }, 30000);
+
+      this.pendingRequests.set(requestId, { resolve, reject, timeout });
+
+      window.postMessage({
+        source: 'edgeai-webapp',
+        type: 'SEARCH_ONLY_REQUEST',
+        data: {
+          requestId,
+          query,
+          maxResults
+        }
+      }, '*');
+    });
+  }
+
+  /**
+   * Request extraction for specific URLs
+   */
+  async extractUrls(urls: string[]): Promise<ExtensionSearchResponse> {
+    if (!this.isConnected()) {
+      throw new Error('Extension not connected.');
+    }
+
+    const requestId = `extract_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    console.log('[ExtensionBridge] 📄 Requesting extraction for:', urls.length, 'URLs');
+
+    return new Promise((resolve, reject) => {
+      // Setup longer timeout for extraction
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(new Error('Extraction request timeout (60s)'));
+      }, 60000);
+
+      this.pendingRequests.set(requestId, { resolve, reject, timeout });
+
+      window.postMessage({
+        source: 'edgeai-webapp',
+        type: 'EXTRACT_URLS_REQUEST',
+        data: {
+          requestId,
+          urls
+        }
+      }, '*');
+    });
+  }
+
+  /**
    * Request search from extension
    */
   async search(query: string, maxResults: number = 10): Promise<ExtensionSearchResponse> {

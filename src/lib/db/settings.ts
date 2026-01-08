@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: Settings = {
   enableWebSearch: true, // Enabled by default - show the toggle
   webSearchSources: ['extension'], // Use browser extension
   webSearchMaxUrls: 3, // Max 3 URLs to fetch
+  webSearchConfirmUrls: true, // Confirm by default for safety
 };
 
 /**
@@ -185,16 +186,18 @@ export async function updateGenerationSettings(settings: {
  * Get web search settings
  */
 export async function getWebSearchSettings() {
-  const [enableWebSearch, webSearchSources, webSearchMaxUrls] = await Promise.all([
+  const [enableWebSearch, webSearchSources, webSearchMaxUrls, webSearchConfirmUrls] = await Promise.all([
     getSetting('enableWebSearch'),
     getSetting('webSearchSources'),
-    getSetting('webSearchMaxUrls')
+    getSetting('webSearchMaxUrls'),
+    getSetting('webSearchConfirmUrls')
   ]);
 
   return {
     enableWebSearch: enableWebSearch ?? false,
     webSearchSources: webSearchSources ?? ['extension'],
-    webSearchMaxUrls: webSearchMaxUrls ?? 3
+    webSearchMaxUrls: webSearchMaxUrls ?? 3,
+    webSearchConfirmUrls: webSearchConfirmUrls ?? true
   };
 }
 
@@ -205,6 +208,7 @@ export async function updateWebSearchSettings(settings: {
   enableWebSearch?: boolean;
   webSearchSources?: ('wikipedia' | 'duckduckgo' | 'extension')[];
   webSearchMaxUrls?: number;
+  webSearchConfirmUrls?: boolean;
 }): Promise<void> {
   await updateSettings(settings);
 }

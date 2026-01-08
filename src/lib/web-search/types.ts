@@ -380,8 +380,14 @@ export interface WebRAGOptions {
   /** TTL del cache en ms */
   cacheTTL?: number;
 
+  /** Requerir confirmación antes de abrir URLs */
+  confirmUrls?: boolean;
+
+  /** Callback para solicitar confirmación de URLs */
+  onConfirmationRequest?: (urls: string[]) => Promise<string[] | null>;
+
   /** Callback de progreso */
-  onProgress?: (step: WebSearchStep, progress: number, message?: string) => void;
+  onProgress?: (step: WebSearchStep, progress: number, message?: string, data?: any) => void;
 
   /** Callback para streaming de tokens durante la generación de respuesta */
   onToken?: (token: string) => void;
@@ -394,6 +400,7 @@ export type WebSearchStep =
   | 'query_generation'
   | 'web_search'
   | 'url_selection'
+  | 'url_confirmation'
   | 'page_fetch'
   | 'content_extraction'
   | 'chunking'

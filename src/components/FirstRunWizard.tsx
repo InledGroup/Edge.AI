@@ -258,7 +258,31 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
     return (
       <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
         <Card className="max-w-2xl w-full">
-          <div className="text-center space-y-6 p-8">
+          <div className="text-center space-y-6 p-8 relative">
+            {/* Language Switcher */}
+            <div className="absolute top-6 right-8 flex gap-1 bg-[var(--color-bg-secondary)] p-1 rounded-md border border-[var(--color-border)]">
+              <button
+                onClick={() => i18nStore.setLanguage('es')}
+                className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                  lang === 'es'
+                    ? 'bg-[var(--color-primary)] text-white shadow-sm'
+                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
+                }`}
+              >
+                ES
+              </button>
+              <button
+                onClick={() => i18nStore.setLanguage('en')}
+                className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                  lang === 'en'
+                    ? 'bg-[var(--color-primary)] text-white shadow-sm'
+                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
+                }`}
+              >
+                EN
+              </button>
+            </div>
+
             <div className="w-20 h-20 mx-auto">
               <img src="/inledai.svg" alt="Edge.AI" width={80} height={80} />
             </div>

@@ -231,6 +231,7 @@ export class WllamaEngine {
     const {
       temperature = 0.7,
       maxTokens = 512,
+      stop,
       onStream,
     } = options;
 
@@ -247,6 +248,7 @@ export class WllamaEngine {
         await this.wllama.createCompletion(prompt, {
           nPredict: maxTokens,
           temp: temperature,
+          stop, // Pass stop tokens
           onNewToken: (_token, _piece, currentText) => {
             // Send incremental chunks
             const newChunk = currentText.slice(fullResponse.length);
@@ -261,6 +263,7 @@ export class WllamaEngine {
         const result = await this.wllama.createCompletion(prompt, {
           nPredict: maxTokens,
           temp: temperature,
+          stop, // Pass stop tokens
         });
         fullResponse = result;
       }

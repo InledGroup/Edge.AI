@@ -28,8 +28,9 @@ export class ExtensionSearchProvider implements SearchProvider {
         throw new Error('Extension bridge not available (SSR context)');
       }
 
-      // Use the extension bridge
-      const response = await bridge.search(query, maxResults);
+      // Use the extension bridge (Search Only mode)
+      // This gets results without opening tabs yet
+      const response = await bridge.searchOnly(query, maxResults);
 
       if (!response.success) {
         throw new Error('Search failed');
@@ -38,14 +39,11 @@ export class ExtensionSearchProvider implements SearchProvider {
       // Convert extension results to SearchResult format
       const results: SearchResult[] = response.results.map((result) => ({
         title: result.title,
-        snippet: result.content.substring(0, 200) + '...', // First 200 chars as snippet
+        snippet: result.snippet || 'No snippet available',
         url: result.url,
         source: 'extension' as const,
-        fetchedAt: result.extractedAt,
-        metadata: {
-          wordCount: result.wordCount,
-          fullContent: result.content // Store full content for later use
-        }
+        fetchedAt: Date.now(),
+        // Note: We don't have fullContent yet, it will be fetched later
       }));
 
       console.log(`[ExtensionSearch] ✅ Found ${results.length} results`);

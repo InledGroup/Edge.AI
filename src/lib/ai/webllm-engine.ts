@@ -22,6 +22,7 @@ export interface GenerationOptions {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
+  stop?: string[];
   onStream?: (chunk: string) => void;
 }
 
@@ -175,6 +176,7 @@ export class WebLLMEngine {
       temperature = 0.7,
       maxTokens = 512,
       topP = 0.95,
+      stop,
       onStream,
     } = options;
 
@@ -190,6 +192,7 @@ export class WebLLMEngine {
           temperature,
           max_tokens: maxTokens,
           top_p: topP,
+          stop, // Pass stop tokens
           stream: true,
         });
 
@@ -210,6 +213,7 @@ export class WebLLMEngine {
           temperature,
           max_tokens: maxTokens,
           top_p: topP,
+          stop, // Pass stop tokens
           stream: false,
         });
 

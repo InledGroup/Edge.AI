@@ -5,6 +5,7 @@ import { MessageSquare, Sparkles, AlertCircle } from 'lucide-preact';
 import { Message } from './Message';
 import { ChatInput } from './ChatInput';
 import { WebSearchProgress } from './WebSearchProgress';
+import { UrlConfirmationModal } from './UrlConfirmationModal';
 import { DocumentCanvas } from '../DocumentCanvas';
 import { Card } from '../ui/Card';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
@@ -33,6 +34,11 @@ export function ChatInterface() {
   const [showDocumentCanvas, setShowDocumentCanvas] = useState(false);
   const [documentContent, setDocumentContent] = useState('');
   const [canvasContent, setCanvasContent] = useState(''); // Track current canvas content
+  
+  // State for URL confirmation modal
+  const [pendingUrls, setPendingUrls] = useState<string[] | null>(null);
+  const [confirmationResolver, setConfirmationResolver] = useState<((urls: string[] | null) => void) | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Audio streaming state management
@@ -389,6 +395,19 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           sources: webSearchSettings.webSearchSources,
           maxUrlsToFetch: webSearchSettings.webSearchMaxUrls,
           topK: 10, // Aumentado a 10 para mejor contexto (chunks de ~600 chars = ~6000 chars total)
+          confirmUrls: webSearchSettings.webSearchConfirmUrls,
+          onConfirmationRequest: async (urls) => {
+            return new Promise<string[] | null>((resolve) => {
+              setPendingUrls(urls);
+              // Store the resolve function to be called by the modal
+              // Note: We use a function that returns the resolver to avoid React state updater confusion
+              setConfirmationResolver(() => (selectedUrls: string[] | null) => {
+                resolve(selectedUrls);
+                setPendingUrls(null);
+                setConfirmationResolver(null);
+              });
+            });
+          },
           onProgress: (step, progress, message) => {
             setWebSearchProgress({ step, progress, message });
           },
@@ -521,6 +540,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
         const answer = await chatEngine.generateText(prompt, {
           temperature: 0.7,
           maxTokens: 2048, // Increased for longer responses
+          stop: ['\nUsuario:', '\nUser:', 'Usuario:', 'User:'], // Stop on user turn start
           onStream: (chunk) => {
             streamedText += chunk;
             processAudioChunk(chunk);
@@ -717,6 +737,15 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           )}
         </div>
       </div>
+
+      {/* URL Confirmation Modal */}
+      {pendingUrls && confirmationResolver && (
+        <UrlConfirmationModal
+          urls={pendingUrls}
+          onConfirm={(selectedUrls) => confirmationResolver(selectedUrls)}
+          onCancel={() => confirmationResolver(null)}
+        />
+      )}
 
       {/* Fixed Input Area at Bottom */}
       <div className="border-t border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur-sm">

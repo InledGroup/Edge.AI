@@ -153,8 +153,30 @@ export class WebRAGOrchestrator {
       timestamps.urlSelection = Date.now() - selectionStart;
 
       const selectedResults = selectedIndices.map((i) => searchResults[i]);
-      const selectedUrls = selectedResults.map((r) => r.url);
+      let selectedUrls = selectedResults.map((r) => r.url);
       console.log(`[WebRAG] Selected ${selectedResults.length} URLs to fetch`);
+
+      // ====================================================================
+      // PASO 3.5: Confirmación de usuario (si está habilitada)
+      // ====================================================================
+      if (options.confirmUrls && options.onConfirmationRequest) {
+        onProgress?.('url_confirmation', 35, 'Esperando confirmación de usuario...', { urls: selectedUrls });
+        
+        console.log('[WebRAG] Requesting user confirmation for URLs:', selectedUrls);
+        const confirmedUrls = await options.onConfirmationRequest(selectedUrls);
+
+        if (!confirmedUrls || confirmedUrls.length === 0) {
+           throw new Error('Búsqueda cancelada por el usuario o sin URLs seleccionadas');
+        }
+
+        // Actualizar lista de URLs con las confirmadas
+        selectedUrls = confirmedUrls;
+        
+        // Filtrar selectedResults para mantener consistencia (opcional, pero bueno para logs)
+        // Nota: selectedResults ya no coincidirá exactamente si el usuario editó la lista, 
+        // pero usaremos selectedUrls para el fetch.
+        console.log(`[WebRAG] User confirmed ${selectedUrls.length} URLs`);
+      }
 
       // ====================================================================
       // PASO 4: Obtener contenido (ya sea desde extensión o fetching)
@@ -400,6 +422,30 @@ JSON:`;
   // ==========================================================================
 
   private async fetchPages(urls: string[]): Promise<FetchedPage[]> {
+    // Try to use extension bridge first if available
+    try {
+      const { getExtensionBridgeSafe } = await import('../extension-bridge');
+      const bridge = getExtensionBridgeSafe();
+      
+      if (bridge && bridge.isConnected()) {
+        console.log(`[WebRAG] 🌉 Using extension bridge to fetch ${urls.length} pages`);
+        const response = await bridge.extractUrls(urls);
+        
+        if (response.success) {
+          return response.results.map(r => ({
+            url: r.url,
+            html: r.content, // Extension returns cleaned content usually, but treating as HTML/text
+            size: r.content.length,
+            status: 200,
+            fetchTime: 0
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('[WebRAG] Failed to use extension for fetching, falling back to worker', e);
+    }
+
+    // Fallback to worker (proxy/fetch)
     const workerPool = getWorkerPool();
     const webSearchWorker = await workerPool.getWebSearchWorker();
 
@@ -660,6 +706,7 @@ RESPUESTA:`;
     const answer = await this.generateText(prompt, {
       temperature: 0.7,
       max_tokens: 1024, // Aumentado de 512 a 1024 para respuestas más completas
+      stop: ['\nPREGUNTA DEL USUARIO:', 'PREGUNTA DEL USUARIO:', '\nCONTEXTO DE FUENTES WEB:'],
       onToken, // Pass streaming callback
     });
 
@@ -675,7 +722,7 @@ RESPUESTA:`;
    */
   private async generateText(
     prompt: string,
-    options: { temperature: number; max_tokens: number; onToken?: (token: string) => void }
+    options: { temperature: number; max_tokens: number; stop?: string[]; onToken?: (token: string) => void }
   ): Promise<string> {
     // WebLLM with streaming support
     if ('generateText' in this.llmEngine) {
@@ -684,6 +731,7 @@ RESPUESTA:`;
         return await this.llmEngine.generateText(prompt, {
           temperature: options.temperature,
           maxTokens: options.max_tokens,
+          stop: options.stop,
           onStream: options.onToken, // Map onToken to onStream for WebLLM
         });
       } else {
@@ -691,6 +739,7 @@ RESPUESTA:`;
         return await this.llmEngine.generateText(prompt, {
           temperature: options.temperature,
           maxTokens: options.max_tokens,
+          stop: options.stop,
         });
       }
     }
@@ -704,6 +753,7 @@ RESPUESTA:`;
           {
             temperature: options.temperature,
             max_tokens: options.max_tokens,
+            stop: options.stop,
           },
           options.onToken
         );
@@ -714,6 +764,7 @@ RESPUESTA:`;
           {
             temperature: options.temperature,
             max_tokens: options.max_tokens,
+            stop: options.stop,
           }
         );
         return response;

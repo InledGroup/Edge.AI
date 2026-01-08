@@ -132,8 +132,9 @@ export interface Settings {
   language: 'es' | 'en';
   // Web search settings
   enableWebSearch?: boolean; // Enable web search by default
-  webSearchSources?: ('wikipedia' | 'duckduckgo')[]; // Search providers to use
+  webSearchSources?: ('wikipedia' | 'duckduckgo' | 'extension')[]; // Search providers to use
   webSearchMaxUrls?: number; // Max URLs to fetch (default: 3)
+  webSearchConfirmUrls?: boolean; // Confirm before opening URLs
   // Browser extension settings
   extensionId?: string; // Browser extension ID for web search
   extensionEnabled?: boolean; // Whether to use extension for searches

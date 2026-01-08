@@ -205,6 +205,7 @@ export async function generateRAGAnswer(
   const answer = await chatEngine.generateText(prompt, {
     temperature: 0.7,
     maxTokens: 1024,
+    stop: ['\n👤 Usuario:', '👤 Usuario:', '\n## PREGUNTA DEL USUARIO:', '\nUsuario:'],
     onStream
   });
 
