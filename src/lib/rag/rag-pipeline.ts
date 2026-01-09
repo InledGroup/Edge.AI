@@ -196,70 +196,57 @@ export async function generateRAGAnswer(
   // Create context from retrieved chunks
   const context = createRAGContext(ragResult.chunks);
 
-  // Build prompt with conversation history
-  const prompt = buildRAGPrompt(query, context, conversationHistory);
-
   console.log('💬 Generating answer with context and history...');
 
-  // Generate response
-  const answer = await chatEngine.generateText(prompt, {
+  // Build structured messages
+  const messages: { role: string; content: string }[] = [];
+
+  // 1. System Prompt with Context
+  const systemContent = `Eres un asistente experto que analiza documentos y responde preguntas de manera precisa y útil.
+
+## CONTEXTO DE DOCUMENTOS:
+${context || 'No hay documentos relevantes disponibles.'}
+
+## INSTRUCCIONES:
+Analiza el contexto proporcionado y responde la pregunta del usuario.
+- Básate PRINCIPALMENTE en el contexto proporcionado
+- Cita las fuentes usando formato [Doc N] cuando menciones información específica
+- Sé claro, completo pero conciso
+- Si el contexto no tiene relación con la pregunta, indícalo pero intenta responder con tu conocimiento general si es posible, aclarando que no proviene de los documentos.
+
+IMPORTANTE: Proporciona solo la respuesta final.`;
+
+  messages.push({
+    role: 'system',
+    content: systemContent
+  });
+
+  // 2. Conversation History
+  if (conversationHistory && conversationHistory.length > 0) {
+    conversationHistory.forEach(msg => {
+      messages.push({ role: msg.role, content: msg.content });
+    });
+  }
+
+  // 3. User Question
+  // Ensure we don't duplicate the last message if it's already in history
+  const lastHistoryMsg = conversationHistory?.[conversationHistory.length - 1];
+  if (!lastHistoryMsg || lastHistoryMsg.content !== query) {
+    messages.push({
+      role: 'user',
+      content: query
+    });
+  }
+
+  // Generate response using structured messages
+  const answer = await chatEngine.generateText(messages, {
     temperature: 0.7,
     maxTokens: 1024,
-    stop: ['\n👤 Usuario:', '👤 Usuario:', '\n## PREGUNTA DEL USUARIO:', '\nUsuario:'],
+    stop: ['<|im_end|>', '<|end|>', '<|eot_id|>'],
     onStream
   });
 
   return answer;
-}
-
-/**
- * Build RAG prompt with context and conversation history
- * MEJORADO: Chain-of-thought reasoning + mejor estructura
- */
-function buildRAGPrompt(query: string, context: string, conversationHistory?: Array<{role: string, content: string}>): string {
-  if (!context) {
-    return `Pregunta: ${query}\n\nResponde de forma clara y concisa.`;
-  }
-
-  // Build conversation history if provided
-  let historyText = '';
-  if (conversationHistory && conversationHistory.length > 0) {
-    historyText = '\n\n## HISTORIAL DE CONVERSACIÓN:\n';
-    conversationHistory.forEach((msg) => {
-      if (msg.role === 'user') {
-        historyText += `👤 Usuario: ${msg.content}\n`;
-      } else if (msg.role === 'assistant') {
-        historyText += `🤖 Asistente: ${msg.content}\n`;
-      }
-    });
-    historyText += '\n';
-  }
-
-  // Enhanced prompt - instruye al modelo internamente pero no le pide mostrar pasos
-  return `Eres un asistente experto que analiza documentos y responde preguntas de manera precisa y útil.
-
-## CONTEXTO DE DOCUMENTOS:
-${context}${historyText}
-## PREGUNTA DEL USUARIO:
-${query}
-
-## INSTRUCCIONES:
-
-Analiza el contexto proporcionado y responde la pregunta siguiendo este proceso mental:
-1. Identifica qué documentos contienen información relevante
-2. Sintetiza la información de múltiples fuentes cuando sea apropiado
-3. Proporciona una respuesta clara y directa
-
-Tu respuesta debe:
-- Basarse PRINCIPALMENTE en el contexto proporcionado
-- Citar las fuentes usando formato [Doc N] cuando menciones información específica
-- Ser clara, completa pero concisa
-- Si usas conocimiento general además del contexto, indica claramente qué proviene de cada fuente
-- Solo si el contexto no tiene NINGUNA relación con la pregunta, indica que los documentos no contienen esa información
-
-IMPORTANTE: Proporciona solo la respuesta final. NO muestres tu proceso de análisis ni pasos intermedios.
-
-Respuesta:`;
 }
 
 /**

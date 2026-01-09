@@ -14,7 +14,7 @@ import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import type { Message as MessageType } from '@/types';
 import { completeRAGFlow } from '@/lib/rag/rag-pipeline';
 import EngineManager from '@/lib/ai/engine-manager';
-import { addMessage, getOrCreateConversation } from '@/lib/db/conversations';
+import { addMessage, getOrCreateConversation, getConversation, generateTitle, updateConversationTitle } from '@/lib/db/conversations';
 import { getRAGSettings, getWebSearchSettings } from '@/lib/db/settings';
 import { WebRAGOrchestrator } from '@/lib/web-search';
 import type { WebSearchStep } from '@/lib/web-search/types';
@@ -339,7 +339,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
       return;
     }
 
-    // Add user message
+    // Add user message to UI
     const userMessage: MessageType = {
       id: generateUUID(),
       role: 'user',
@@ -348,6 +348,48 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
     };
 
     setMessages(prev => [...prev, userMessage]);
+
+    // ============================================================
+    // CONVERSATION MANAGEMENT & PERSISTENCE (Start)
+    // ============================================================
+    // Ensure conversation exists and save user message immediately
+    let conversationId = conversationsStore.activeId;
+    let isNewConversation = false;
+
+    if (!conversationId) {
+      const conversation = await getOrCreateConversation();
+      conversationId = conversation.id;
+      isNewConversation = true;
+      // Add to store (empty for now)
+      conversationsStore.add(conversation);
+    }
+
+    // Save user message to DB
+    await addMessage(conversationId, userMessage);
+
+    // If new conversation, generate title and activate
+    if (isNewConversation) {
+      const title = generateTitle(content);
+      await updateConversationTitle(conversationId, title);
+      
+      // Update store with the new message and title
+      const updatedConv = await getConversation(conversationId);
+      if (updatedConv) {
+        conversationsStore.update(conversationId, updatedConv);
+        // Activate ONLY after store is updated to avoid wiping UI
+        conversationsStore.setActive(conversationId);
+      }
+    } else {
+      // Existing conversation: just sync store
+      const updatedConv = await getConversation(conversationId);
+      if (updatedConv) {
+        conversationsStore.update(conversationId, updatedConv);
+      }
+    }
+    // ============================================================
+    // CONVERSATION MANAGEMENT & PERSISTENCE (End)
+    // ============================================================
+
     setIsGenerating(true);
     setCurrentResponse('');
     setWebSearchProgress(null);
@@ -513,34 +555,42 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
           content: msg.content
         }));
 
-        // Build chat prompt with full conversation context
-        let prompt = 'Eres un asistente útil y conversacional. Responde de manera natural y coherente basándote en el contexto de la conversación.\n\n';
+        // Build structured messages for the engine
+        const chatMessages: { role: string; content: string }[] = [];
 
-        // Include canvas content if available
+        // 1. System Prompt
+        chatMessages.push({
+          role: 'system',
+          content: 'Eres un asistente útil y conversacional. Responde de manera natural y coherente basándote en el contexto de la conversación.'
+        });
+
+        // 2. Canvas Context (if available)
         if (canvasContent && canvasContent.trim() !== '' && canvasContent !== '<p><br></p>') {
           // Strip HTML tags for context
           const canvasText = canvasContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
           if (canvasText.length > 0) {
-            prompt += `CONTEXTO: El usuario está trabajando en un documento que contiene:\n"${canvasText.substring(0, 1000)}${canvasText.length > 1000 ? '...' : ''}"\n\n`;
+            chatMessages.push({
+              role: 'system',
+              content: `CONTEXTO ADICIONAL: El usuario está trabajando en un documento que contiene:\n"${canvasText.substring(0, 1000)}${canvasText.length > 1000 ? '...' : ''}"`
+            });
             console.log('📄 Incluyendo contenido del canvas en el contexto');
           }
         }
 
-        // Add conversation history
-        prompt += conversationHistory
-          .map(msg => `${msg.role === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`)
-          .join('\n\n');
-
-        prompt += '\n\nAsistente:';
+        // 3. Conversation History (including current message)
+        chatMessages.push(...conversationHistory);
 
         console.log('📝 Conversation history length:', conversationHistory.length, 'messages');
 
         // Generate direct response with streaming
         let streamedText = '';
-        const answer = await chatEngine.generateText(prompt, {
+        
+        // Use the new structured messages API
+        const answer = await chatEngine.generateText(chatMessages, {
           temperature: 0.7,
-          maxTokens: 2048, // Increased for longer responses
-          stop: ['\nUsuario:', '\nUser:', 'Usuario:', 'User:'], // Stop on user turn start
+          maxTokens: 2048,
+          // Stop tokens are handled by the engine's template logic, but we keep some just in case
+          stop: ['<|im_end|>', '<|end|>', '<|eot_id|>'], 
           onStream: (chunk) => {
             streamedText += chunk;
             processAudioChunk(chunk);
@@ -590,28 +640,9 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
       }
 
       // Save to conversation
-      let conversationId = conversationsStore.activeId;
-      let isNewConversation = false;
+      // Note: conversationId is already defined at start of function
 
-      if (!conversationId) {
-        const conversation = await getOrCreateConversation();
-        conversationId = conversation.id;
-        conversationsStore.setActive(conversationId);
-        conversationsStore.add(conversation);
-        isNewConversation = true;
-      }
-
-      await addMessage(conversationId, userMessage);
       await addMessage(conversationId, assistantMessage);
-
-      // Reload conversation from DB to sync with store
-      const { getConversation, generateTitle, updateConversationTitle } = await import('@/lib/db/conversations');
-
-      // Update conversation title if it's the first message
-      if (isNewConversation) {
-        const title = generateTitle(content);
-        await updateConversationTitle(conversationId, title);
-      }
 
       // Reload and update the conversation in the store
       const updatedConv = await getConversation(conversationId);

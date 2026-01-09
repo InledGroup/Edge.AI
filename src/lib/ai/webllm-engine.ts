@@ -165,7 +165,7 @@ export class WebLLMEngine {
    * Supports streaming for better UX
    */
   async generateText(
-    prompt: string,
+    input: string | { role: string; content: string }[],
     options: GenerationOptions = {}
   ): Promise<string> {
     if (!this.isInitialized || !this.engine) {
@@ -183,12 +183,20 @@ export class WebLLMEngine {
     try {
       console.log('💬 Generating text with WebLLM...');
 
+      // Prepare messages
+      const messages = Array.isArray(input) 
+        ? input 
+        : [{ role: 'user', content: input }];
+
+      // @ts-ignore - WebLLM types might be strict about role strings
+      const chatMessages = messages.map(m => ({ role: m.role, content: m.content }));
+
       if (onStream) {
         // Streaming mode
         let fullResponse = '';
 
         const completion = await this.engine.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+          messages: chatMessages,
           temperature,
           max_tokens: maxTokens,
           top_p: topP,
@@ -209,7 +217,7 @@ export class WebLLMEngine {
       } else {
         // Non-streaming mode
         const response = await this.engine.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+          messages: chatMessages,
           temperature,
           max_tokens: maxTokens,
           top_p: topP,

@@ -221,7 +221,7 @@ export class WllamaEngine {
    * Supports streaming for better UX
    */
   async generateText(
-    prompt: string,
+    input: string | { role: string; content: string }[],
     options: GenerationOptions = {}
   ): Promise<string> {
     if (!this.isInitialized || !this.wllama) {
@@ -231,7 +231,7 @@ export class WllamaEngine {
     const {
       temperature = 0.7,
       maxTokens = 512,
-      stop,
+      stop = [],
       onStream,
     } = options;
 
@@ -241,6 +241,50 @@ export class WllamaEngine {
       // IMPORTANT: Disable embeddings mode before text generation
       await this.wllama.setOptions({ embeddings: false });
 
+      let prompt = '';
+      let effectiveStop = [...(stop || [])];
+
+      // Handle structured messages or raw string
+      if (Array.isArray(input)) {
+        // Detect model type for template
+        const isQwen = this.modelUrl.toLowerCase().includes('qwen') || this.modelUrl.toLowerCase().includes('smollm');
+        const isLlama = this.modelUrl.toLowerCase().includes('llama') && !this.modelUrl.toLowerCase().includes('tiny');
+        const isPhi = this.modelUrl.toLowerCase().includes('phi');
+
+        if (isQwen) {
+          // ChatML Template (Qwen, SmolLM, TinyLlama)
+          prompt = input.map(msg => 
+            `<|im_start|>${msg.role}\n${msg.content}<|im_end|>`
+          ).join('\n') + '\n<|im_start|>assistant\n';
+          
+          effectiveStop.push('<|im_end|>');
+          effectiveStop.push('<|im_start|>');
+        } else if (isLlama) {
+          // Llama 3 Template
+          prompt = `<|begin_of_text|>` + input.map(msg => 
+            `<|start_header_id|>${msg.role}<|end_header_id|>\n\n${msg.content}<|eot_id|>`
+          ).join('') + `<|start_header_id|>assistant<|end_header_id|>\n\n`;
+          
+          effectiveStop.push('<|eot_id|>');
+          effectiveStop.push('<|end_of_text|>');
+        } else if (isPhi) {
+          // Phi-3 Template
+          prompt = input.map(msg => 
+            `<|${msg.role}|>\n${msg.content}<|end|>`
+          ).join('\n') + '\n<|assistant|>\n';
+          
+          effectiveStop.push('<|end|>');
+        } else {
+          // Fallback: standard chat format
+          prompt = input.map(msg => 
+            `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+          ).join('\n') + '\nAssistant:';
+        }
+      } else {
+        // Raw string input (legacy support)
+        prompt = input;
+      }
+
       let fullResponse = '';
 
       if (onStream) {
@@ -248,7 +292,7 @@ export class WllamaEngine {
         await this.wllama.createCompletion(prompt, {
           nPredict: maxTokens,
           temp: temperature,
-          stop, // Pass stop tokens
+          stop: effectiveStop, // Pass stop tokens
           onNewToken: (_token, _piece, currentText) => {
             // Send incremental chunks
             const newChunk = currentText.slice(fullResponse.length);
@@ -263,7 +307,7 @@ export class WllamaEngine {
         const result = await this.wllama.createCompletion(prompt, {
           nPredict: maxTokens,
           temp: temperature,
-          stop, // Pass stop tokens
+          stop: effectiveStop, // Pass stop tokens
         });
         fullResponse = result;
       }
