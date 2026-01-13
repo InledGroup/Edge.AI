@@ -7,7 +7,7 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 
 export interface DocumentCanvasProps {
-  initialContent?: string;
+  content?: string;
   onClose?: () => void;
   onContentChange?: (content: string) => void;
 }
@@ -18,7 +18,7 @@ export function getCanvasContent(quillRef: any): string {
   return quillRef.current.root?.innerHTML || '';
 }
 
-export function DocumentCanvas({ initialContent = '', onClose, onContentChange }: DocumentCanvasProps) {
+export function DocumentCanvas({ content = '', onClose, onContentChange }: DocumentCanvasProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<any>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -63,14 +63,16 @@ export function DocumentCanvas({ initialContent = '', onClose, onContentChange }
         });
 
         // Set initial content if provided
-        if (initialContent) {
-          quill.clipboard.dangerouslyPasteHTML(initialContent);
+        if (content) {
+          quill.clipboard.dangerouslyPasteHTML(content);
         }
 
         // Listen for content changes
-        quill.on('text-change', () => {
-          if (onContentChange) {
+        quill.on('text-change', (delta: any, oldDelta: any, source: string) => {
+          // console.log('Quill change:', source);
+          if (source === 'user' && onContentChange) {
             const html = quill.root.innerHTML;
+            // console.log('Updating content:', html.substring(0, 20));
             onContentChange(html);
           }
         });
@@ -88,17 +90,31 @@ export function DocumentCanvas({ initialContent = '', onClose, onContentChange }
         quillRef.current = null;
       }
     };
-  }, [isClient, initialContent]);
+  }, [isClient]); // Removed content dependency to avoid re-init
 
-  // Update content when initialContent changes
+  // Update content when content prop changes
   useEffect(() => {
-    if (!isClient || !quillRef.current || !initialContent) return;
+    if (!isClient || !quillRef.current || content === undefined) return;
 
-    const currentContent = quillRef.current.root?.innerHTML;
-    if (currentContent === '<p><br></p>' || currentContent === '') {
-      quillRef.current.clipboard.dangerouslyPasteHTML(initialContent);
+    const currentContent = quillRef.current.root.innerHTML;
+    // Only update if content is different to avoid cursor jumps and loops
+    // This is a naive check; for production, comparing text content might be better
+    if (currentContent !== content && content !== '') {
+      // Store selection range
+      const range = quillRef.current.getSelection();
+      
+      quillRef.current.clipboard.dangerouslyPasteHTML(content);
+      
+      // Restore selection if possible (often tricky with HTML replacement)
+      if (range) {
+        try {
+          quillRef.current.setSelection(range);
+        } catch (e) {
+          // Ignore selection errors
+        }
+      }
     }
-  }, [isClient, initialContent]);
+  }, [isClient, content]);
 
   /**
    * Export as Markdown

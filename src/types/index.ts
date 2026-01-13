@@ -69,6 +69,8 @@ export interface Message {
   timestamp: number;
   sources?: RetrievedChunk[]; // RAG sources used
   model?: string; // Model that generated this (for assistant)
+  streaming?: boolean;
+  metadata?: Record<string, any>;
 }
 
 /**

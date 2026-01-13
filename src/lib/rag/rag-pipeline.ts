@@ -167,8 +167,8 @@ export async function queryWithRAG(
     documentIds,
     searchQuery, // Use original query for BM25
     {
-      semanticWeight: 0.7,
-      lexicalWeight: 0.3,
+      semanticWeight: 0.85, // Higher weight for our new better embedding model
+      lexicalWeight: 0.15,
       useReranking: true
     }
   );
@@ -191,7 +191,8 @@ export async function generateRAGAnswer(
   ragResult: RAGResult,
   chatEngine: WebLLMEngine | WllamaEngine,
   conversationHistory?: Array<{role: string, content: string}>,
-  onStream?: (chunk: string) => void
+  onStream?: (chunk: string) => void,
+  additionalContext?: string
 ): Promise<string> {
   // Create context from retrieved chunks
   const context = createRAGContext(ragResult.chunks);
@@ -202,7 +203,7 @@ export async function generateRAGAnswer(
   const messages: { role: string; content: string }[] = [];
 
   // 1. System Prompt with Context
-  const systemContent = `Eres un asistente experto que analiza documentos y responde preguntas de manera precisa y útil.
+  let systemContent = `Eres un asistente experto que analiza documentos y responde preguntas de manera precisa y útil.
 
 ## CONTEXTO DE DOCUMENTOS:
 ${context || 'No hay documentos relevantes disponibles.'}
@@ -215,6 +216,10 @@ Analiza el contexto proporcionado y responde la pregunta del usuario.
 - Si el contexto no tiene relación con la pregunta, indícalo pero intenta responder con tu conocimiento general si es posible, aclarando que no proviene de los documentos.
 
 IMPORTANTE: Proporciona solo la respuesta final.`;
+
+  if (additionalContext) {
+    systemContent += `\n\n${additionalContext}`;
+  }
 
   messages.push({
     role: 'system',
@@ -265,6 +270,7 @@ export async function completeRAGFlow(
     useQueryExpansion?: boolean;
     useQueryRewriting?: boolean;
     calculateMetrics?: boolean;
+    additionalContext?: string;
   }
 ): Promise<{
   answer: string;
@@ -302,7 +308,7 @@ export async function completeRAGFlow(
   }
 
   // Step 3: Generate answer with conversation history
-  const answer = await generateRAGAnswer(query, ragResult, chatEngine, conversationHistory, onStream);
+  const answer = await generateRAGAnswer(query, ragResult, chatEngine, conversationHistory, onStream, options?.additionalContext);
 
   // Step 4: Calculate answer faithfulness (if metrics enabled)
   let faithfulness;

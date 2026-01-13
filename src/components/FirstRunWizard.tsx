@@ -61,6 +61,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
     embedding: null
   });
   const [error, setError] = useState<string | null>(null);
+  const [chatModelFilter, setChatModelFilter] = useState<'all' | 'gpu' | 'cpu'>('all');
 
   // Subscribe to language changes
   const lang = languageSignal.value;
@@ -221,28 +222,50 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
     modelsStore.setEmbeddingLoading(true);
 
     try {
-      const engine = new WllamaEngine();
-      const modelUrl = model.ggufUrl;
+      let engine: WllamaEngine | WebLLMEngine;
+      let engineName: string;
 
-      if (!modelUrl) {
-        throw new Error('No GGUF URL for embedding model');
+      // Check if model uses WebLLM (e.g. Snowflake Arctic GPU)
+      if (model.engine === 'webllm' && model.webllmModelId) {
+         const webllmEngine = new WebLLMEngine();
+         engine = webllmEngine;
+         engineName = 'webllm';
+         
+         await webllmEngine.initialize(model.webllmModelId, (progress, status) => {
+            setLoadingProgress(prev => ({
+              ...prev,
+              embedding: { progress, message: status }
+            }));
+         });
+      } else {
+        // Default to Wllama (CPU)
+        const wllamaEngine = new WllamaEngine();
+        engine = wllamaEngine;
+        engineName = 'wllama';
+        const modelUrl = model.ggufUrl;
+
+        if (!modelUrl) {
+          throw new Error('No GGUF URL for embedding model');
+        }
+
+        await wllamaEngine.initialize(modelUrl, (progress, status) => {
+          setLoadingProgress(prev => ({
+            ...prev,
+            embedding: { progress, message: status }
+          }));
+        });
       }
 
-      await engine.initialize(modelUrl, (progress, status) => {
-        setLoadingProgress(prev => ({
-          ...prev,
-          embedding: { progress, message: status }
-        }));
-      });
-
+      // @ts-ignore - EngineManager types might need update but runtime is compatible
       EngineManager.setEmbeddingEngine(engine, model.id);
+      
       modelsStore.setEmbeddingModel({
         id: model.id,
         name: model.displayName,
         type: 'embedding',
-        engine: 'wllama',
+        engine: engineName,
         contextSize: model.contextSize,
-        requiresGPU: false,
+        requiresGPU: model.requiresWebGPU,
         sizeGB: model.sizeGB
       });
     } finally {
@@ -377,9 +400,40 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
 
             {/* Chat Models */}
             <div className="space-y-3">
-              <h3 className="font-semibold">{i18nStore.t('wizard.chatModel')}</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">{i18nStore.t('wizard.chatModel')}</h3>
+                <div className="flex gap-1 bg-[var(--color-bg-tertiary)] p-1 rounded-lg">
+                  <button
+                    onClick={() => setChatModelFilter('all')}
+                    className={`px-2 py-1 text-xs font-medium rounded-md transition-all ${chatModelFilter === 'all' ? 'bg-[var(--color-bg-primary)] shadow-sm text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'}`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setChatModelFilter('gpu')}
+                    className={`px-2 py-1 text-xs font-medium rounded-md transition-all ${chatModelFilter === 'gpu' ? 'bg-[var(--color-bg-primary)] shadow-sm text-amber-500' : 'text-[var(--color-text-secondary)] hover:text-amber-500'}`}
+                    title="WebLLM (WebGPU)"
+                  >
+                    GPU
+                  </button>
+                  <button
+                    onClick={() => setChatModelFilter('cpu')}
+                    className={`px-2 py-1 text-xs font-medium rounded-md transition-all ${chatModelFilter === 'cpu' ? 'bg-[var(--color-bg-primary)] shadow-sm text-blue-500' : 'text-[var(--color-text-secondary)] hover:text-blue-500'}`}
+                    title="Wllama (WASM)"
+                  >
+                    CPU
+                  </button>
+                </div>
+              </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {chatScores.map(score => (
+                {chatScores
+                  .filter(s => {
+                    if (chatModelFilter === 'all') return true;
+                    if (chatModelFilter === 'gpu') return s.model.engine === 'webllm';
+                    if (chatModelFilter === 'cpu') return s.model.engine === 'wllama';
+                    return true;
+                  })
+                  .map(score => (
                   <button
                     key={score.model.id}
                     onClick={() => setSelectedChatModel(score.model)}
@@ -435,23 +489,47 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
             <div className="space-y-3">
               <h3 className="font-semibold">{i18nStore.t('wizard.embeddingModel')}</h3>
               <div className="space-y-2">
-                {embeddingScores.slice(0, 1).map(score => (
-                  <div
+                {embeddingScores.map(score => (
+                  <button
                     key={score.model.id}
-                    className="p-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]"
+                    onClick={() => setSelectedEmbeddingModel(score.model)}
+                    className={`w-full text-left p-4 rounded-lg border transition-all ${
+                      selectedEmbeddingModel?.id === score.model.id
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                        : 'border-[var(--color-border)] hover:border-[var(--color-primary)]/50'
+                    }`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-medium">{score.model.displayName}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{score.model.displayName}</span>
+                          <span className="text-xs">{getRecommendationEmoji(score.recommendation)}</span>
+                        </div>
                         <div className="text-xs text-[var(--color-text-secondary)] mt-1">
+                          {score.model.description}
+                        </div>
+                        <div className="text-xs text-[var(--color-text-tertiary)] mt-1">
                           {score.model.sizeGB.toFixed(2)}GB • {i18nStore.t('wizard.semanticSearch')}
                         </div>
                       </div>
-                      <div className={`text-lg font-bold ${getScoreColor(score.score)}`}>
-                        {formatScore(score.score)}
+                      <div className="text-right">
+                        <div className={`text-lg font-bold ${getScoreColor(score.score)}`}>
+                          {formatScore(score.score)}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                    
+                    {score.warnings.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {score.warnings.map((warning, i) => (
+                          <div key={i} className="text-xs text-orange-500 flex items-start gap-1">
+                            <span className="mt-0.5">⚠️</span>
+                            <span>{warning}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </button>
                 ))}
               </div>
             </div>

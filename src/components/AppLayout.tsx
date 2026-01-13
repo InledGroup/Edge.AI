@@ -5,12 +5,14 @@ import { Sidebar } from './Sidebar';
 import { ChatInterface } from './chat/ChatInterface';
 import { DocumentViewer } from './DocumentViewer';
 import { DocumentUpload } from './DocumentUpload';
+import { DocumentCanvas } from './DocumentCanvas';
 import { FirstRunWizard } from './FirstRunWizard';
 import { ModelLoadingIndicator } from './ModelLoadingIndicator';
 import { ExtensionStatus } from './ExtensionStatus';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
 import { i18nStore } from '@/lib/stores/i18n';
+import { canvasSignal, canvasStore } from '@/lib/stores';
 
 export function AppLayout() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
@@ -44,6 +46,8 @@ export function AppLayout() {
     initialize();
   }, []);
 
+  const canvasOpen = canvasSignal.value.isOpen;
+
   return (
     <>
       <div className="h-screen bg-[var(--color-bg)] flex overflow-hidden">
@@ -55,8 +59,21 @@ export function AppLayout() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col lg:ml-64">
-          <ChatInterface />
+        <main className="flex-1 flex flex-row lg:ml-64 overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0">
+            <ChatInterface />
+          </div>
+
+          {/* Right Sidebar (Canvas) */}
+          {canvasOpen && (
+            <div className="w-1/2 min-w-[400px] max-w-[800px] border-l border-[var(--color-border)] bg-[var(--color-bg)] h-full flex flex-col shadow-xl z-20 transition-all duration-300">
+               <DocumentCanvas
+                 content={canvasSignal.value.content}
+                 onClose={() => canvasStore.close()}
+                 onContentChange={(c) => canvasStore.setContent(c)}
+               />
+            </div>
+          )}
         </main>
       </div>
 

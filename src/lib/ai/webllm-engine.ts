@@ -74,7 +74,24 @@ export class WebLLMEngine {
 
       // Get optimal WebGPU configuration based on GPU tier
       const webgpuConfig = getWebGPUConfig(gpuLimits.tier);
-      console.log('⚙️ WebGPU config:', webgpuConfig);
+      
+      // Override config for embedding models (Snowflake Arctic)
+      // WebLLM Embedding requires context_window_size === prefill_chunk_size
+      const isEmbeddingModel = modelName.toLowerCase().includes('embed');
+      const overrideConfig = isEmbeddingModel 
+        ? {
+            context_window_size: 512, // Force small context for embeddings
+            // @ts-ignore
+            prefill_chunk_size: 512,  // Must match context window
+            max_batch_size: 32        // Keep batch size reasonable
+          }
+        : {
+            context_window_size: webgpuConfig.max_window_size,
+            // @ts-ignore
+            max_batch_size: webgpuConfig.max_batch_size,
+          };
+
+      console.log('⚙️ WebGPU config:', { ...webgpuConfig, ...overrideConfig });
 
       // Create MLCEngine instance - requires WebGPU
       this.engine = new webllm.MLCEngine();
@@ -88,9 +105,7 @@ export class WebLLMEngine {
       let firstProgressTime = 0;
 
       await this.engine.reload(modelName, {
-        context_window_size: webgpuConfig.max_window_size,
-        // @ts-ignore - advanced options
-        max_batch_size: webgpuConfig.max_batch_size,
+        ...overrideConfig,
         // @ts-ignore - initProgressCallback exists but might not be in types
         initProgressCallback: (report: webllm.InitProgressReport) => {
           if (firstProgressTime === 0) {
@@ -127,11 +142,24 @@ export class WebLLMEngine {
       console.log('🔥 Warming up GPU pipeline...');
       onProgress?.(95, 'Calentando modelo...');
 
-      await this.engine.chat.completions.create({
-        messages: [{ role: 'user', content: 'Hi' }],
-        max_tokens: 1,
-        temperature: 0.7,
-      });
+      if (isEmbeddingModel) {
+        // Warm up embedding pipeline
+        // @ts-ignore
+        if (this.engine.embeddings) {
+           // @ts-ignore
+           await this.engine.embeddings.create({
+             input: "warmup",
+             model: modelName
+           });
+        }
+      } else {
+        // Warm up chat pipeline
+        await this.engine.chat.completions.create({
+          messages: [{ role: 'user', content: 'Hi' }],
+          max_tokens: 1,
+          temperature: 0.7,
+        });
+      }
 
       console.log('✅ Model warmed up, ready for inference');
 
@@ -151,13 +179,91 @@ export class WebLLMEngine {
 
   /**
    * Generate embeddings for a text (for semantic search)
-   * NOTE: WebLLM doesn't support embeddings
-   * This method should NOT be called - use WllamaEngine instead
+   * WebLLM now supports embeddings via the embeddings.create API
    */
   async generateEmbedding(text: string): Promise<Float32Array> {
-    throw new Error(
-      'WebLLM does not support embeddings. Use WllamaEngine for embeddings instead.'
-    );
+    if (!this.isInitialized || !this.engine) {
+      throw new Error('WebLLM engine not initialized');
+    }
+
+    try {
+      console.log(`🔢 Generating embedding for ${text.length} chars (WebGPU)...`);
+      const startTime = Date.now();
+
+      // Check if engine supports embeddings
+      // @ts-ignore
+      if (!this.engine.embeddings) {
+        throw new Error('This WebLLM version or model does not support embeddings');
+      }
+
+      // @ts-ignore
+      const response = await this.engine.embeddings.create({
+        input: text,
+        model: this.modelName
+      });
+
+      const embedding = response.data[0].embedding;
+      const result = new Float32Array(embedding);
+
+      const elapsed = Date.now() - startTime;
+      console.log(`✅ Embedding generated in ${elapsed}ms (GPU)`);
+
+      return result;
+    } catch (error) {
+      console.error('❌ WebLLM embedding failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate embeddings in batch
+   */
+  async generateEmbeddingsBatch(
+    texts: string[],
+    maxConcurrent = 4, // Ignored for WebLLM as we send full batch
+    onProgress?: (progress: number, status: string) => void
+  ): Promise<Float32Array[]> {
+    if (!this.isInitialized || !this.engine) {
+      throw new Error('WebLLM engine not initialized');
+    }
+
+    try {
+      console.log(`🔢 Generating ${texts.length} embeddings in batch (WebGPU)...`);
+      const startTime = Date.now();
+
+      // @ts-ignore
+      if (!this.engine.embeddings) {
+        throw new Error('This WebLLM version or model does not support embeddings');
+      }
+
+      // WebLLM supports batch input directly
+      // @ts-ignore
+      const response = await this.engine.embeddings.create({
+        input: texts,
+        model: this.modelName
+      });
+
+      // Map responses to Float32Array
+      // @ts-ignore
+      const results = response.data.map((item: any) => new Float32Array(item.embedding));
+
+      const elapsed = Date.now() - startTime;
+      console.log(`✅ Generated ${texts.length} embeddings in ${elapsed}ms (GPU Batch)`);
+      
+      return results;
+    } catch (error) {
+      console.error('❌ WebLLM batch embedding failed:', error);
+      
+      // Fallback: Process one by one if batch fails
+      console.warn('⚠️ Batch failed, trying sequential processing...');
+      const results: Float32Array[] = [];
+      for (let i = 0; i < texts.length; i++) {
+        const res = await this.generateEmbedding(texts[i]);
+        results.push(res);
+        onProgress?.(Math.round(((i + 1) / texts.length) * 100), `Embeddings: ${i + 1}/${texts.length}`);
+      }
+      return results;
+    }
   }
 
   /**

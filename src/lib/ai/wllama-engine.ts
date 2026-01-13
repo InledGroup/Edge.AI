@@ -109,7 +109,7 @@ export class WllamaEngine {
       const loadModel = async (attempt: number) => {
         try {
           await this.wllama!.loadModelFromUrl(this.modelUrl, {
-            n_ctx: 2048,
+            n_ctx: 4096,
             embeddings: true, // Enable embeddings support
             n_threads: optimalThreads, // Use optimal threads for max speed
             useCache: true, // Force caching to avoid re-downloading on mobile
@@ -141,7 +141,30 @@ export class WllamaEngine {
             await new Promise(r => setTimeout(r, 1000));
             await loadModel(attempt + 1);
           } else {
-            throw err;
+            // If all retries failed, try one last time with cache clearing
+            console.warn('⚠️ All standard retries failed. Attempting to clear cache and retry...');
+            onProgress?.(10, 'Error de caché detectado. Limpiando y reintentando...');
+            
+            try {
+              // @ts-ignore - access internal cache methods if available or use generic approach
+              if (this.wllama && this.wllama.cacheManager) {
+                 await this.wllama.cacheManager.delete(this.modelUrl);
+              }
+            } catch (e) {
+              console.warn('Failed to clear cache:', e);
+            }
+            
+            // Force reload without cache
+            await this.wllama!.loadModelFromUrl(this.modelUrl, {
+              n_ctx: 2048,
+              embeddings: true,
+              n_threads: optimalThreads,
+              useCache: false, // FORCE NO CACHE
+              progressCallback: ({ loaded, total }: any) => {
+                const percent = Math.round((loaded / total) * 70);
+                onProgress?.(10 + percent, `Descargando (sin caché): ${Math.round(loaded/1024/1024)}MB`);
+              }
+            });
           }
         }
       };

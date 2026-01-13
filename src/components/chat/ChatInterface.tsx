@@ -6,10 +6,9 @@ import { Message } from './Message';
 import { ChatInput } from './ChatInput';
 import { WebSearchProgress } from './WebSearchProgress';
 import { UrlConfirmationModal } from './UrlConfirmationModal';
-import { DocumentCanvas } from '../DocumentCanvas';
 import { Card } from '../ui/Card';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
-import { conversationsStore, modelsReady, hasReadyDocuments } from '@/lib/stores';
+import { conversationsStore, modelsReady, hasReadyDocuments, canvasStore, canvasSignal } from '@/lib/stores';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import type { Message as MessageType } from '@/types';
 import { completeRAGFlow } from '@/lib/rag/rag-pipeline';
@@ -31,9 +30,6 @@ export function ChatInterface() {
     progress: number;
     message?: string;
   } | null>(null);
-  const [showDocumentCanvas, setShowDocumentCanvas] = useState(false);
-  const [documentContent, setDocumentContent] = useState('');
-  const [canvasContent, setCanvasContent] = useState(''); // Track current canvas content
   
   // State for URL confirmation modal
   const [pendingUrls, setPendingUrls] = useState<string[] | null>(null);
@@ -145,8 +141,7 @@ export function ChatInterface() {
    */
   function handleOpenInCanvas(content: string) {
     const htmlContent = markdownToHTML(content);
-    setDocumentContent(htmlContent);
-    setShowDocumentCanvas(true);
+    canvasStore.open(htmlContent);
   }
 
   /**
@@ -221,14 +216,18 @@ export function ChatInterface() {
       'genera',
       'crea',
       'escribe',
-      'redacta'
+      'redacta',
+      'modifica',
+      'actualiza',
+      'cambia',
+      'edita'
     ];
 
     // Check if message contains document-related keywords
     const hasKeyword = keywords.some(keyword => lowerMessage.includes(keyword));
 
     // Additional check: message is longer than 30 chars and starts with common verbs
-    const startsWithVerb = /^(genera|crea|escribe|redacta)/i.test(message);
+    const startsWithVerb = /^(genera|crea|escribe|redacta|modifica|actualiza|cambia|edita)/i.test(message);
     const isLongEnough = message.length > 30;
 
     console.log('🔎 Document detection:', {
@@ -402,9 +401,54 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
       const embeddingEngine = await EngineManager.getEmbeddingEngine();
       const chatEngine = await EngineManager.getChatEngine();
 
+      // ============================================================
+      // PREPARE CANVAS CONTEXT (Shared across modes)
+      // ============================================================
+      let canvasContextString = '';
+      const currentCanvasContent = canvasSignal.value.content;
+      const isCanvasOpen = canvasSignal.value.isOpen;
+
+      console.log('🔍 Debug Canvas State:', { 
+        isOpen: isCanvasOpen, 
+        contentLength: currentCanvasContent?.length,
+        preview: currentCanvasContent?.substring(0, 50) 
+      });
+
+      if (isCanvasOpen && currentCanvasContent && currentCanvasContent.trim() !== '' && currentCanvasContent !== '<p><br></p>') {
+        // Strip HTML tags for context
+        const canvasText = currentCanvasContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        
+        console.log('📄 Canvas Text Extracted:', canvasText.substring(0, 50));
+
+        if (canvasText.length > 0) {
+          canvasContextString = `
+=== HERRAMIENTA DE EDICIÓN ACTIVA ===
+El usuario tiene abierto un documento en el panel lateral. Tú tienes acceso total de LECTURA y ESCRITURA a este documento.
+
+CONTENIDO ACTUAL DEL DOCUMENTO:
+"""
+${canvasText.substring(0, 3000)}${canvasText.length > 3000 ? '...' : ''}
+"""
+
+INSTRUCCIONES DE EDICIÓN:
+1. Si el usuario pide "reescribir", "modificar", "cambiar" o "corregir" el documento, tu respuesta DEBE contener el texto completo revisado.
+2. NO uses resúmenes ni placeholders como "[resto del texto]" o "[...]".
+3. NO digas que no puedes leerlo. El contenido está arriba.
+4. Responde directamente con el nuevo contenido si se solicita una reescritura, o con comentarios si se solicitan sugerencias.
+=====================================`;
+          console.log('✅ Canvas context prepared with explicit instructions');
+        } else {
+           console.warn('⚠️ Canvas text is empty after stripping HTML');
+        }
+      } else {
+         console.log('ℹ️ Canvas context skipped (closed or empty)');
+      }
+
       let assistantMessage: MessageType;
 
       if (effectiveMode === 'web') {
+        // ... (web mode implementation remains the same)
+        // Note: Web mode might also benefit from canvas context, but focusing on local/conv first.
         // ============================================================
         // WEB SEARCH MODE
         // ============================================================
@@ -525,6 +569,9 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
             streamedText += chunk;
             processAudioChunk(chunk);
             setCurrentResponse(streamedText);
+          },
+          {
+            additionalContext: canvasContextString // Pass canvas context here
           }
         );
 
@@ -559,23 +606,17 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
         const chatMessages: { role: string; content: string }[] = [];
 
         // 1. System Prompt
+        let systemContent = 'Eres un asistente útil y conversacional. Responde de manera natural y coherente basándote en el contexto de la conversación.';
+
+        // Append canvas context if available
+        if (canvasContextString) {
+          systemContent += `\n\n${canvasContextString}`;
+        }
+
         chatMessages.push({
           role: 'system',
-          content: 'Eres un asistente útil y conversacional. Responde de manera natural y coherente basándote en el contexto de la conversación.'
+          content: systemContent
         });
-
-        // 2. Canvas Context (if available)
-        if (canvasContent && canvasContent.trim() !== '' && canvasContent !== '<p><br></p>') {
-          // Strip HTML tags for context
-          const canvasText = canvasContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-          if (canvasText.length > 0) {
-            chatMessages.push({
-              role: 'system',
-              content: `CONTEXTO ADICIONAL: El usuario está trabajando en un documento que contiene:\n"${canvasText.substring(0, 1000)}${canvasText.length > 1000 ? '...' : ''}"`
-            });
-            console.log('📄 Incluyendo contenido del canvas en el contexto');
-          }
-        }
 
         // 3. Conversation History (including current message)
         chatMessages.push(...conversationHistory);
@@ -619,24 +660,28 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
       setWebSearchProgress(null);
 
       // Check if this was a document generation request
+      // We check if the user asked to generate OR modify if canvas is open
       const isDocGenRequest = isDocumentGenerationRequest(content);
-      console.log('🔍 Checking if document generation:', {
+      const shouldUpdateCanvas = isDocGenRequest || (canvasSignal.value.isOpen && isDocGenRequest);
+
+      console.log('🔍 Checking if document generation/update:', {
         userMessage: content,
-        isDocGen: isDocGenRequest
+        isDocGen: isDocGenRequest,
+        canvasOpen: canvasSignal.value.isOpen
       });
 
-      if (isDocGenRequest) {
-        console.log('📄 Document generation detected - opening editor');
+      if (shouldUpdateCanvas) {
+        console.log('📄 Document generation detected - updating editor');
         console.log('📝 Assistant response length:', assistantMessage.content.length);
 
         // Convert answer to HTML format for Quill
         const htmlContent = markdownToHTML(assistantMessage.content);
         console.log('🔄 HTML content generated:', htmlContent.substring(0, 100) + '...');
 
-        setDocumentContent(htmlContent);
-        setShowDocumentCanvas(true);
+        // Update global store
+        canvasStore.open(htmlContent);
 
-        console.log('✅ Canvas state updated - should show now');
+        console.log('✅ Canvas updated');
       }
 
       // Save to conversation
@@ -672,19 +717,6 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Document Canvas Modal */}
-      {showDocumentCanvas && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl h-[90vh] bg-[var(--color-bg)] rounded-lg shadow-2xl overflow-hidden">
-            <DocumentCanvas
-              initialContent={documentContent}
-              onClose={() => setShowDocumentCanvas(false)}
-              onContentChange={(content) => setCanvasContent(content)}
-            />
-          </div>
-        </div>
-      )}
-
       {/* Messages Area with Internal Scroll */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-8">
@@ -800,9 +832,8 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
             <button
               onClick={() => {
                 console.log('🧪 Test button clicked');
-                setDocumentContent('<h1>Documento de Prueba</h1><p>Este es un documento de prueba generado automáticamente.</p>');
-                setShowDocumentCanvas(true);
-                console.log('showDocumentCanvas:', showDocumentCanvas);
+                canvasStore.open('<h1>Documento de Prueba</h1><p>Este es un documento de prueba generado automáticamente.</p>');
+                console.log('canvasStore updated');
               }}
               className="text-xs text-blue-500 hover:text-blue-600 underline"
             >

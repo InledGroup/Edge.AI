@@ -231,21 +231,57 @@ export const MODEL_REGISTRY: ModelMetadata[] = [
   // ========================================================================
   {
     id: 'qwen2-0.5b-embed',
-    name: 'Qwen2-0.5B-Embeddings',
-    displayName: 'Qwen2 0.5B (Embeddings)',
-    description: 'Modelo ligero para búsqueda semántica. Funciona en CPU sin problemas.',
+    name: 'Qwen2-0.5B-Instruct',
+    displayName: 'Qwen2 0.5B (CPU / Seguro)',
+    description: 'Opción clásica y segura. Funciona siempre en CPU.',
     type: 'embedding',
     engine: 'wllama',
     ggufUrl: 'https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf',
     sizeGB: 0.35,
-    speed: 'very-fast',
+    speed: 'fast',
     quality: 'good',
     quantization: 'q4',
     minMemoryGB: 1,
     preferredMemoryGB: 2,
     requiresWebGPU: false,
     contextSize: 2048,
-    tags: ['embedding', 'fast']
+    tags: ['embedding', 'cpu', 'reliable']
+  },
+  {
+    id: 'snowflake-arctic-embed-m-gpu',
+    name: 'Snowflake Arctic Embed M',
+    displayName: 'Arctic Embed M (GPU / Ultra Rápido)',
+    description: 'Modelo profesional de embeddings. Requiere WebGPU. Muy alta precisión.',
+    type: 'embedding',
+    engine: 'webllm',
+    webllmModelId: 'snowflake-arctic-embed-m-q0f32-MLC-b32',
+    sizeGB: 0.1, // ~100MB
+    speed: 'very-fast',
+    quality: 'excellent',
+    quantization: 'q0f32',
+    minMemoryGB: 2,
+    preferredMemoryGB: 4,
+    requiresWebGPU: true,
+    contextSize: 512,
+    tags: ['embedding', 'gpu', 'recommended']
+  },
+  {
+    id: 'snowflake-arctic-embed-s-gpu',
+    name: 'Snowflake Arctic Embed S',
+    displayName: 'Arctic Embed S (GPU / Instantáneo)',
+    description: 'Versión ligera de Arctic. Instantáneo en WebGPU.',
+    type: 'embedding',
+    engine: 'webllm',
+    webllmModelId: 'snowflake-arctic-embed-s-q0f32-MLC-b32',
+    sizeGB: 0.03, // ~30MB
+    speed: 'very-fast',
+    quality: 'good',
+    quantization: 'q0f32',
+    minMemoryGB: 1,
+    preferredMemoryGB: 2,
+    requiresWebGPU: true,
+    contextSize: 512,
+    tags: ['embedding', 'gpu', 'fast']
   }
 ];
 

@@ -100,9 +100,17 @@ export class ContentExtractor {
     console.log(`🌐 [ContentExtractor] Extracting content from: ${url}`);
     console.log(`📄 [ContentExtractor] HTML size: ${html.length} characters`);
 
+    // PERFORMANCE: Truncate huge HTML files before parsing
+    // Parsing >1MB HTML on main thread can freeze UI
+    let contentToParse = html;
+    if (html.length > 1_000_000) {
+        console.warn('⚠️ HTML too large, truncating to 1MB for performance');
+        contentToParse = html.substring(0, 1_000_000) + '</body></html>';
+    }
+
     // Crear DOM temporal (scripts NO se ejecutan)
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+    const doc = parser.parseFromString(contentToParse, 'text/html');
 
     if (!doc.body) {
       throw new Error('Invalid HTML: no body element');

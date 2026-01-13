@@ -134,20 +134,39 @@ async function loadSavedEmbeddingModel(
   modelsStore.setEmbeddingLoading(true);
 
   try {
-    const engine = new WllamaEngine();
-    const modelUrl = model.ggufUrl;
+    let engine: WllamaEngine | WebLLMEngine;
+    let engineName: string;
 
-    if (!modelUrl) {
-      throw new Error('No GGUF URL for embedding model');
+    // Check if model uses WebLLM (e.g. Snowflake Arctic GPU)
+    if (model.engine === 'webllm' && model.webllmModelId) {
+       console.log('🚀 Loading embedding model with WebLLM (GPU)');
+       const webllmEngine = new WebLLMEngine();
+       engine = webllmEngine;
+       engineName = 'webllm';
+       
+       await webllmEngine.initialize(model.webllmModelId, (progress, status) => {
+          onProgress?.('embedding', progress, status);
+       });
+    } else {
+      // Default to Wllama (CPU)
+      const wllamaEngine = new WllamaEngine();
+      engine = wllamaEngine;
+      engineName = 'wllama';
+      const modelUrl = model.ggufUrl;
+
+      if (!modelUrl) {
+        throw new Error('No GGUF URL for embedding model');
+      }
+
+      console.log('🚀 Loading embedding model with Wllama');
+
+      await wllamaEngine.initialize(modelUrl, (progress, status) => {
+        onProgress?.('embedding', progress, status);
+      });
     }
 
-    console.log('🚀 Loading embedding model with Wllama');
-
-    await engine.initialize(modelUrl, (progress, status) => {
-      onProgress?.('embedding', progress, status);
-    });
-
     // Register engine
+    // @ts-ignore
     EngineManager.setEmbeddingEngine(engine, model.id);
 
     // Update store
@@ -155,9 +174,9 @@ async function loadSavedEmbeddingModel(
       id: model.id,
       name: model.displayName,
       type: 'embedding',
-      engine: 'wllama',
+      engine: engineName,
       contextSize: model.contextSize,
-      requiresGPU: false,
+      requiresGPU: model.requiresWebGPU,
       sizeGB: model.sizeGB
     });
 

@@ -235,6 +235,59 @@ export const uiStore = {
 };
 
 // ============================================================================
+// Canvas Store (Right Sidebar)
+// ============================================================================
+
+interface CanvasState {
+  isOpen: boolean;
+  content: string;
+}
+
+export const canvasSignal = signal<CanvasState>({
+  isOpen: false,
+  content: ''
+});
+
+export const canvasStore = {
+  get isOpen() {
+    return canvasSignal.value.isOpen;
+  },
+
+  get content() {
+    return canvasSignal.value.content;
+  },
+
+  open(content?: string) {
+    canvasSignal.value = {
+      isOpen: true,
+      content: content !== undefined ? content : canvasSignal.value.content
+    };
+  },
+
+  close() {
+    canvasSignal.value = {
+      ...canvasSignal.value,
+      isOpen: false
+    };
+  },
+
+  toggle() {
+    canvasSignal.value = {
+      ...canvasSignal.value,
+      isOpen: !canvasSignal.value.isOpen
+    };
+  },
+
+  setContent(content: string) {
+    // console.log('📝 Canvas Store Update:', content.substring(0, 50));
+    canvasSignal.value = {
+      ...canvasSignal.value,
+      content
+    };
+  }
+};
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
