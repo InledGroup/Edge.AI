@@ -137,7 +137,7 @@ export function ExtensionSetup({ onComplete, onSkip }: ExtensionSetupProps) {
   // Checking step
   if (step === 'check') {
     return (
-      <div className="space-y-6 p-8">
+      <div className="space-y-6 p-4 md:p-8">
         <div className="text-center">
           <div className="w-16 h-16 mx-auto flex items-center justify-center">
             <div className="spinner text-[var(--color-primary)]" />
@@ -154,7 +154,7 @@ export function ExtensionSetup({ onComplete, onSkip }: ExtensionSetupProps) {
   // Install step
   if (step === 'install') {
     return (
-      <div className="space-y-6 p-8">
+      <div className="space-y-6 p-4 md:p-8">
         <div className="text-center space-y-3">
           <div className="w-16 h-16 mx-auto flex items-center justify-center rounded-full bg-blue-500/10">
             <Download size={32} className="text-blue-500" />
@@ -165,7 +165,7 @@ export function ExtensionSetup({ onComplete, onSkip }: ExtensionSetupProps) {
           </p>
         </div>
 
-        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-6 space-y-4">
+        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-4 md:p-6 space-y-4">
           <h4 className="font-semibold">{i18nStore.t('extension.featuresTitle')}</h4>
           <ul className="space-y-2 text-sm text-[var(--color-text-secondary)]">
             <li className="flex items-start gap-2">
@@ -199,7 +199,7 @@ export function ExtensionSetup({ onComplete, onSkip }: ExtensionSetupProps) {
               setHasDownloaded(true);
             }}
             variant="primary"
-            className="w-full flex items-center justify-center gap-2 py-6 bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 py-4 md:py-6 bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all active:scale-[0.98]"
           >
             <Download size={24} />
             <div className="text-left">
@@ -256,7 +256,7 @@ export function ExtensionSetup({ onComplete, onSkip }: ExtensionSetupProps) {
   // Configure step
   if (step === 'configure') {
     return (
-      <div className="space-y-6 p-8">
+      <div className="space-y-6 p-4 md:p-8">
         <div className="text-center space-y-2">
           <h3 className="text-xl font-bold">{i18nStore.t('extension.configureTitle')}</h3>
           <p className="text-sm text-[var(--color-text-secondary)]">
@@ -323,7 +323,7 @@ export function ExtensionSetup({ onComplete, onSkip }: ExtensionSetupProps) {
   // Complete step
   if (step === 'complete') {
     return (
-      <div className="space-y-6 p-8">
+      <div className="space-y-6 p-4 md:p-8">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 mx-auto flex items-center justify-center">
             <CheckCircle2 size={64} className="text-[var(--color-success)]" />

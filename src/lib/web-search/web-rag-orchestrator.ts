@@ -27,6 +27,7 @@ import type { WebLLMEngine } from '../ai/webllm-engine';
 import { WebSearchService } from './web-search';
 import { ContentExtractor } from './content-extractor';
 import { semanticChunkText } from '../rag/semantic-chunking';
+import { cosineSimilarity } from '../rag/vector-search';
 import { getWorkerPool } from '../workers';
 import {
   getCachedWebPage,
@@ -35,6 +36,7 @@ import {
   cacheWebEmbeddings,
   cleanupExpiredPages
 } from '../db/web-cache';
+import { getExtensionBridgeSafe } from '../extension-bridge';
 
 /**
  * Remove aiproxy.inled.es from URLs for display
@@ -193,11 +195,11 @@ export class WebRAGOrchestrator {
         (r: any) => r.metadata?.fullContent
       );
 
-      let cleanedContents: CleanedContent[];
+      let cleanedContents: CleanedContent[] = [];
       let sourcesUsed = 0;
 
       if (hasExtensionContent) {
-        // Use content already extracted by extension
+        // Strategy 1: Use content already extracted by extension (during search)
         console.log(`[WebRAG] Using content extracted by browser extension`);
         cleanedContents = selectedResults
           .filter((r: any) => r.metadata?.fullContent)
@@ -212,30 +214,65 @@ export class WebRAGOrchestrator {
         sourcesUsed = cleanedContents.length;
         console.log(`[WebRAG] Using ${cleanedContents.length} pre-extracted pages from extension`);
       } else {
-        // Fallback to traditional fetch + extraction
-        const fetchedPages = await this.fetchPages(selectedUrls);
-        timestamps.pageFetch = Date.now() - fetchStart;
+        // Strategy 2: Try to fetch & extract via Extension (if connected)
+        // This is better than fetching HTML because extension bypasses CORS and ads
+        const bridge = getExtensionBridgeSafe();
+        let extensionSuccess = false;
 
-        console.log(`[WebRAG] Successfully fetched ${fetchedPages.length} pages`);
+        if (bridge && bridge.isConnected()) {
+          try {
+            console.log(`[WebRAG] Fetching ${selectedUrls.length} pages via browser extension...`);
+            const response = await bridge.extractUrls(selectedUrls);
 
-        if (fetchedPages.length === 0) {
-          throw new Error('No se pudo descargar ninguna página');
+            if (response.success && response.results) {
+              console.log(`[WebRAG] Extension successfully extracted ${response.results.length} pages`);
+              
+              // Map directly to CleanedContent, preserving the title!
+              cleanedContents = response.results.map(r => ({
+                text: r.content,
+                title: r.title || 'Sin título', // Use title from extension
+                url: r.url,
+                extractedAt: Date.now(),
+                wordCount: r.wordCount,
+              }));
+              
+              sourcesUsed = cleanedContents.length;
+              timestamps.pageFetch = Date.now() - fetchStart;
+              // Skip content extraction step since extension already did it
+              timestamps.contentExtraction = 0; 
+              extensionSuccess = true;
+            }
+          } catch (extError) {
+            console.warn('[WebRAG] Extension fetch failed, falling back to worker:', extError);
+          }
         }
 
-        sourcesUsed = fetchedPages.length;
+        // Strategy 3: Fallback to traditional fetch (Worker/Proxy) + extraction
+        if (!extensionSuccess) {
+          const fetchedPages = await this.fetchPages(selectedUrls);
+          timestamps.pageFetch = Date.now() - fetchStart;
 
-        // ====================================================================
-        // PASO 5: Limpieza de contenido
-        // ====================================================================
-        onProgress?.('content_extraction', 50, 'Extrayendo contenido limpio...');
-        const extractionStart = Date.now();
+          console.log(`[WebRAG] Successfully fetched ${fetchedPages.length} pages`);
 
-        cleanedContents = fetchedPages.map((page) =>
-          this.contentExtractor.extract(page.html, page.url, {
-            maxWords: 2000 // Aumentado a 2000 palabras (~8000 chars) para capturar más contexto
-          })
-        );
-        timestamps.contentExtraction = Date.now() - extractionStart;
+          if (fetchedPages.length === 0) {
+            throw new Error('No se pudo descargar ninguna página');
+          }
+
+          sourcesUsed = fetchedPages.length;
+
+          // ====================================================================
+          // PASO 5: Limpieza de contenido
+          // ====================================================================
+          onProgress?.('content_extraction', 50, 'Extrayendo contenido limpio...');
+          const extractionStart = Date.now();
+
+          cleanedContents = fetchedPages.map((page) =>
+            this.contentExtractor.extract(page.html, page.url, {
+              maxWords: 2000 // Aumentado a 2000 palabras (~8000 chars) para capturar más contexto
+            })
+          );
+          timestamps.contentExtraction = Date.now() - extractionStart;
+        }
       }
 
       console.log(
@@ -422,7 +459,158 @@ Responde SOLO con un JSON en este formato exacto:
     }
   }
 
-  // ... (PASO 4 to 7 omitted as they don't generate text) ...
+  // ==========================================================================
+  // PASO 4: Fetch pages
+  // ==========================================================================
+
+  private async fetchPages(urls: string[]): Promise<FetchedPage[]> {
+    try {
+      // Usar WebSearchWorker (con proxy)
+      const workerPool = getWorkerPool();
+      const webSearchWorker = await workerPool.getWebSearchWorker();
+      
+      console.log(`[WebRAG] Fetching ${urls.length} pages via worker (proxy)...`);
+      const pages = await webSearchWorker.fetchPages(urls, {
+        timeout: 15000, // 15s timeout
+        maxSize: 1024 * 1024, // 1MB limit
+      });
+      
+      return pages;
+    } catch (error) {
+      console.error('[WebRAG] Error fetching pages:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================================================
+  // PASO 6: Chunking + Embeddings
+  // ==========================================================================
+
+  private async processWebDocuments(
+    contents: CleanedContent[],
+    searchQuery: string,
+    onProgress?: (progress: number) => void
+  ): Promise<WebDocument[]> {
+    const documents: WebDocument[] = [];
+    let totalProcessed = 0;
+    const totalItems = contents.length;
+
+    console.log(`[WebRAG] Processing ${totalItems} cleaned pages...`);
+
+    for (const content of contents) {
+      // 1. Chunking semántico
+      const chunks = await semanticChunkText(content.text, 800, 400);
+
+      // 2. Generar embeddings
+      const texts = chunks.map((c) => c.content);
+      let embeddings: Float32Array[] = [];
+
+      try {
+        if ('generateEmbeddingsBatch' in (this.embeddingEngine as any)) {
+           embeddings = await (this.embeddingEngine as any).generateEmbeddingsBatch(
+             texts,
+             4, // Concurrency
+             (_p: number) => {
+               // Optional: report detailed embedding progress
+             }
+           );
+        } else {
+           // Fallback for engines without batch support
+           for (const text of texts) {
+             const emb = await (this.embeddingEngine as any).generateEmbedding(text);
+             embeddings.push(emb);
+           }
+        }
+      } catch (error) {
+        console.warn(`[WebRAG] Failed to generate embeddings for ${content.url}:`, error);
+        // Continue with empty embeddings (or skip document?)
+        // Let's skip document to avoid bad results
+        continue;
+      }
+
+      // 3. Crear WebDocument
+      const webDoc: WebDocument = {
+        id: `web-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'web',
+        url: content.url,
+        title: content.title,
+        content: content.text,
+        chunks: chunks.map((chunk, i) => ({
+          ...chunk,
+          index: i,
+          embedding: embeddings[i] || new Float32Array(0),
+          metadata: {
+            ...chunk.metadata,
+            startChar: 0,
+            endChar: chunk.content.length,
+          } as any,
+        })),
+        temporary: true,
+        fetchedAt: Date.now(),
+        metadata: {
+          source: 'extension', 
+          searchQuery,
+          originalSize: content.text.length,
+          fetchTime: 0,
+        }
+      };
+
+      documents.push(webDoc);
+      
+      totalProcessed++;
+      if (onProgress) {
+        onProgress((totalProcessed / totalItems) * 100);
+      }
+    }
+
+    return documents;
+  }
+
+  // ==========================================================================
+  // PASO 7: Vector Search
+  // ==========================================================================
+
+  private async searchWebDocuments(
+    queryEmbedding: Float32Array | number[],
+    documents: WebDocument[],
+    topK: number
+  ): Promise<RetrievedWebChunk[]> {
+    const allChunks: RetrievedWebChunk[] = [];
+    
+    // Normalize query embedding to Float32Array
+    const queryVec = queryEmbedding instanceof Float32Array 
+      ? queryEmbedding 
+      : new Float32Array(queryEmbedding);
+
+    // Collect all chunks from all documents
+    for (const doc of documents) {
+      for (const chunk of doc.chunks) {
+        // Calculate similarity
+        let score = 0;
+        if (chunk.embedding.length > 0) {
+          score = cosineSimilarity(queryVec, chunk.embedding);
+        }
+
+        allChunks.push({
+          content: chunk.content,
+          score,
+          document: {
+            id: doc.id,
+            title: doc.title,
+            url: doc.url,
+            type: 'web',
+          },
+          metadata: chunk.metadata,
+        });
+      }
+    }
+
+    // Sort by score descending
+    allChunks.sort((a, b) => b.score - a.score);
+
+    // Return top K
+    return allChunks.slice(0, topK);
+  }
 
   // ==========================================================================
   // PASO 8: Generar respuesta final
@@ -517,11 +705,11 @@ INSTRUCCIONES:
     // BUT wait, WllamaEngine has generateText now. The type definition LLMEngine union should cover it.
     
     // Fallback for any other engine type or if WllamaEngine uses different interface in types
-    if ('createChatCompletion' in this.llmEngine) {
+    if ('createChatCompletion' in (this.llmEngine as any)) {
       // Convert input to messages if string
       const messages = Array.isArray(input) ? input : [{ role: 'user', content: input }];
       
-      if (options.onToken && 'createChatCompletionStream' in this.llmEngine) {
+      if (options.onToken && 'createChatCompletionStream' in (this.llmEngine as any)) {
         // Stream mode for Wllama raw
         return await (this.llmEngine as any).createChatCompletionStream(
           messages,
@@ -534,7 +722,7 @@ INSTRUCCIONES:
         );
       } else {
         // Non-stream mode
-        const response = await this.llmEngine.createChatCompletion(
+        const response = await (this.llmEngine as any).createChatCompletion(
           messages,
           {
             temperature: options.temperature,

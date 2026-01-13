@@ -55,11 +55,14 @@ async function fetchPage(
     throw new Error(`Invalid URL: ${url}`);
   }
 
-  // Aplicar proxy CORS si estamos en localhost
+  // Aplicar proxy CORS si estamos en localhost o si el proxy está disponible
   const corsProxy = getCorsProxy();
   const fetchUrl = corsProxy ? `${corsProxy}${encodeURIComponent(url)}` : url;
 
-  console.log(`[WebSearchWorker] Fetching: ${url} (proxy: ${!!corsProxy})`);
+  console.log(`[WebSearchWorker] Fetching: ${url}`);
+  if (corsProxy) {
+    console.log(`[WebSearchWorker] Using proxy: ${corsProxy}`);
+  }
 
   // Crear AbortController para timeout
   const controller = new AbortController();
@@ -67,21 +70,42 @@ async function fetchPage(
 
   try {
     // Realizar fetch
-    const response = await fetch(fetchUrl, {
-      method: 'GET',
-      signal: controller.signal,
-      headers: {
-        Accept: 'text/html,application/xhtml+xml',
-        'User-Agent': 'EdgeAI/1.0 (Local Browser Agent; +https://github.com/InledGroup/Edge.AI)',
-        ...headers,
-      },
-      redirect: followRedirects ? 'follow' : 'manual',
-    });
+    let response: Response;
+    try {
+      response = await fetch(fetchUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          Accept: 'text/html,application/xhtml+xml',
+          'User-Agent': 'EdgeAI/1.0 (Local Browser Agent; +https://github.com/InledGroup/Edge.AI)',
+          ...headers,
+        },
+        redirect: followRedirects ? 'follow' : 'manual',
+      });
+    } catch (fetchError) {
+      console.warn(`[WebSearchWorker] Proxy fetch failed for ${url}, trying direct...`, fetchError);
+      // Fallback a fetch directo si el proxy falla (CORS podría bloquearlo, pero vale la pena intentar)
+      if (corsProxy && !controller.signal.aborted) {
+        response = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            Accept: 'text/html,application/xhtml+xml',
+            'User-Agent': 'EdgeAI/1.0 (Local Browser Agent; +https://github.com/InledGroup/Edge.AI)',
+            ...headers,
+          },
+          redirect: followRedirects ? 'follow' : 'manual',
+        });
+      } else {
+        throw fetchError;
+      }
+    }
 
     clearTimeout(timeoutId);
 
     // Verificar status
     if (!response.ok) {
+      console.error(`[WebSearchWorker] HTTP Error for ${url}: ${response.status} ${response.statusText}`);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 

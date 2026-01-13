@@ -26,6 +26,16 @@ export async function autoLoadModels(
     return false;
   }
 
+  // Ensure persistent storage for mobile devices
+  if (navigator.storage && navigator.storage.persist) {
+    try {
+      const isPersisted = await navigator.storage.persist();
+      console.log(`💾 Storage persistence enabled: ${isPersisted}`);
+    } catch (e) {
+      console.warn('Failed to request storage persistence:', e);
+    }
+  }
+
   console.log('🔄 Auto-loading saved models:', { chatModelId, embeddingModelId });
 
   try {

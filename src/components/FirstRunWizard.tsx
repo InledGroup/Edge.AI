@@ -530,8 +530,8 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
 
   if (step === 'extension-setup') {
     return (
-      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-        <Card className="max-w-2xl w-full">
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+        <Card className="max-w-2xl w-full my-8">
           <ExtensionSetup
             onComplete={() => {
               // Mark setup complete

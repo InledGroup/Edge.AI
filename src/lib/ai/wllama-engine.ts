@@ -113,6 +113,7 @@ export class WllamaEngine {
             n_ctx: 2048,
             embeddings: true, // Enable embeddings support
             n_threads: 1, // FORCE 1 THREAD for stability
+            useCache: true, // Force caching to avoid re-downloading on mobile
             progressCallback: ({ loaded, total }) => {
               if (total > 0) {
                 // Detect if loading from cache (instant progress jumps)
