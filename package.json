@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@astrojs/preact": "^3.0.1",
-    "@mlc-ai/web-llm": "^0.2.54",
+    "@mlc-ai/web-llm": "^0.2.80",
     "@preact/signals": "^1.2.2",
     "@wllama/wllama": "^2.3.7",
     "astro": "^4.0.8",

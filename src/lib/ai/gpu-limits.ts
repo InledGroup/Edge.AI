@@ -100,12 +100,12 @@ export function getWebGPUConfig(tier: 'mobile' | 'integrated' | 'discrete'): {
       recommended_context: 512,
     },
     integrated: {
-      max_batch_size: 64,
+      max_batch_size: 128,
       max_window_size: 2048,
       recommended_context: 1024,
     },
     discrete: {
-      max_batch_size: 128,
+      max_batch_size: 256,
       max_window_size: 4096,
       recommended_context: 2048,
     },

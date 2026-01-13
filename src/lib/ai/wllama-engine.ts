@@ -111,7 +111,7 @@ export class WllamaEngine {
           await this.wllama!.loadModelFromUrl(this.modelUrl, {
             n_ctx: 2048,
             embeddings: true, // Enable embeddings support
-            n_threads: 1, // FORCE 1 THREAD for stability
+            n_threads: optimalThreads, // Use optimal threads for max speed
             useCache: true, // Force caching to avoid re-downloading on mobile
             progressCallback: ({ loaded, total }: any) => {
               if (total > 0) {
@@ -191,9 +191,9 @@ export class WllamaEngine {
     }
 
     try {
-      // IMPORTANT: Truncate text to max 256 chars for faster embedding generation
+      // IMPORTANT: Truncate text to max 512 chars for faster embedding generation
       // Wllama with CPU is very slow with long texts
-      const maxLength = 256;
+      const maxLength = 512;
       const truncatedText = text.length > maxLength ? text.substring(0, maxLength) : text;
 
       if (text.length > maxLength) {
@@ -352,7 +352,7 @@ export class WllamaEngine {
           if (!item) break;
 
           const { text, idx } = item;
-          const truncated = text.substring(0, 256); // Truncate for speed
+          const truncated = text.substring(0, 512); // Truncate for speed
 
           try {
             const embedding = await this.wllama!.createEmbedding(truncated);
