@@ -14,6 +14,10 @@ import {
     ChevronRight,
     ChevronDown,
     Globe,
+    Star,
+    Check,
+    X,
+    Minus,
 } from "lucide-preact";
 ---
 
@@ -527,6 +531,275 @@ import {
                 <div
                     class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--color-primary)]/50 to-transparent"
                 >
+                </div>
+            </section>
+
+            <!-- Comparison Section -->
+            <section id="comparison" class="relative py-20 sm:py-24 lg:py-32 bg-[var(--color-bg)]/50">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative">
+                    <!-- Section Header -->
+                    <div class="text-center mb-16">
+                        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6">
+                            <span class="gradient-text animate-gradient" data-i18n="landing.comparison.title">
+                                Comparativa
+                            </span>
+                        </h2>
+                        <p class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)]" data-i18n="landing.comparison.subtitle">
+                            Cómo nos comparamos con otros
+                        </p>
+                    </div>
+
+                    <!-- Comparison Table -->
+                    <div class="overflow-x-auto pb-4">
+                        <div class="min-w-[800px] glass rounded-3xl p-8 border border-[var(--color-primary)]/20">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th class="p-4 text-[var(--color-text-secondary)] font-medium text-lg w-1/5"></th>
+                                        <th class="p-4 text-[var(--color-primary)] font-bold text-xl w-1/5 text-center bg-[var(--color-primary)]/10 rounded-t-2xl border-t border-x border-[var(--color-primary)]/20" data-i18n="landing.comparison.col_edgeai">Edge AI</th>
+                                        <th class="p-4 text-[var(--color-text)] font-semibold text-lg w-1/5 text-center" data-i18n="landing.comparison.col_chatgpt">ChatGPT</th>
+                                        <th class="p-4 text-[var(--color-text)] font-semibold text-lg w-1/5 text-center" data-i18n="landing.comparison.col_notebooklm">NotebookLM</th>
+                                        <th class="p-4 text-[var(--color-text)] font-semibold text-lg w-1/5 text-center" data-i18n="landing.comparison.col_liquid">Liquid AI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-[var(--color-text)]">
+                                    <!-- Row 1: Data Collection -->
+                                    <tr class="border-b border-white/5">
+                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_data_collection">Recopilación de datos</td>
+                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
+                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
+                                                <X size={20} /> <span data-i18n="landing.comparison.value_no">No</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-red-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-red-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-red-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <!-- Row 2: Model Training -->
+                                    <tr class="border-b border-white/5">
+                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_model_training">Entrenamiento de modelos</td>
+                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
+                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
+                                                <X size={20} /> <span data-i18n="landing.comparison.value_no">No</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-red-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-red-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-yellow-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_cloud">Nube</span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <!-- Row 3: Web Search -->
+                                    <tr class="border-b border-white/5">
+                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_web_search">Búsqueda en internet</td>
+                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
+                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <!-- Row 4: Upload Documents -->
+                                    <tr class="border-b border-white/5">
+                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_upload_docs">Subir documentos</td>
+                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
+                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_local">Local</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-yellow-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_cloud">Nube</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-yellow-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_cloud">Nube</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-yellow-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_cloud">Nube</span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <!-- Row 5: GDPR -->
+                                    <tr class="border-b border-white/5">
+                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_gdpr">RGPD</td>
+                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
+                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-yellow-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_mixed">Híbrido</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-yellow-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_mixed">Híbrido</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-yellow-400">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_mixed">Híbrido</span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <!-- Row 6: Voice Assistant -->
+                                    <tr>
+                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_voice_assistant">Asistente de voz</td>
+                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-b border-[var(--color-primary)]/10 rounded-b-2xl">
+                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
+                                            <span class="inline-flex items-center gap-2">
+                                                <X size={20} /> <span data-i18n="landing.comparison.value_no">No</span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
+                                            <span class="inline-flex items-center gap-2">
+                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Reviews Section -->
+            <section class="relative py-20 sm:py-24 lg:py-32">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative">
+                    <!-- Section Header -->
+                    <div class="text-center mb-16">
+                        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6">
+                            <span class="gradient-text animate-gradient" data-i18n="landing.reviews.title">
+                                Lo que dicen nuestros usuarios
+                            </span>
+                        </h2>
+                        <p class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)]" data-i18n="landing.reviews.subtitle">
+                            Únete a la comunidad de privacidad
+                        </p>
+                    </div>
+
+                    <!-- Reviews Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-7xl mx-auto">
+                        <!-- Review 1 -->
+                        <div class="p-8 glass rounded-3xl border border-white/10 hover:border-[var(--color-primary)]/30 transition-all duration-300">
+                            <div class="flex gap-1 text-yellow-400 mb-4">
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                            </div>
+                            <p class="text-lg text-[var(--color-text)] mb-6 leading-relaxed italic" data-i18n="landing.reviews.review1_text">
+                                "Increíble poder usar modelos LLM directamente en mi navegador sin enviar datos a nadie."
+                            </p>
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-blue-500 flex items-center justify-center text-white font-bold text-xl">
+                                    C
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-[var(--color-text)]" data-i18n="landing.reviews.review1_author">Carlos M.</h4>
+                                    <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.reviews.review1_role">Desarrollador</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Review 2 -->
+                        <div class="p-8 glass rounded-3xl border border-white/10 hover:border-[var(--color-primary)]/30 transition-all duration-300">
+                            <div class="flex gap-1 text-yellow-400 mb-4">
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                            </div>
+                            <p class="text-lg text-[var(--color-text)] mb-6 leading-relaxed italic" data-i18n="landing.reviews.review2_text">
+                                "La función de búsqueda web privada es justo lo que necesitaba. Rápido y seguro."
+                            </p>
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xl">
+                                    S
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-[var(--color-text)]" data-i18n="landing.reviews.review2_author">Sarah L.</h4>
+                                    <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.reviews.review2_role">Investigadora</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Review 3 -->
+                        <div class="p-8 glass rounded-3xl border border-white/10 hover:border-[var(--color-primary)]/30 transition-all duration-300">
+                            <div class="flex gap-1 text-yellow-400 mb-4">
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                                <Star size={18} fill="currentColor" />
+                            </div>
+                            <p class="text-lg text-[var(--color-text)] mb-6 leading-relaxed italic" data-i18n="landing.reviews.review3_text">
+                                "Poder analizar mis PDFs confidenciales sin subirlos a la nube no tiene precio."
+                            </p>
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white font-bold text-xl">
+                                    D
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-[var(--color-text)]" data-i18n="landing.reviews.review3_author">David R.</h4>
+                                    <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.reviews.review3_role">Analista Legal</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

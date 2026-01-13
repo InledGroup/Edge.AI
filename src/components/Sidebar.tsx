@@ -123,17 +123,12 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
+        <a href={"/landing"}>
           <div className="flex items-center gap-2">
             <img src="/inledai.svg" width={28} height={28} />
             <span className="font-semibold text-sm">Edge.AI</span>
           </div>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="lg:hidden w-8 h-8 rounded-lg hover:bg-[var(--color-bg-tertiary)] flex items-center justify-center transition-colors"
-            aria-label="Close sidebar"
-          >
-            <X size={18} />
-          </button>
+        </a>
         </div>
 
         {/* New Chat Button */}
