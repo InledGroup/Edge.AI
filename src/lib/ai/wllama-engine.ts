@@ -1,7 +1,8 @@
 // Wllama Engine - Pure WebAssembly CPU inference
 // Adapted for local-first architecture (no external cache dependencies)
 
-import { Wllama } from '@wllama/wllama';
+// @ts-ignore
+import { Wllama } from './wllama-lib.js';
 import type { GenerationOptions, ProgressCallback } from './webllm-engine';
 import { detectWasmFeatures, getRecommendedWllamaBuild, getOptimalThreadCount } from './wasm-features';
 
@@ -11,7 +12,7 @@ import { detectWasmFeatures, getRecommendedWllamaBuild, getOptimalThreadCount } 
  * Uses llama.cpp compiled to WASM - no ONNX Runtime needed
  */
 export class WllamaEngine {
-  private wllama: Wllama | null = null;
+  private wllama: any | null = null;
   private modelUrl: string = '';
   private isInitialized: boolean = false;
   private initializing: boolean = false;
@@ -70,15 +71,13 @@ export class WllamaEngine {
 
       this.modelUrl = defaultModelUrl;
 
-      // FORCE SINGLE-THREAD MODE FOR STABILITY
       // Multi-threading often causes "Module already initialized" or worker conflicts in some environments
-      console.log('🛡️ FORCE: Using single-thread mode for maximum stability');
+      console.log('🛡️  Using multi-thread mode when available');
       
-      const basePath = '/wllama/single-thread/wllama';
-
-      const config: Record<string, string> = {
-        'single-thread/wllama.wasm': basePath + '.wasm',
-        'single-thread/wllama.js': basePath + '.js',
+      const config = {
+        'single-thread/wllama.wasm': '/wllama/single-thread/wllama.wasm',
+        'multi-thread/wllama.wasm': '/wllama/multi-thread/wllama.wasm',
+        'multi-thread/wllama.worker.mjs': '/wllama/multi-thread/wllama.worker.mjs',
       };
 
       // GLOBAL CLEANUP: Attempt to remove any existing Emscripten Module global
@@ -114,7 +113,7 @@ export class WllamaEngine {
             embeddings: true, // Enable embeddings support
             n_threads: 1, // FORCE 1 THREAD for stability
             useCache: true, // Force caching to avoid re-downloading on mobile
-            progressCallback: ({ loaded, total }) => {
+            progressCallback: ({ loaded, total }: any) => {
               if (total > 0) {
                 // Detect if loading from cache (instant progress jumps)
                 if (loaded > lastLoaded + 50 * 1024 * 1024 && Date.now() - loadStartTime < 1000) {
@@ -248,7 +247,7 @@ export class WllamaEngine {
       // Handle structured messages or raw string
       if (Array.isArray(input)) {
         // Detect model type for template
-        const isQwen = this.modelUrl.toLowerCase().includes('qwen') || this.modelUrl.toLowerCase().includes('smollm');
+        const isQwen = this.modelUrl.toLowerCase().includes('qwen') || this.modelUrl.toLowerCase().includes('smollm') || this.modelUrl.toLowerCase().includes('lfm');
         const isLlama = this.modelUrl.toLowerCase().includes('llama') && !this.modelUrl.toLowerCase().includes('tiny');
         const isPhi = this.modelUrl.toLowerCase().includes('phi');
 
@@ -294,7 +293,7 @@ export class WllamaEngine {
           nPredict: maxTokens,
           temp: temperature,
           stop: effectiveStop, // Pass stop tokens
-          onNewToken: (_token, _piece, currentText) => {
+          onNewToken: (_token: any, _piece: any, currentText: any) => {
             // Send incremental chunks
             const newChunk = currentText.slice(fullResponse.length);
             if (newChunk) {

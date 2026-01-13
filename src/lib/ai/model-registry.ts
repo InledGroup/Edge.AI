@@ -109,6 +109,24 @@ export const MODEL_REGISTRY: ModelMetadata[] = [
   // CHAT MODELS - Medium (1-2GB)
   // ========================================================================
   {
+    id: 'lfm-2.5-1.6b-q4',
+    name: 'LFM-2.5-1.6B-Q4',
+    displayName: 'LFM 2.5 1.6B (Ligero)',
+    description: 'Modelo LiquidAI eficiente. Arquitectura innovadora y rápida (1.1GB).',
+    type: 'chat',
+    engine: 'wllama',
+    ggufUrl: 'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/LFM2.5-VL-1.6B-Q4_0.gguf',
+    sizeGB: 1.1,
+    speed: 'fast',
+    quality: 'good',
+    quantization: 'q4',
+    minMemoryGB: 2,
+    preferredMemoryGB: 4,
+    requiresWebGPU: false,
+    contextSize: 4096,
+    tags: ['medium', 'liquid', 'balanced']
+  },
+  {
     id: 'tinyllama-1.1b',
     name: 'TinyLlama-1.1B-Chat',
     displayName: 'TinyLlama 1.1B (Equilibrado)',
