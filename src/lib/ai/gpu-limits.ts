@@ -56,8 +56,17 @@ export async function probeActualLimits(): Promise<GPUTierConfig | null> {
     console.log('🔍 Detected GPU limits:', {
       maxBufferSize: `${Math.round(maxBufferSize / 1024 / 1024)}MB`,
       maxStorageBufferBinding: `${Math.round(limits.maxStorageBufferBindingSize / 1024 / 1024)}MB`,
+      maxComputeWorkgroupStorageSize: `${Math.round(limits.maxComputeWorkgroupStorageSize / 1024)}KB`,
       maxComputeWorkgroupSizeX: limits.maxComputeWorkgroupSizeX,
     });
+
+    // CRITICAL: WebLLM requires at least 32KB of workgroup storage
+    // Many mobile GPUs only have 16KB. In this case, we MUST fail WebGPU check
+    // to force fallback to CPU (Wllama).
+    if (limits.maxComputeWorkgroupStorageSize < 32768) {
+      console.warn(`⚠️ GPU storage limit too low for WebLLM (${limits.maxComputeWorkgroupStorageSize} < 32768). Disabling WebGPU.`);
+      return null;
+    }
 
     // Determine tier based on max buffer size
     let tier: 'mobile' | 'integrated' | 'discrete';

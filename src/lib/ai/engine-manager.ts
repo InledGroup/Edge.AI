@@ -4,26 +4,27 @@
 import { WebLLMEngine } from './webllm-engine';
 import { WllamaEngine } from './wllama-engine';
 import type { ProgressCallback } from './webllm-engine';
+import { getModelById } from './model-registry';
 
 /**
  * Global singleton instances of AI engines
  * These are shared across the entire application
  */
 class EngineManager {
-  private static chatEngineInstance: WebLLMEngine | null = null;
+  private static chatEngineInstance: WebLLMEngine | WllamaEngine | null = null;
   private static embeddingEngineInstance: WllamaEngine | null = null;
   private static chatModelName: string = '';
   private static embeddingModelName: string = '';
 
   /**
-   * Initialize or get the chat engine (WebLLM)
+   * Initialize or get the chat engine (WebLLM with Wllama fallback)
    * Returns existing instance if already initialized with same model
    */
   static async getChatEngine(
     modelName?: string,
     onProgress?: ProgressCallback
-  ): Promise<WebLLMEngine> {
-    // If no instance exists, create one
+  ): Promise<WebLLMEngine | WllamaEngine> {
+    // If no instance exists, start with WebLLM
     if (!this.chatEngineInstance) {
       console.log('🆕 Creating new WebLLM chat engine instance');
       this.chatEngineInstance = new WebLLMEngine();
@@ -32,7 +33,65 @@ class EngineManager {
     // If model name provided and different from current, reinitialize
     if (modelName && modelName !== this.chatModelName) {
       console.log(`🔄 Initializing chat engine with model: ${modelName}`);
-      await this.chatEngineInstance.initialize(modelName, onProgress);
+      
+      try {
+        // First try: WebLLM (GPU)
+        // Only try WebLLM if the current instance is a WebLLMEngine or if we haven't decided yet
+        if (this.chatEngineInstance instanceof WebLLMEngine) {
+           await this.chatEngineInstance.initialize(modelName, onProgress);
+        } else {
+           // If we are already using Wllama, maybe we should try WebLLM again?
+           // No, if we are in Wllama mode, it's likely because GPU failed previously or user chose it.
+           // BUT if the user explicitly selected a model that is WebLLM-capable, we should maybe try GPU again?
+           // For now, let's assume if we are switching models, we try WebLLM first unless we know it fails.
+           // Actually, easiest is to force try WebLLM if the model supports it.
+           
+           // Check if model requires WebGPU or if we should try it
+           const modelMeta = getModelById(modelName);
+           if (modelMeta?.engine === 'webllm') {
+             console.log('🔄 Attempting to switch back to WebLLM for this model...');
+             this.chatEngineInstance = new WebLLMEngine();
+             await this.chatEngineInstance.initialize(modelName, onProgress);
+           } else {
+             // It's a Wllama model
+             const wllamaInstance = this.chatEngineInstance as WllamaEngine;
+             if (modelMeta?.ggufUrl) {
+                await wllamaInstance.initialize(modelMeta.ggufUrl, onProgress);
+             } else {
+                throw new Error(`Model ${modelName} missing GGUF URL`);
+             }
+           }
+        }
+      } catch (error: any) {
+        console.error('❌ WebLLM initialization failed:', error);
+        
+        // Check for GPU limit errors or other fatal WebGPU errors
+        const isGpuLimitError = error.message?.includes('maxComputeWorkgroupStorageSize') || 
+                                error.message?.includes('WebGPU') ||
+                                error.message?.includes('adapter');
+                                
+        if (isGpuLimitError) {
+          console.warn('⚠️ GPU limitations detected. Falling back to CPU (Wllama)...');
+          onProgress?.(10, 'GPU no compatible/soportada. Cambiando a modo CPU...');
+          
+          // Find GGUF URL for fallback
+          const modelMeta = getModelById(modelName);
+          if (modelMeta && modelMeta.ggufUrl) {
+            console.log(`🔄 Fallback: Using GGUF version of ${modelName}: ${modelMeta.ggufUrl}`);
+            
+            // Switch to WllamaEngine
+            this.chatEngineInstance = new WllamaEngine();
+            await this.chatEngineInstance.initialize(modelMeta.ggufUrl, onProgress);
+            console.log('✅ Fallback to Wllama successful');
+          } else {
+            throw new Error(`WebLLM failed and no CPU fallback (GGUF URL) found for model ${modelName}`);
+          }
+        } else {
+          // Re-throw if it's not a GPU error (e.g. network error)
+          throw error;
+        }
+      }
+      
       this.chatModelName = modelName;
     }
 
@@ -94,7 +153,7 @@ class EngineManager {
   /**
    * Set the chat engine instance (called by ModelSelector after initialization)
    */
-  static setChatEngine(engine: WebLLMEngine, modelName: string): void {
+  static setChatEngine(engine: WebLLMEngine | WllamaEngine, modelName: string): void {
     this.chatEngineInstance = engine;
     this.chatModelName = modelName;
     console.log('✅ Chat engine instance registered:', modelName);

@@ -2011,12 +2011,31 @@ function opfsFileSize(originalURL, prefix = "") {
 }
 function urlToFileName(url, prefix) {
   return __async(this, null, function* () {
-    const hashBuffer = yield crypto.subtle.digest(
-      "SHA-1",
-      new TextEncoder().encode(url)
-    );
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    let hashHex;
+    if (typeof crypto !== "undefined" && crypto.subtle && crypto.subtle.digest) {
+      try {
+        const hashBuffer = yield crypto.subtle.digest(
+          "SHA-1",
+          new TextEncoder().encode(url)
+        );
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+      } catch (e) {
+        // Fallback if digest fails
+        let hash = 5381;
+        for (let i = 0; i < url.length; i++) {
+          hash = (hash << 5) + hash + url.charCodeAt(i);
+        }
+        hashHex = (hash >>> 0).toString(16);
+      }
+    } else {
+      // Fallback: Simple string hash (djb2 implementation)
+      let hash = 5381;
+      for (let i = 0; i < url.length; i++) {
+        hash = (hash << 5) + hash + url.charCodeAt(i);
+      }
+      hashHex = (hash >>> 0).toString(16);
+    }
     return `${prefix}${hashHex}_${url.split("/").pop()}`;
   });
 }
