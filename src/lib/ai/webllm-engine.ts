@@ -271,7 +271,7 @@ export class WebLLMEngine {
    * Supports streaming for better UX
    */
   async generateText(
-    input: string | { role: string; content: string }[],
+    input: string | { role: string; content: string | any[] }[],
     options: GenerationOptions = {}
   ): Promise<string> {
     if (!this.isInitialized || !this.engine) {
@@ -302,7 +302,7 @@ export class WebLLMEngine {
         let fullResponse = '';
 
         const completion = await this.engine.chat.completions.create({
-          messages: chatMessages,
+          messages: chatMessages as any, // Cast to any to allow mixed content types
           temperature,
           max_tokens: maxTokens,
           top_p: topP,
@@ -323,7 +323,7 @@ export class WebLLMEngine {
       } else {
         // Non-streaming mode
         const response = await this.engine.chat.completions.create({
-          messages: chatMessages,
+          messages: chatMessages as any,
           temperature,
           max_tokens: maxTokens,
           top_p: topP,

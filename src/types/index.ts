@@ -69,6 +69,7 @@ export interface Message {
   timestamp: number;
   sources?: RetrievedChunk[]; // RAG sources used
   model?: string; // Model that generated this (for assistant)
+  images?: string[]; // Base64 images or URLs
   streaming?: boolean;
   metadata?: Record<string, any>;
 }

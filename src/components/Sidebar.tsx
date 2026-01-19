@@ -13,7 +13,8 @@ import {
   Upload,
   Brain,
   Check,
-  Languages
+  Languages,
+  MessageCircle
 } from 'lucide-preact';
 import { conversationsStore, documentsStore, uiStore } from '@/lib/stores';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
@@ -37,11 +38,28 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [showDocuments, setShowDocuments] = useState(false);
-  
+
   // Subscribe to language changes for re-rendering
   const lang = languageSignal.value;
 
+  function openFeedbackPopup() {
+    // Only run on client-side to avoid SSR errors
+    if (typeof window === 'undefined') return;
+
+    const width = 640;
+    const height = 800;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    window.open(
+      'https://form.typeform.com/to/h0cyYt3d',
+      'FeedbackEdgeAI',
+      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
+    );
+  }
+
   // Load conversations
+
   useEffect(() => {
     loadConversations();
   }, [conversationsStore.all.length]);
@@ -123,12 +141,12 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
-        <a href={"/landing"}>
-          <div className="flex items-center gap-2">
-            <img src="/inledai.svg" width={28} height={28} />
-            <span className="font-semibold text-sm">Edge.AI</span>
-          </div>
-        </a>
+          <a href={"/landing"}>
+            <div className="flex items-center gap-2">
+              <img src="/inledai.svg" width={28} height={28} />
+              <span className="font-semibold text-sm">Edge.AI</span>
+            </div>
+          </a>
         </div>
 
         {/* New Chat Button */}
@@ -147,8 +165,8 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
           <button
             onClick={() => setShowDocuments(false)}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${!showDocuments
-                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]/50'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]/50'
               }`}
           >
             <MessageSquare size={14} />
@@ -157,8 +175,8 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
           <button
             onClick={() => setShowDocuments(true)}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${showDocuments
-                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]/50'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]/50'
               }`}
           >
             <FileText size={14} />
@@ -187,8 +205,8 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                         key={conv.id}
                         onClick={() => handleSelectConversation(conv.id)}
                         className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${conversationsStore.activeId === conv.id
-                            ? 'bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]'
-                            : 'hover:bg-[var(--color-bg-tertiary)]/50'
+                          ? 'bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]'
+                          : 'hover:bg-[var(--color-bg-tertiary)]/50'
                           }`}
                       >
                         <MessageSquare size={14} className="flex-shrink-0 text-[var(--color-text-secondary)]" />
@@ -255,7 +273,15 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
             <Upload size={16} />
             <span>{i18nStore.t('common.uploadDocuments')}</span>
           </button>
-          
+
+          <button
+            onClick={openFeedbackPopup}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          >
+            <MessageCircle size={16} />
+            <span>{i18nStore.t('common.feedback')}</span>
+          </button>
+
           {/* Language Switcher */}
           <button
             onClick={() => i18nStore.setLanguage(lang === 'es' ? 'en' : 'es')}

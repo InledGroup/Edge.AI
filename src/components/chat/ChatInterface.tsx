@@ -8,7 +8,7 @@ import { WebSearchProgress } from './WebSearchProgress';
 import { UrlConfirmationModal } from './UrlConfirmationModal';
 import { Card } from '../ui/Card';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
-import { conversationsStore, modelsReady, hasReadyDocuments, canvasStore, canvasSignal } from '@/lib/stores';
+import { conversationsStore, modelsReady, hasReadyDocuments, canvasStore, canvasSignal, modelsStore } from '@/lib/stores';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import type { Message as MessageType } from '@/types';
 import { completeRAGFlow } from '@/lib/rag/rag-pipeline';
@@ -314,7 +314,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
     }
   }, [conversationsStore.activeId]);
 
-  async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation') {
+  async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[]) {
     // Verification check if models are ready
     if (!modelsReady.value) {
       alert(i18nStore.t('chat.loadModelsFirst'));
@@ -343,6 +343,7 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
       id: generateUUID(),
       role: 'user',
       content,
+      images,
       timestamp: Date.now()
     };
 
@@ -597,13 +598,25 @@ INSTRUCCIONES DE EDICIÓN:
 
         // Prepare conversation history INCLUDING current user message
         // Take last 10 messages for better context (5 exchanges)
-        const conversationHistory = [...messages.slice(-10), userMessage].map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
+        const conversationHistory = [...messages.slice(-10), userMessage].map(msg => {
+          // If message has images, we need to format it for the engine
+          if (msg.images && msg.images.length > 0) {
+            return {
+              role: msg.role,
+              content: [
+                { type: 'text', text: msg.content },
+                ...msg.images.map(img => ({ type: 'image_url', image_url: { url: img } }))
+              ]
+            };
+          }
+          return {
+            role: msg.role,
+            content: msg.content
+          };
+        });
 
         // Build structured messages for the engine
-        const chatMessages: { role: string; content: string }[] = [];
+        const chatMessages: { role: string; content: string | any[] }[] = [];
 
         // 1. System Prompt
         let systemContent = 'Eres un asistente útil y conversacional. Responde de manera natural y coherente basándote en el contexto de la conversación.';
@@ -627,7 +640,7 @@ INSTRUCCIONES DE EDICIÓN:
         let streamedText = '';
         
         // Use the new structured messages API
-        const answer = await chatEngine.generateText(chatMessages, {
+        const answer = await chatEngine.generateText(chatMessages as any, {
           temperature: 0.7,
           maxTokens: 2048,
           // Stop tokens are handled by the engine's template logic, but we keep some just in case
@@ -823,6 +836,7 @@ INSTRUCCIONES DE EDICIÓN:
                 ? i18nStore.t('chat.placeholderNoModel')
                 : i18nStore.t('chat.placeholder')
             }
+            supportsVision={!!modelsStore.chatModel?.supportsVision}
           />
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-[var(--color-text-tertiary)]">

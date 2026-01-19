@@ -36,6 +36,9 @@ export interface ModelMetadata {
   // Context
   contextSize: number;
 
+  // Capabilities
+  supportsVision?: boolean;
+
   // Tags for categorization
   tags: string[];
 }
@@ -44,6 +47,29 @@ export interface ModelMetadata {
  * Complete registry of available models
  */
 export const MODEL_REGISTRY: ModelMetadata[] = [
+  // ========================================================================
+  // VISION MODELS
+  // ========================================================================
+  {
+    id: 'phi-3.5-vision',
+    name: 'Phi-3.5-vision-instruct',
+    displayName: 'Phi-3.5 Vision (Multimodal)',
+    description: 'Modelo avanzado de Microsoft con capacidad de visión nativa. Puede ver y analizar imágenes.',
+    type: 'chat',
+    engine: 'webllm',
+    webllmModelId: 'Phi-3.5-vision-instruct-q4f32_1-MLC',
+    sizeGB: 2.4,
+    speed: 'medium',
+    quality: 'excellent',
+    quantization: 'q4',
+    minMemoryGB: 4,
+    preferredMemoryGB: 8,
+    requiresWebGPU: true,
+    contextSize: 4096,
+    supportsVision: true,
+    tags: ['large', 'phi', 'vision', 'gpu']
+  },
+
   // ========================================================================
   // CHAT MODELS - Small (< 1GB)
   // ========================================================================

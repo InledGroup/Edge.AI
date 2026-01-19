@@ -244,7 +244,7 @@ export class WllamaEngine {
    * Supports streaming for better UX
    */
   async generateText(
-    input: string | { role: string; content: string }[],
+    input: string | { role: string; content: string | any[] }[],
     options: GenerationOptions = {}
   ): Promise<string> {
     if (!this.isInitialized || !this.wllama) {
@@ -267,47 +267,82 @@ export class WllamaEngine {
       let prompt = '';
       let effectiveStop = [...(stop || [])];
 
-      // Handle structured messages or raw string
+      // Prepare input for template processing
+      let messages: { role: string; content: string }[] = [];
+      const extractedImages: string[] = [];
+      
       if (Array.isArray(input)) {
-        // Detect model type for template
-        const isQwen = this.modelUrl.toLowerCase().includes('qwen') || this.modelUrl.toLowerCase().includes('smollm') || this.modelUrl.toLowerCase().includes('lfm');
-        const isLlama = this.modelUrl.toLowerCase().includes('llama') && !this.modelUrl.toLowerCase().includes('tiny');
-        const isPhi = this.modelUrl.toLowerCase().includes('phi');
-
-        if (isQwen) {
-          // ChatML Template (Qwen, SmolLM, TinyLlama)
-          prompt = input.map(msg => 
-            `<|im_start|>${msg.role}\n${msg.content}<|im_end|>`
-          ).join('\n') + '\n<|im_start|>assistant\n';
-          
-          effectiveStop.push('<|im_end|>');
-          effectiveStop.push('<|im_start|>');
-        } else if (isLlama) {
-          // Llama 3 Template
-          prompt = `<|begin_of_text|>` + input.map(msg => 
-            `<|start_header_id|>${msg.role}<|end_header_id|>\n\n${msg.content}<|eot_id|>`
-          ).join('') + `<|start_header_id|>assistant<|end_header_id|>\n\n`;
-          
-          effectiveStop.push('<|eot_id|>');
-          effectiveStop.push('<|end_of_text|>');
-        } else if (isPhi) {
-          // Phi-3 Template
-          prompt = input.map(msg => 
-            `<|${msg.role}|>\n${msg.content}<|end|>`
-          ).join('\n') + '\n<|assistant|>\n';
-          
-          effectiveStop.push('<|end|>');
-        } else {
-          // Fallback: standard chat format
-          prompt = input.map(msg => 
-            `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
-          ).join('\n') + '\nAssistant:';
-        }
+        messages = input.map(msg => {
+          if (Array.isArray(msg.content)) {
+            // Handle mixed content (text + image)
+            const textPart = msg.content.find((p: any) => p.type === 'text');
+            const imageParts = msg.content.filter((p: any) => p.type === 'image_url');
+            
+            if (imageParts.length > 0) {
+              imageParts.forEach((part: any) => {
+                // Extract base64 data from data URL if present
+                const url = part.image_url.url;
+                if (url.startsWith('data:image')) {
+                  // Keep the full data URL, wllama might handle parsing
+                  extractedImages.push(url);
+                } else {
+                  extractedImages.push(url);
+                }
+              });
+              console.log(`🖼️ Extracted ${imageParts.length} images for Wllama`);
+            }
+            
+            return {
+              role: msg.role,
+              content: textPart ? textPart.text : ''
+            };
+          } else {
+            return {
+              role: msg.role,
+              content: msg.content as string
+            };
+          }
+        });
       } else {
-        // Raw string input (legacy support)
-        prompt = input;
+        // Raw string
+        messages = [{ role: 'user', content: input }];
       }
 
+      // Detect model type for template
+      const isQwen = this.modelUrl.toLowerCase().includes('qwen') || this.modelUrl.toLowerCase().includes('smollm') || this.modelUrl.toLowerCase().includes('lfm');
+      const isLlama = this.modelUrl.toLowerCase().includes('llama') && !this.modelUrl.toLowerCase().includes('tiny');
+      const isPhi = this.modelUrl.toLowerCase().includes('phi');
+
+      if (isQwen) {
+        // ChatML Template (Qwen, SmolLM, TinyLlama)
+        prompt = messages.map(msg => 
+          `<|im_start|>${msg.role}\n${msg.content}<|im_end|>`
+        ).join('\n') + '\n<|im_start|>assistant\n';
+        
+        effectiveStop.push('<|im_end|>');
+        effectiveStop.push('<|im_start|>');
+      } else if (isLlama) {
+        // Llama 3 Template
+        prompt = `<|begin_of_text|>` + messages.map(msg => 
+          `<|start_header_id|>${msg.role}<|end_header_id|>\n\n${msg.content}<|eot_id|>`
+        ).join('') + `<|start_header_id|>assistant<|end_header_id|>\n\n`;
+        
+        effectiveStop.push('<|eot_id|>');
+        effectiveStop.push('<|end_of_text|>');
+      } else if (isPhi) {
+        // Phi-3 Template
+        prompt = messages.map(msg => 
+          `<|${msg.role}|>\n${msg.content}<|end|>`
+        ).join('\n') + '\n<|assistant|>\n';
+        
+        effectiveStop.push('<|end|>');
+      } else {
+        // Fallback: standard chat format
+        prompt = messages.map(msg => 
+          `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+        ).join('\n') + '\nAssistant:';
+      }
+      
       let fullResponse = '';
 
       if (onStream) {
@@ -316,6 +351,7 @@ export class WllamaEngine {
           nPredict: maxTokens,
           temp: temperature,
           stop: effectiveStop, // Pass stop tokens
+          images: extractedImages, // Pass extracted images
           onNewToken: (_token: any, _piece: any, currentText: any) => {
             // Send incremental chunks
             const newChunk = currentText.slice(fullResponse.length);
@@ -331,6 +367,7 @@ export class WllamaEngine {
           nPredict: maxTokens,
           temp: temperature,
           stop: effectiveStop, // Pass stop tokens
+          images: extractedImages, // Pass extracted images
         });
         fullResponse = result;
       }

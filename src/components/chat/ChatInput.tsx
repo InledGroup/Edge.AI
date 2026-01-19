@@ -1,19 +1,20 @@
 // ChatInput Component - Message input with auto-resize
 
 import { useState, useRef, useEffect } from 'preact/hooks';
-import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2 } from 'lucide-preact';
+import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle } from 'lucide-preact';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import { speechService, voiceState, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 
 export interface ChatInputProps {
-  onSend: (message: string, mode: 'web' | 'local' | 'smart' | 'conversation') => void;
+  onSend: (message: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[]) => void;
   disabled?: boolean;
   loading?: boolean;
   placeholder?: string;
   webSearchEnabled?: boolean;
   onWebSearchToggle?: (enabled: boolean) => void;
+  supportsVision?: boolean;
 }
 
 export function ChatInput({
@@ -22,11 +23,14 @@ export function ChatInput({
   loading = false,
   placeholder = 'Escribe tu pregunta...',
   webSearchEnabled = false,
-  onWebSearchToggle
+  onWebSearchToggle,
+  supportsVision = true
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [mode, setMode] = useState<'web' | 'local' | 'smart' | 'conversation'>('conversation');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Subscribe to language changes
   const lang = languageSignal.value;
@@ -51,21 +55,45 @@ export function ChatInput({
         // Accedemos directamente a la señal para evitar cierres obsoletos (stale closures)
         if (isVoiceModeEnabled.value) {
           // Si es modo conversación, enviar automáticamente
-          onSend(text, mode);
+          onSend(text, mode, selectedImage ? [selectedImage] : undefined);
+          setSelectedImage(null);
         } else {
           // Si es solo dictado, añadir al input
           setMessage(prev => prev + ' ' + text);
         }
       });
     }
-  }, [vState, mode, onSend]);
+  }, [vState, mode, onSend, selectedImage]);
 
   function handleSubmit(e: Event) {
     e.preventDefault();
-    if (message.trim() && !disabled && !loading) {
-      onSend(message.trim(), mode);
+    if ((message.trim() || selectedImage) && !disabled && !loading) {
+      onSend(message.trim(), mode, selectedImage ? [selectedImage] : undefined);
       setMessage('');
+      setSelectedImage(null);
     }
+  }
+
+  function handleImageSelect(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      // Check if it's an image
+      if (!file.type.startsWith('image/')) {
+        alert(i18nStore.t('chat.onlyImages'));
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setSelectedImage(e.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input so same file can be selected again
+    input.value = '';
   }
 
   function setModeAndNotify(newMode: typeof mode) {
@@ -129,7 +157,57 @@ export function ChatInput({
         )}
       </div>
 
+      {/* Selected Image Preview */}
+      {selectedImage && (
+        <div className="mb-2 relative inline-block group">
+          <img src={selectedImage} alt="Preview" className="h-20 w-auto rounded-lg border border-[var(--color-border)] object-cover" />
+          <button
+            type="button"
+            onClick={() => setSelectedImage(null)}
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 shadow-md hover:bg-red-600 transition-colors"
+          >
+            <X size={14} />
+          </button>
+          
+          {!supportsVision && (
+            <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center backdrop-blur-[1px]">
+              <div className="text-xs text-white text-center px-1 font-medium flex flex-col items-center gap-1">
+                <AlertTriangle size={16} className="text-amber-400" />
+                <span>Modelo sin visión</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="relative flex items-end gap-2 p-3 bg-[var(--color-bg-secondary)] rounded-2xl transition-all duration-200">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          accept="image/*"
+          onChange={handleImageSelect}
+        />
+
+        {/* Image Upload Button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled || loading}
+          className={cn(
+            'flex-shrink-0 p-2 rounded-lg transition-all duration-200',
+            'hover:bg-[var(--color-bg-hover)] active:scale-95',
+            'text-[var(--color-text-secondary)]',
+            (disabled || loading) && 'opacity-50 cursor-not-allowed',
+            !supportsVision && 'opacity-50'
+          )}
+          title={!supportsVision ? 'El modelo seleccionado no soporta imágenes' : i18nStore.t('chat.uploadImage')}
+        >
+          <ImageIcon size={20} className={!supportsVision ? 'text-gray-400' : ''} />
+        </button>
+
+        <div className="w-[1px] h-8 bg-[var(--color-border)] mx-1 hidden sm:block" />
+
         {/* Conversation mode button */}
         <button
           type="button"
@@ -239,7 +317,7 @@ export function ChatInput({
           type="submit"
           size="icon"
           variant="primary"
-          disabled={!message.trim() || disabled || loading}
+          disabled={(!message.trim() && !selectedImage) || disabled || loading}
           className="flex-shrink-0"
         >
           {loading ? (

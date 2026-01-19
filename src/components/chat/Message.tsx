@@ -65,6 +65,21 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
       )}
 
       <div className={cn('flex flex-col gap-1 max-w-[80%]', isUser && 'items-end')}>
+        
+        {/* Images attached to the message */}
+        {message.images && message.images.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-1 justify-end">
+            {message.images.map((img, idx) => (
+              <img 
+                key={idx}
+                src={img} 
+                alt="Uploaded" 
+                className="max-w-[200px] max-h-[200px] rounded-lg border border-[var(--color-border)] object-cover bg-black/5"
+              />
+            ))}
+          </div>
+        )}
+
         <div
           className={cn(
             'rounded-2xl px-4 py-2.5 text-sm',
