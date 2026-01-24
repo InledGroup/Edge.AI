@@ -351,7 +351,12 @@ export const translations = {
       benefit3Title: 'Siempre Gratis',
       benefit3Desc: 'Sin tarifas ocultas ni suscripciones',
       footerTagline: '¿Desde cuando la IA es igual a preocupaciones?',
-      footerLicense: 'Licenciado bajo GNU General Public License v3.0 | Inled Group'
+      footerLicense: 'Licenciado bajo GNU General Public License v3.0 | Inled Group',
+      productHunt: {
+        title: '¡Estamos en Product Hunt!',
+        subtitle: 'Este domingo lanzamos Edge AI. ¡Apóyanos con tu voto!',
+        button: 'Votar en Product Hunt'
+      }
     }
   },
   en: {
@@ -706,7 +711,12 @@ export const translations = {
       benefit3Title: 'Always Free',
       benefit3Desc: 'No hidden fees or subscriptions',
       footerTagline: 'Since when is AI equal to worries?',
-      footerLicense: 'Licensed under GNU General Public License v3.0 | Inled Group'
+      footerLicense: 'Licensed under GNU General Public License v3.0 | Inled Group',
+      productHunt: {
+        title: "We're on Product Hunt!",
+        subtitle: "This Sunday we're launching Edge AI. Support us with your vote!",
+        button: 'Vote on Product Hunt'
+      }
     }
   }
 };

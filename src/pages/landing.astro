@@ -142,8 +142,35 @@ import {
     </head>
     <body>
         <div class="min-h-screen bg-[var(--color-bg)] grid-pattern">
+            <!-- Product Hunt Announcement -->
+            <div class="bg-[var(--color-primary)]/10 border-b border-[var(--color-primary)]/20 py-4 relative z-[60]">
+                <div class="container mx-auto px-4 flex flex-col md:flex-row items-center justify-center gap-6 text-center">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-[var(--color-primary)]/20 p-2 rounded-lg">
+                            <Rocket size={20} className="text-[var(--color-primary)]" />
+                        </div>
+                        <span class="text-base font-bold text-[var(--color-text)]" data-i18n="landing.productHunt.subtitle">
+                            Este domingo lanzamos Edge AI en Product Hunt. ¡Apóyanos con tu voto!
+                        </span>
+                    </div>
+                    <a 
+                        href="https://www.producthunt.com/products/edge-ai-2?utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-edge-ai-2" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        class="inline-block transition-transform hover:scale-105 shadow-lg shadow-[var(--color-primary)]/10 rounded-lg overflow-hidden"
+                    >
+                        <img 
+                            alt="Edge AI - Free, private, local AI — running in your browser | Product Hunt" 
+                            width="250" 
+                            height="54" 
+                            src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1067479&theme=neutral&t=1769254236694"
+                        />
+                    </a>
+                </div>
+            </div>
+
             <!-- Language Switcher -->
-            <div class="fixed top-6 right-6 z-50">
+            <div class="fixed top-6 right-6 z-[70]">
                 <button
                     id="langSwitcher"
                     class="px-4 py-2 glass hover:bg-[var(--color-primary)]/10 text-[var(--color-text)] font-semibold rounded-xl transition-all duration-300 border border-white/10 flex items-center gap-2"
@@ -267,6 +294,13 @@ import {
                                     />
                                 </span>
                             </a>
+                        </div>
+
+                        <!-- Product Hunt Badge Hero -->
+                        <div class="flex justify-center mb-16 opacity-0 fade-in-up" style="animation-delay: 0.35s;">
+                             <a href="https://www.producthunt.com/products/edge-ai-2?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-edge-ai-2" target="_blank" rel="noopener noreferrer" class="transition-transform hover:scale-105 shadow-xl shadow-[var(--color-primary)]/20 rounded-xl overflow-hidden border border-white/5">
+                                <img alt="Edge AI - Free, private, local AI — running in your browser | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1067479&theme=neutral&t=1769254236694">
+                             </a>
                         </div>
 
                         <!-- Trust Indicators -->
