@@ -11,6 +11,7 @@ import { createDocument } from '@/lib/db/documents';
 import { processDocument } from '@/lib/rag/rag-pipeline';
 import EngineManager from '@/lib/ai/engine-manager';
 import { getRAGSettings } from '@/lib/db/settings';
+import { i18nStore } from '@/lib/stores/i18n';
 
 export function DocumentUpload() {
   const [isDragging, setIsDragging] = useState(false);
@@ -45,7 +46,7 @@ export function DocumentUpload() {
     if (files.length > 0) {
       // Check if models are ready before processing
       if (!modelsReady.value) {
-        alert('⏳ Los modelos aún se están cargando. Por favor espera un momento e inténtalo de nuevo.');
+        alert(i18nStore.t('documents.alertModelsLoading'));
         // Reset input
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -74,7 +75,7 @@ export function DocumentUpload() {
 
       // CRITICAL: Check if models are ready before processing
       if (!modelsReady.value) {
-        alert('⚠️ Los modelos de IA aún no están cargados. Por favor, espera a que se completen antes de subir documentos.');
+        alert(i18nStore.t('documents.alertWaitModels'));
         return;
       }
 
@@ -90,7 +91,7 @@ export function DocumentUpload() {
         documentId: 'temp',
         stage: 'parsing',
         progress: 0,
-        message: 'Extrayendo texto...'
+        message: i18nStore.t('documents.processingParsing')
       });
 
       const parsed = await parseDocument(file, {
@@ -165,7 +166,7 @@ export function DocumentUpload() {
   }
 
   async function deleteDocument(id: string) {
-    if (!confirm('¿Eliminar este documento?')) return;
+    if (!confirm(i18nStore.t('documents.deleteConfirm'))) return;
 
     try {
       const { deleteDocument: dbDeleteDocument } = await import('@/lib/db/documents');
@@ -181,9 +182,9 @@ export function DocumentUpload() {
   return (
     <Card className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold mb-2">Documentos</h3>
+        <h3 className="text-lg font-semibold mb-2">{i18nStore.t('documents.title')}</h3>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Sube documentos para consultar con IA
+          {i18nStore.t('documents.uploadSubtitle')}
         </p>
       </div>
 
@@ -220,7 +221,7 @@ export function DocumentUpload() {
             <UploadCloud size={48} strokeWidth={1.5} />
           </div>
           <p className="text-sm font-medium">
-            Arrastra archivos aquí o haz click para seleccionar
+            {i18nStore.t('documents.dragActive')}
           </p>
           <Button
             variant="default"
@@ -231,16 +232,16 @@ export function DocumentUpload() {
               fileInputRef.current?.click();
             }}
           >
-            Seleccionar archivos
+            {i18nStore.t('documents.select')}
           </Button>
           <p className="text-xs text-[var(--color-text-tertiary)]">
-            PDF, TXT, MD (máx. 50MB)
+            {i18nStore.t('documents.formatsInfo')}
           </p>
 
           {/* Show loading status */}
           {!modelsReady.value && (
             <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-600">
-              ⏳ Los modelos se están cargando. Puedes seleccionar archivos pero espera a que terminen.
+              {i18nStore.t('documents.loadingModels')}
               <div className="mt-1">
                 Chat: {modelsStore.chat ? '✓' : '⏳'}
                 {' · '}
@@ -251,7 +252,7 @@ export function DocumentUpload() {
 
           {modelsReady.value && (
             <div className="mt-2 text-xs text-green-600">
-              ✓ Modelos listos
+              {i18nStore.t('documents.modelsReady')}
             </div>
           )}
         </div>
@@ -271,7 +272,7 @@ export function DocumentUpload() {
       {/* Documents List */}
       {documentsStore.all.length > 0 && (
         <div className="space-y-2">
-          <h4 className="font-medium text-sm">Documentos cargados</h4>
+          <h4 className="font-medium text-sm">{i18nStore.t('documents.uploaded')}</h4>
           {documentsStore.all.map(doc => (
             <div
               key={doc.id}
@@ -285,7 +286,7 @@ export function DocumentUpload() {
               </div>
               <div className="flex items-center gap-2">
                 {doc.status === 'ready' && (
-                  <span className="text-xs text-[var(--color-success)] font-bold">READY</span>
+                  <span className="text-xs text-[var(--color-success)] font-bold">{i18nStore.t('documents.readyStatus')}</span>
                 )}
                 {doc.status === 'processing' && (
                   <span className="spinner text-[var(--color-primary)]" />

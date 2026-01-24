@@ -67,6 +67,18 @@ export const translations = {
       dragDrop: 'Arrastra y suelta archivos aquí',
       browse: 'Explorar archivos',
       supportedFormats: 'PDF, TXT, MD (Max 10MB)',
+      dragActive: 'Arrastra archivos aquí o haz click para seleccionar',
+      select: 'Seleccionar archivos',
+      uploadSubtitle: 'Sube documentos para consultar con IA',
+      formatsInfo: 'PDF, TXT, MD (máx. 50MB)',
+      loadingModels: '⏳ Los modelos se están cargando. Puedes seleccionar archivos pero espera a que terminen.',
+      modelsReady: '✓ Modelos listos',
+      uploaded: 'Documentos cargados',
+      readyStatus: 'LISTO',
+      deleteConfirm: '¿Eliminar este documento?',
+      alertModelsLoading: '⏳ Los modelos aún se están cargando. Por favor espera un momento e inténtalo de nuevo.',
+      alertWaitModels: '⚠️ Los modelos de IA aún no están cargados. Por favor, espera a que se completen antes de subir documentos.',
+      processingParsing: 'Extrayendo texto...',
     },
     settings: {
         title: 'Configuración',
@@ -89,6 +101,123 @@ export const translations = {
       change: 'Cambiar modelos',
       reload: 'Recargar modelos actuales',
       reset: 'Resetear configuración',
+      title: 'Modelos de IA',
+      subtitle: 'Carga los modelos necesarios para el funcionamiento local',
+      detecting: 'Detectando capacidades...',
+      webGpuAvailable: 'WebGPU disponible',
+      cpuOnly: 'Solo CPU',
+      memory: 'Memoria',
+      chatModel: 'Modelo de Chat',
+      chatSubtitle: 'Para generar respuestas',
+      loaded: 'Cargado',
+      load: 'Cargar',
+      embeddingModel: 'Modelo de Embeddings',
+      embeddingSubtitle: 'Para búsqueda semántica',
+      initializing: 'Inicializando...',
+      autoLoading: 'Auto-cargando modelos...',
+      progress: {
+        initializing: 'Inicializando...',
+        backendGpu: 'Usando backend: GPU (WebGPU)',
+        backendCpu: 'Usando backend: CPU (WASM)',
+        verifyingCache: 'Verificando caché...',
+        downloading: 'Descargando...',
+        fromCache: ' (desde caché)',
+        warmingUp: 'Calentando modelo...',
+        modelReady: 'Modelo listo',
+        loadingWasm: 'Inicializando motor WASM...',
+        modelProcessed: 'Modelo procesado...',
+        embeddings: 'Generando embeddings',
+        retry: 'Reintentando...',
+        clearingCache: 'Limpiando caché...',
+      }
+    },
+    message: {
+      listen: 'Escuchar',
+      stop: 'Parar',
+      copy: 'Copiar',
+      copied: 'Copiado!',
+      openCanvas: 'Abrir en canvas',
+      source: 'fuente',
+      sources: 'fuentes',
+    },
+    webSearch: {
+      title: 'Fuentes web consultadas',
+      words: 'palabras',
+      disclaimer: 'Información analizada localmente. Todo el procesamiento se realizó en tu navegador. No se envió ningún dato a servidores externos.',
+    },
+    webSearchProgress: {
+      query_generation: 'Generando consulta',
+      web_search: 'Buscando en web',
+      url_selection: 'Seleccionando fuentes',
+      page_fetch: 'Descargando páginas',
+      content_extraction: 'Extrayendo contenido',
+      chunking: 'Procesando documentos',
+      embedding: 'Generando embeddings',
+      vector_search: 'Buscando relevancia',
+      answer_generation: 'Generando respuesta',
+      completed: 'Completado',
+      error: 'Error'
+    },
+    urlConfirmation: {
+      title: 'Confirmar fuentes externas',
+      description: 'La IA ha encontrado estas páginas para responder tu pregunta. Por seguridad, confirma cuáles quieres que analice:',
+      cancel: 'Cancelar',
+      analyze: 'Analizar {count} páginas',
+      openLink: 'Abrir enlace en nueva pestaña',
+    },
+    modelRegistry: {
+      'phi-3.5-vision': {
+        name: 'Phi-3.5 Vision (Multimodal)',
+        description: 'Modelo avanzado de Microsoft con capacidad de visión nativa. Puede ver y analizar imágenes.'
+      },
+      'smollm2-135m': {
+        name: 'SmolLM2 135M (Ultra Rápido)',
+        description: 'Modelo ultraligero ideal para dispositivos limitados. Respuestas muy rápidas con calidad básica.'
+      },
+      'smollm2-360m': {
+        name: 'SmolLM2 360M (Rápido)',
+        description: 'Modelo pequeño pero capaz. Buen equilibrio entre velocidad y calidad.'
+      },
+      'qwen2-0.5b': {
+        name: 'Qwen2.5 0.5B (Rápido)',
+        description: 'Modelo ligero de Alibaba. Excelente para tareas simples con poca latencia.'
+      },
+      'lfm-2.5-1.6b-q4': {
+        name: 'LFM 2.5 1.6B (Ligero)',
+        description: 'Modelo LiquidAI eficiente. Arquitectura innovadora y rápida (1.1GB).'
+      },
+      'tinyllama-1.1b': {
+        name: 'TinyLlama 1.1B (Equilibrado)',
+        description: 'Modelo compacto basado en Llama. Buena calidad con requisitos moderados.'
+      },
+      'llama-3.2-1b': {
+        name: 'Llama 3.2 1B (Alta Calidad)',
+        description: 'Modelo oficial de Meta. Excelente calidad en tamaño compacto.'
+      },
+      'qwen2-1.5b': {
+        name: 'Qwen2.5 1.5B (Recomendado)',
+        description: 'Modelo equilibrado de Alibaba. Excelente relación calidad/rendimiento.'
+      },
+      'llama-3.2-3b': {
+        name: 'Llama 3.2 3B (Máxima Calidad)',
+        description: 'Modelo grande de Meta. Máxima calidad, requiere WebGPU y buena memoria.'
+      },
+      'phi-3.5-mini': {
+        name: 'Phi 3.5 Mini (Avanzado)',
+        description: 'Modelo de Microsoft Research. Alta capacidad de razonamiento, requiere WebGPU.'
+      },
+      'qwen2-0.5b-embed': {
+        name: 'Qwen2 0.5B (CPU / Seguro)',
+        description: 'Opción clásica y segura. Funciona siempre en CPU.'
+      },
+      'snowflake-arctic-embed-m-gpu': {
+        name: 'Arctic Embed M (GPU / Ultra Rápido)',
+        description: 'Modelo profesional de embeddings. Requiere WebGPU. Muy alta precisión.'
+      },
+      'snowflake-arctic-embed-s-gpu': {
+        name: 'Arctic Embed S (GPU / Instantáneo)',
+        description: 'Versión ligera de Arctic. Instantáneo en WebGPU.'
+      },
     },
     wizard: {
       welcome: 'Bienvenido a Edge.AI',
@@ -119,7 +248,8 @@ export const translations = {
       finish: 'Finalizar',
       errorDetection: 'Error al detectar las capacidades del dispositivo',
       errorLoading: 'Error al cargar modelos',
-      selectBoth: 'Selecciona ambos modelos'
+      selectBoth: 'Selecciona ambos modelos',
+      webGpuFallback: 'WebGPU falló, intentando modo CPU...',
     },
     extension: {
       checkTitle: 'Verificando extensión',
@@ -292,6 +422,18 @@ export const translations = {
       dragDrop: 'Drag and drop files here',
       browse: 'Browse files',
       supportedFormats: 'PDF, TXT, MD (Max 10MB)',
+      dragActive: 'Drag files here or click to select',
+      select: 'Select files',
+      uploadSubtitle: 'Upload documents to consult with AI',
+      formatsInfo: 'PDF, TXT, MD (max. 50MB)',
+      loadingModels: '⏳ Models are loading. You can select files but wait for them to finish.',
+      modelsReady: '✓ Models ready',
+      uploaded: 'Uploaded documents',
+      readyStatus: 'READY',
+      deleteConfirm: 'Delete this document?',
+      alertModelsLoading: '⏳ Models are still loading. Please wait a moment and try again.',
+      alertWaitModels: '⚠️ AI models are not loaded yet. Please wait for them to complete before uploading documents.',
+      processingParsing: 'Extracting text...',
     },
     settings: {
         title: 'Settings',
@@ -314,6 +456,123 @@ export const translations = {
       change: 'Change models',
       reload: 'Reload current models',
       reset: 'Reset configuration',
+      title: 'AI Models',
+      subtitle: 'Load necessary models for local operation',
+      detecting: 'Detecting capabilities...',
+      webGpuAvailable: 'WebGPU available',
+      cpuOnly: 'CPU only',
+      memory: 'Memory',
+      chatModel: 'Chat Model',
+      chatSubtitle: 'To generate responses',
+      loaded: 'Loaded',
+      load: 'Load',
+      embeddingModel: 'Embedding Model',
+      embeddingSubtitle: 'For semantic search',
+      initializing: 'Initializing...',
+      autoLoading: 'Auto-loading models...',
+      progress: {
+        initializing: 'Initializing...',
+        backendGpu: 'Using backend: GPU (WebGPU)',
+        backendCpu: 'Using backend: CPU (WASM)',
+        verifyingCache: 'Verifying cache...',
+        downloading: 'Downloading...',
+        fromCache: ' (from cache)',
+        warmingUp: 'Warming up model...',
+        modelReady: 'Model ready',
+        loadingWasm: 'Initializing WASM engine...',
+        modelProcessed: 'Model processed...',
+        embeddings: 'Generating embeddings',
+        retry: 'Retrying...',
+        clearingCache: 'Clearing cache...',
+      }
+    },
+    message: {
+      listen: 'Listen',
+      stop: 'Stop',
+      copy: 'Copy',
+      copied: 'Copied!',
+      openCanvas: 'Open in canvas',
+      source: 'source',
+      sources: 'sources',
+    },
+    webSearch: {
+      title: 'Web sources consulted',
+      words: 'words',
+      disclaimer: 'Information analyzed locally. All processing was done in your browser. No data was sent to external servers.',
+    },
+    webSearchProgress: {
+      query_generation: 'Generating query',
+      web_search: 'Searching web',
+      url_selection: 'Selecting sources',
+      page_fetch: 'Fetching pages',
+      content_extraction: 'Extracting content',
+      chunking: 'Processing documents',
+      embedding: 'Generating embeddings',
+      vector_search: 'Searching relevance',
+      answer_generation: 'Generating answer',
+      completed: 'Completed',
+      error: 'Error'
+    },
+    urlConfirmation: {
+      title: 'Confirm external sources',
+      description: 'The AI found these pages to answer your question. For security, confirm which ones you want it to analyze:',
+      cancel: 'Cancel',
+      analyze: 'Analyze {count} pages',
+      openLink: 'Open link in new tab',
+    },
+    modelRegistry: {
+      'phi-3.5-vision': {
+        name: 'Phi-3.5 Vision (Multimodal)',
+        description: 'Advanced Microsoft model with native vision capabilities. Can see and analyze images.'
+      },
+      'smollm2-135m': {
+        name: 'SmolLM2 135M (Ultra Fast)',
+        description: 'Ultralight model ideal for limited devices. Very fast responses with basic quality.'
+      },
+      'smollm2-360m': {
+        name: 'SmolLM2 360M (Fast)',
+        description: 'Small but capable model. Good balance between speed and quality.'
+      },
+      'qwen2-0.5b': {
+        name: 'Qwen2.5 0.5B (Fast)',
+        description: 'Lightweight model from Alibaba. Excellent for simple tasks with low latency.'
+      },
+      'lfm-2.5-1.6b-q4': {
+        name: 'LFM 2.5 1.6B (Light)',
+        description: 'Efficient LiquidAI model. Innovative and fast architecture (1.1GB).'
+      },
+      'tinyllama-1.1b': {
+        name: 'TinyLlama 1.1B (Balanced)',
+        description: 'Compact model based on Llama. Good quality with moderate requirements.'
+      },
+      'llama-3.2-1b': {
+        name: 'Llama 3.2 1B (High Quality)',
+        description: 'Official Meta model. Excellent quality in compact size.'
+      },
+      'qwen2-1.5b': {
+        name: 'Qwen2.5 1.5B (Recommended)',
+        description: 'Balanced model from Alibaba. Excellent quality/performance ratio.'
+      },
+      'llama-3.2-3b': {
+        name: 'Llama 3.2 3B (Max Quality)',
+        description: 'Large Meta model. Max quality, requires WebGPU and good memory.'
+      },
+      'phi-3.5-mini': {
+        name: 'Phi 3.5 Mini (Advanced)',
+        description: 'Microsoft Research model. High reasoning capacity, requires WebGPU.'
+      },
+      'qwen2-0.5b-embed': {
+        name: 'Qwen2 0.5B (CPU / Safe)',
+        description: 'Classic and safe option. Always works on CPU.'
+      },
+      'snowflake-arctic-embed-m-gpu': {
+        name: 'Arctic Embed M (GPU / Ultra Fast)',
+        description: 'Professional embedding model. Requires WebGPU. Very high precision.'
+      },
+      'snowflake-arctic-embed-s-gpu': {
+        name: 'Arctic Embed S (GPU / Instant)',
+        description: 'Lightweight Arctic version. Instant on WebGPU.'
+      },
     },
     wizard: {
       welcome: 'Welcome to Edge.AI',
@@ -344,7 +603,8 @@ export const translations = {
       finish: 'Finish',
       errorDetection: 'Error detecting device capabilities',
       errorLoading: 'Error loading models',
-      selectBoth: 'Select both models'
+      selectBoth: 'Select both models',
+      webGpuFallback: 'WebGPU failed, attempting CPU mode...',
     },
     extension: {
       checkTitle: 'Checking extension',

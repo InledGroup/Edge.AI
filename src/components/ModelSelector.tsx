@@ -12,6 +12,7 @@ import { selectOptimalModel } from '@/lib/ai/model-selector';
 import { WebLLMEngine } from '@/lib/ai/webllm-engine';
 import { WllamaEngine } from '@/lib/ai/wllama-engine';
 import EngineManager from '@/lib/ai/engine-manager';
+import { i18nStore } from '@/lib/stores/i18n';
 
 interface LoadingState {
   progress: number;
@@ -128,7 +129,7 @@ export function ModelSelector() {
 
     try {
       modelsStore.setChatLoading(true);
-      chatLoadingState.value = { progress: 0, message: 'Inicializando...' };
+      chatLoadingState.value = { progress: 0, message: i18nStore.t('models.initializing') };
 
       // Get recommended model
       const recommended = selectOptimalModel(
@@ -196,7 +197,7 @@ export function ModelSelector() {
   async function loadEmbeddingModel() {
     try {
       modelsStore.setEmbeddingLoading(true);
-      embeddingLoadingState.value = { progress: 0, message: 'Inicializando...' };
+      embeddingLoadingState.value = { progress: 0, message: i18nStore.t('models.initializing') };
 
       const engine = new WllamaEngine();
 
@@ -235,7 +236,7 @@ export function ModelSelector() {
         <div className="text-center py-8">
           <div className="spinner text-[var(--color-primary)] mx-auto mb-2" />
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Detectando capacidades...
+            {i18nStore.t('models.detecting')}
           </p>
         </div>
       </Card>
@@ -246,9 +247,9 @@ export function ModelSelector() {
     <Card>
       <div className="space-y-4">
         <div>
-          <h3 className="text-lg font-semibold mb-2">Modelos de IA</h3>
+          <h3 className="text-lg font-semibold mb-2">{i18nStore.t('models.title')}</h3>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Carga los modelos necesarios para el funcionamiento local
+            {i18nStore.t('models.subtitle')}
           </p>
         </div>
 
@@ -261,12 +262,12 @@ export function ModelSelector() {
               ) : (
                 <Cpu size={12} />
               )}
-              {capabilities.value.hasWebGPU ? 'WebGPU disponible' : 'Solo CPU'}
+              {capabilities.value.hasWebGPU ? i18nStore.t('models.webGpuAvailable') : i18nStore.t('models.cpuOnly')}
             </div>
             {capabilities.value.gpuTier && (
               <div>Tier: {capabilities.value.gpuTier}</div>
             )}
-            <div>Memoria: ~{capabilities.value.memoryGB}GB</div>
+            <div>{i18nStore.t('models.memory')}: ~{capabilities.value.memoryGB}GB</div>
           </div>
         )}
 
@@ -274,15 +275,15 @@ export function ModelSelector() {
         <div className="border-t border-[var(--color-border)] pt-4">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h4 className="font-medium">Modelo de Chat</h4>
+              <h4 className="font-medium">{i18nStore.t('models.chatModel')}</h4>
               <p className="text-sm text-[var(--color-text-secondary)]">
-                Para generar respuestas
+                {i18nStore.t('models.chatSubtitle')}
               </p>
             </div>
             <div>
               {modelsStore.chat ? (
                 <span className="text-sm text-[var(--color-success)] font-medium">
-                  ✓ Cargado
+                  ✓ {i18nStore.t('models.loaded')}
                 </span>
               ) : (
                 <Button
@@ -291,7 +292,7 @@ export function ModelSelector() {
                   disabled={modelsStore.chatLoading}
                   size="sm"
                 >
-                  Cargar
+                  {i18nStore.t('models.load')}
                 </Button>
               )}
             </div>
@@ -307,7 +308,11 @@ export function ModelSelector() {
 
           {modelsStore.chat && (
             <div className="mt-2 text-xs text-[var(--color-text-tertiary)]">
-              {modelsStore.chat.name} ({modelsStore.chat.engine})
+              {(() => {
+                const key = `modelRegistry.${modelsStore.chat.id}.name`;
+                const translation = i18nStore.t(key);
+                return translation !== key ? translation : modelsStore.chat.name;
+              })()} ({modelsStore.chat.engine})
             </div>
           )}
         </div>
@@ -316,15 +321,15 @@ export function ModelSelector() {
         <div className="border-t border-[var(--color-border)] pt-4">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h4 className="font-medium">Modelo de Embeddings</h4>
+              <h4 className="font-medium">{i18nStore.t('models.embeddingModel')}</h4>
               <p className="text-sm text-[var(--color-text-secondary)]">
-                Para búsqueda semántica
+                {i18nStore.t('models.embeddingSubtitle')}
               </p>
             </div>
             <div>
               {modelsStore.embedding ? (
                 <span className="text-sm text-[var(--color-success)] font-medium">
-                  ✓ Cargado
+                  ✓ {i18nStore.t('models.loaded')}
                 </span>
               ) : (
                 <Button
@@ -333,7 +338,7 @@ export function ModelSelector() {
                   disabled={modelsStore.embeddingLoading}
                   size="sm"
                 >
-                  Cargar
+                  {i18nStore.t('models.load')}
                 </Button>
               )}
             </div>
@@ -349,7 +354,11 @@ export function ModelSelector() {
 
           {modelsStore.embedding && (
             <div className="mt-2 text-xs text-[var(--color-text-tertiary)]">
-              {modelsStore.embedding.name} ({modelsStore.embedding.engine})
+              {(() => {
+                const key = `modelRegistry.${modelsStore.embedding.id}.name`;
+                const translation = i18nStore.t(key);
+                return translation !== key ? translation : modelsStore.embedding.name;
+              })()} ({modelsStore.embedding.engine})
             </div>
           )}
         </div>
@@ -359,7 +368,7 @@ export function ModelSelector() {
           <div className="bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 rounded-lg p-3 flex items-center gap-2">
             <CheckCircle2 size={16} className="text-[var(--color-success)]" />
             <p className="text-sm text-[var(--color-success)] font-medium">
-              Todos los modelos listos
+              {i18nStore.t('models.allReady')}
             </p>
           </div>
         )}

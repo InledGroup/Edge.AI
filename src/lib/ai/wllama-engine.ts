@@ -5,6 +5,7 @@
 import { Wllama } from './wllama-lib.js';
 import type { GenerationOptions, ProgressCallback } from './webllm-engine';
 import { detectWasmFeatures, getRecommendedWllamaBuild, getOptimalThreadCount } from './wasm-features';
+import { i18nStore } from '../stores/i18n';
 
 /**
  * Wllama Engine for pure WebAssembly CPU inference
@@ -55,7 +56,7 @@ export class WllamaEngine {
       }
 
       console.log('🚀 Initializing Wllama (WebAssembly CPU)...');
-      onProgress?.(0, 'Inicializando motor WASM...');
+      onProgress?.(0, i18nStore.t('models.progress.loadingWasm'));
 
       // Detect WASM features (SIMD, threads, bulk memory)
       const wasmFeatures = await detectWasmFeatures();
@@ -97,7 +98,7 @@ export class WllamaEngine {
         throw new Error(`Wllama creation failed: ${err.message}`);
       }
 
-      onProgress?.(10, 'Verificando caché...');
+      onProgress?.(10, i18nStore.t('models.progress.verifyingCache'));
 
       // Use Wllama's built-in cache manager (OPFS)
       // This will cache the model locally and avoid re-downloading
@@ -125,7 +126,7 @@ export class WllamaEngine {
                 const loadedMB = Math.round(loaded / 1024 / 1024);
                 const totalMB = Math.round(total / 1024 / 1024);
 
-                const cacheStatus = isLoadingFromCache ? ' (desde caché OPFS ⚡)' : ' (descargando...)';
+                const cacheStatus = isLoadingFromCache ? ` (${i18nStore.t('models.progress.fromCache')} OPFS ⚡)` : ` (${i18nStore.t('models.progress.downloading')})`;
                 onProgress?.(10 + percent, `${loadedMB}MB / ${totalMB}MB${cacheStatus}`);
 
                 if (loaded === total && isLoadingFromCache) {
@@ -137,13 +138,13 @@ export class WllamaEngine {
         } catch (err) {
           if (attempt < 2) {
             console.warn(`⚠️ Attempt ${attempt} failed, retrying in 1s...`, err);
-            onProgress?.(10, `Error, reintentando (${attempt}/2)...`);
+            onProgress?.(10, `${i18nStore.t('models.progress.retry')} (${attempt}/2)...`);
             await new Promise(r => setTimeout(r, 1000));
             await loadModel(attempt + 1);
           } else {
             // If all retries failed, try one last time with cache clearing
             console.warn('⚠️ All standard retries failed. Attempting to clear cache and retry...');
-            onProgress?.(10, 'Error de caché detectado. Limpiando y reintentando...');
+            onProgress?.(10, i18nStore.t('models.progress.clearingCache'));
             
             try {
               // @ts-ignore - access internal cache methods if available or use generic approach
@@ -162,7 +163,7 @@ export class WllamaEngine {
               useCache: false, // FORCE NO CACHE
               progressCallback: ({ loaded, total }: any) => {
                 const percent = Math.round((loaded / total) * 70);
-                onProgress?.(10 + percent, `Descargando (sin caché): ${Math.round(loaded/1024/1024)}MB`);
+                onProgress?.(10 + percent, `${i18nStore.t('models.progress.downloading')} (no cache): ${Math.round(loaded/1024/1024)}MB`);
               }
             });
           }
@@ -178,12 +179,12 @@ export class WllamaEngine {
         console.log(`📥 [Wllama] Model downloaded and cached in ${Math.round(loadTime / 1000)}s`);
       }
 
-      onProgress?.(95, 'Modelo procesado...');
+      onProgress?.(95, i18nStore.t('models.progress.modelProcessed'));
 
       this.isInitialized = true;
 
       console.log('✅ Wllama initialized successfully (WASM/CPU)');
-      onProgress?.(100, 'Modelo cargado (CPU)');
+      onProgress?.(100, i18nStore.t('models.progress.modelReady') + ' (CPU)');
     } catch (error) {
       console.error('❌ Failed to initialize Wllama:', error);
       this.isInitialized = false;
@@ -333,7 +334,7 @@ export class WllamaEngine {
         // Phi-3 Template
         prompt = messages.map(msg => 
           `<|${msg.role}|>\n${msg.content}<|end|>`
-        ).join('\n') + '\n<|assistant|>\n';
+        ).join('\n') + '\n<|assistant|}\n';
         
         effectiveStop.push('<|end|>');
       } else {
@@ -397,7 +398,8 @@ export class WllamaEngine {
       throw new Error('Wllama engine not initialized');
     }
 
-    console.log(`🔢 Generating ${texts.length} embeddings in batch (concurrency=${maxConcurrent})...`);
+    console.log(`🔢 Generating ${texts.length} embeddings in batch (concurrency=${maxConcurrent})...
+`);
 
     const results: Float32Array[] = new Array(texts.length);
     const queue = texts.map((text, idx) => ({ text, idx }));
@@ -428,7 +430,7 @@ export class WllamaEngine {
           // Report progress every 5 completions
           if (completed % 5 === 0 || completed === texts.length) {
             const progress = Math.round((completed / texts.length) * 100);
-            onProgress?.(progress, `Embeddings: ${completed}/${texts.length}`);
+            onProgress?.(progress, `${i18nStore.t('models.progress.embeddings')}: ${completed}/${texts.length}`);
           }
         }
       });

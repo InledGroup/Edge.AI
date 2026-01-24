@@ -8,6 +8,7 @@
 import { Globe, Search, FileText, Cpu, Sparkles } from 'lucide-preact';
 import { cn } from '@/lib/utils';
 import type { WebSearchStep } from '@/lib/web-search/types';
+import { i18nStore } from '@/lib/stores/i18n';
 
 export interface WebSearchProgressProps {
   step: WebSearchStep;
@@ -15,60 +16,49 @@ export interface WebSearchProgressProps {
   message?: string;
 }
 
-const STEP_INFO: Record<WebSearchStep, { icon: any; label: string; color: string }> = {
+const STEP_INFO: Record<WebSearchStep, { icon: any; color: string }> = {
   query_generation: {
     icon: Sparkles,
-    label: 'Generando consulta',
     color: 'text-purple-500'
   },
   web_search: {
     icon: Search,
-    label: 'Buscando en web',
     color: 'text-blue-500'
   },
   url_selection: {
     icon: FileText,
-    label: 'Seleccionando fuentes',
     color: 'text-indigo-500'
   },
   page_fetch: {
     icon: Globe,
-    label: 'Descargando páginas',
     color: 'text-cyan-500'
   },
   content_extraction: {
     icon: FileText,
-    label: 'Extrayendo contenido',
     color: 'text-teal-500'
   },
   chunking: {
     icon: Cpu,
-    label: 'Procesando documentos',
     color: 'text-green-500'
   },
   embedding: {
     icon: Cpu,
-    label: 'Generando embeddings',
     color: 'text-emerald-500'
   },
   vector_search: {
     icon: Search,
-    label: 'Buscando relevancia',
     color: 'text-lime-500'
   },
   answer_generation: {
     icon: Sparkles,
-    label: 'Generando respuesta',
     color: 'text-amber-500'
   },
   completed: {
     icon: Sparkles,
-    label: 'Completado',
     color: 'text-green-600'
   },
   error: {
     icon: Sparkles,
-    label: 'Error',
     color: 'text-red-500'
   }
 };
@@ -76,6 +66,9 @@ const STEP_INFO: Record<WebSearchStep, { icon: any; label: string; color: string
 export function WebSearchProgress({ step, progress, message }: WebSearchProgressProps) {
   const stepInfo = STEP_INFO[step] || STEP_INFO.web_search;
   const Icon = stepInfo.icon;
+
+  // Dynamically get the label translation based on the step
+  const label = i18nStore.t(`webSearchProgress.${step}`);
 
   return (
     <div className="py-3 px-4 bg-[var(--color-bg-secondary)] rounded-lg">
@@ -86,7 +79,7 @@ export function WebSearchProgress({ step, progress, message }: WebSearchProgress
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-[var(--color-text)]">
-            {stepInfo.label}
+            {label}
           </div>
           {message && (
             <div className="text-xs text-[var(--color-text-secondary)] truncate">

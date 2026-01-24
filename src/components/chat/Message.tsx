@@ -9,6 +9,7 @@ import { WebSources } from './WebSources';
 import type { WebSource } from './WebSources';
 import { Button } from '../ui/Button';
 import { speechService, voiceState } from '@/lib/voice/speech-service';
+import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 
 export interface MessageProps {
   message: MessageType;
@@ -19,6 +20,7 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const vState = voiceState.value;
+  const lang = languageSignal.value;
 
   // Detectar si hay fuentes web (metadata con webSources)
   const webSources = (message as any).metadata?.webSources as WebSource[] | undefined;
@@ -105,7 +107,7 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
         {!isUser && hasLocalSources && !hasWebSources && (
           <div className="flex flex-col gap-1 mt-1">
             <span className="text-xs text-[var(--color-text-tertiary)] px-2">
-              {message.sources!.length} fuente{message.sources!.length > 1 ? 's' : ''}
+              {message.sources!.length} {message.sources!.length > 1 ? i18nStore.t('message.sources') : i18nStore.t('message.source')}
             </span>
             <div className="flex flex-wrap gap-1">
               {message.sources!.map((source, idx) => (
@@ -128,7 +130,7 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
         )}
 
         <span className="text-xs text-[var(--color-text-tertiary)] px-2">
-          {new Date(message.timestamp).toLocaleTimeString('es-ES', {
+          {new Date(message.timestamp).toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-ES', {
             hour: '2-digit',
             minute: '2-digit'
           })}
@@ -142,10 +144,10 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
               size="sm"
               onClick={handleSpeak}
               className="h-7 px-2 text-xs"
-              title="Escuchar respuesta"
+              title={vState === 'speaking' ? i18nStore.t('message.stop') : i18nStore.t('message.listen')}
             >
               {vState === 'speaking' ? <VolumeX size={14} className="mr-1" /> : <Volume2 size={14} className="mr-1" />}
-              {vState === 'speaking' ? 'Parar' : 'Escuchar'}
+              {vState === 'speaking' ? i18nStore.t('message.stop') : i18nStore.t('message.listen')}
             </Button>
             <Button
               variant="ghost"
@@ -154,7 +156,7 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
               className="h-7 px-2 text-xs"
             >
               <Copy size={14} className="mr-1" />
-              {copied ? 'Copiado!' : 'Copiar'}
+              {copied ? i18nStore.t('message.copied') : i18nStore.t('message.copy')}
             </Button>
             <Button
               variant="ghost"
@@ -163,7 +165,7 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
               className="h-7 px-2 text-xs"
             >
               <FileEdit size={14} className="mr-1" />
-              Abrir en canvas
+              {i18nStore.t('message.openCanvas')}
             </Button>
           </div>
         )}

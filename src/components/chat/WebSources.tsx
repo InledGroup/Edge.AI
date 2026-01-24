@@ -7,6 +7,7 @@
 
 import { ExternalLink, Globe } from 'lucide-preact';
 import { cn } from '@/lib/utils';
+import { i18nStore } from '@/lib/stores/i18n';
 
 export interface WebSource {
   title: string;
@@ -46,7 +47,7 @@ export function WebSources({ sources, className }: WebSourcesProps) {
       {/* Header */}
       <div className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
         <Globe size={14} />
-        <span>Fuentes web consultadas</span>
+        <span>{i18nStore.t('webSearch.title')}</span>
       </div>
 
       {/* Sources list */}
@@ -82,7 +83,7 @@ export function WebSources({ sources, className }: WebSourcesProps) {
                 </div>
               {source.wordCount && (
                 <div className="mt-1 text-xs text-[var(--color-text-tertiary)]">
-                  {source.wordCount.toLocaleString()} palabras
+                  {source.wordCount.toLocaleString()} {i18nStore.t('webSearch.words')}
                 </div>
               )}
             </div>
@@ -109,8 +110,7 @@ export function WebSources({ sources, className }: WebSourcesProps) {
           <Globe size={12} className="text-blue-600 dark:text-blue-400" />
         </div>
         <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
-          <strong>Información analizada localmente.</strong> Todo el procesamiento se realizó
-          en tu navegador. No se envió ningún dato a servidores externos.
+          {i18nStore.t('webSearch.disclaimer')}
         </p>
       </div>
     </div>

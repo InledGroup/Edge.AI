@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { getDB } from './schema';
-import type { Settings } from '@/types';
+import type { Settings } from '../../types';
 
 /**
  * Default settings

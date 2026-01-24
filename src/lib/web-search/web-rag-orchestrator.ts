@@ -115,7 +115,7 @@ export class WebRAGOrchestrator {
       // ====================================================================
       // PASO 1: LLM genera query de búsqueda
       // ====================================================================
-      onProgress?.('query_generation', 10, 'Generando consulta de búsqueda...');
+      onProgress?.('query_generation', 10);
       const stepStart = Date.now();
 
       const searchQuery = await this.generateSearchQuery(userQuery);
@@ -126,7 +126,7 @@ export class WebRAGOrchestrator {
       // ====================================================================
       // PASO 2: Búsqueda web (navegador)
       // ====================================================================
-      onProgress?.('web_search', 20, 'Buscando en la web...');
+      onProgress?.('web_search', 20);
       const searchStart = Date.now();
 
       const searchResults = await this.webSearchService.search(searchQuery, {
@@ -144,7 +144,7 @@ export class WebRAGOrchestrator {
       // ====================================================================
       // PASO 3: LLM selecciona URLs relevantes
       // ====================================================================
-      onProgress?.('url_selection', 30, 'Seleccionando fuentes relevantes...');
+      onProgress?.('url_selection', 30);
       const selectionStart = Date.now();
 
       const selectedIndices = await this.selectRelevantResults(
@@ -162,7 +162,8 @@ export class WebRAGOrchestrator {
       // PASO 3.5: Confirmación de usuario (si está habilitada)
       // ====================================================================
       if (options.confirmUrls && options.onConfirmationRequest) {
-        onProgress?.('url_confirmation', 35, 'Esperando confirmación de usuario...', { urls: selectedUrls });
+        // @ts-ignore - Extra payload for confirmation
+        onProgress?.('url_confirmation', 35, 'Confirm', { urls: selectedUrls });
         
         console.log('[WebRAG] Requesting user confirmation for URLs:', selectedUrls);
         const confirmedUrls = await options.onConfirmationRequest(selectedUrls);
@@ -183,11 +184,7 @@ export class WebRAGOrchestrator {
       // ====================================================================
       // PASO 4: Obtener contenido (ya sea desde extensión o fetching)
       // ====================================================================
-      onProgress?.(
-        'page_fetch',
-        40,
-        `Obteniendo contenido de ${selectedResults.length} páginas...`
-      );
+      onProgress?.('page_fetch', 40);
       const fetchStart = Date.now();
 
       // Check if we have content from extension (fullContent in metadata)
@@ -263,7 +260,7 @@ export class WebRAGOrchestrator {
           // ====================================================================
           // PASO 5: Limpieza de contenido
           // ====================================================================
-          onProgress?.('content_extraction', 50, 'Extrayendo contenido limpio...');
+          onProgress?.('content_extraction', 50);
           const extractionStart = Date.now();
 
           cleanedContents = fetchedPages.map((page) =>
@@ -282,14 +279,14 @@ export class WebRAGOrchestrator {
       // ====================================================================
       // PASO 6: Chunking + embeddings (RAG pipeline)
       // ====================================================================
-      onProgress?.('chunking', 60, 'Procesando documentos web...');
+      onProgress?.('chunking', 60);
       const chunkingStart = Date.now();
 
       const webDocuments = await this.processWebDocuments(
         cleanedContents,
         searchQuery,
         (progress) => {
-          onProgress?.('embedding', 60 + progress * 0.2, 'Generando embeddings...');
+          onProgress?.('embedding', 60 + progress * 0.2);
         }
       );
       timestamps.chunking = Date.now() - chunkingStart;
@@ -303,7 +300,7 @@ export class WebRAGOrchestrator {
       // ====================================================================
       // PASO 7: Vector search
       // ====================================================================
-      onProgress?.('vector_search', 80, 'Buscando fragmentos relevantes...');
+      onProgress?.('vector_search', 80);
       const searchVectorStart = Date.now();
 
       const queryEmbedding = await this.embeddingEngine.generateEmbedding(userQuery);
@@ -319,7 +316,7 @@ export class WebRAGOrchestrator {
       // ====================================================================
       // PASO 8: Generación de respuesta
       // ====================================================================
-      onProgress?.('answer_generation', 90, 'Generando respuesta...');
+      onProgress?.('answer_generation', 90);
       const answerStart = Date.now();
 
       const answer = await this.generateAnswer(userQuery, retrievedChunks, options.onToken);
@@ -332,7 +329,7 @@ export class WebRAGOrchestrator {
       // ====================================================================
       const totalTime = Date.now() - startTime;
 
-      onProgress?.('completed', 100, 'Búsqueda completada');
+      onProgress?.('completed', 100);
 
       return {
         query: userQuery,

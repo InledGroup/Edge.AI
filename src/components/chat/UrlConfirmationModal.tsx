@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldAlert, X, ExternalLink, Globe, Check } from 'lucide-preact';
 import { Button } from '../ui/Button';
+import { i18nStore } from '@/lib/stores/i18n';
 
 interface UrlConfirmationModalProps {
   urls: string[];
@@ -28,7 +29,7 @@ export function UrlConfirmationModal({ urls, onConfirm, onCancel }: UrlConfirmat
             <div className="p-2 rounded-lg bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
               <ShieldAlert size={20} />
             </div>
-            <h3 className="font-semibold text-[var(--color-text-primary)]">Confirmar fuentes externas</h3>
+            <h3 className="font-semibold text-[var(--color-text-primary)]">{i18nStore.t('urlConfirmation.title')}</h3>
           </div>
           <button 
             onClick={onCancel}
@@ -41,8 +42,7 @@ export function UrlConfirmationModal({ urls, onConfirm, onCancel }: UrlConfirmat
         {/* Content */}
         <div className="p-5 space-y-4 overflow-y-auto">
           <p className="text-[var(--color-text-secondary)] text-sm leading-relaxed">
-            La IA ha encontrado estas páginas para responder tu pregunta. 
-            Por seguridad, confirma cuáles quieres que analice:
+            {i18nStore.t('urlConfirmation.description')}
           </p>
 
           <div className="space-y-2">
@@ -82,7 +82,7 @@ export function UrlConfirmationModal({ urls, onConfirm, onCancel }: UrlConfirmat
                     rel="noopener noreferrer" 
                     className="opacity-0 group-hover:opacity-100 p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-all"
                     onClick={(e) => e.stopPropagation()}
-                    title="Abrir enlace en nueva pestaña"
+                    title={i18nStore.t('urlConfirmation.openLink')}
                   >
                     <ExternalLink size={14} />
                   </a>
@@ -98,14 +98,14 @@ export function UrlConfirmationModal({ urls, onConfirm, onCancel }: UrlConfirmat
             variant="ghost"
             onClick={onCancel}
           >
-            Cancelar
+            {i18nStore.t('urlConfirmation.cancel')}
           </Button>
           <Button
             onClick={() => onConfirm(selectedUrls)}
             disabled={selectedUrls.length === 0}
             className="shadow-lg shadow-[var(--color-primary)]/20"
           >
-            Analizar {selectedUrls.length} páginas
+            {i18nStore.t('urlConfirmation.analyze').replace('{count}', selectedUrls.length.toString())}
           </Button>
         </div>
       </div>

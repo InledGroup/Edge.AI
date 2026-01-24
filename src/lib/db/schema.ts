@@ -10,7 +10,7 @@ import type {
   StoredEmbedding,
   Conversation,
   Settings
-} from '@/types';
+} from '../../types';
 
 /**
  * Database schema definition

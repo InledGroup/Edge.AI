@@ -170,7 +170,7 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
           if (model.ggufUrl) {
             setLoadingProgress(prev => ({
               ...prev,
-              chat: { progress: 0, message: 'WebGPU falló, intentando modo CPU...' }
+              chat: { progress: 0, message: i18nStore.t('wizard.webGpuFallback') }
             }));
 
             engine = new WllamaEngine();
@@ -446,11 +446,21 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{score.model.displayName}</span>
+                          <span className="font-medium">
+                            {(() => {
+                              const key = `modelRegistry.${score.model.id}.name`;
+                              const translation = i18nStore.t(key);
+                              return translation !== key ? translation : score.model.displayName;
+                            })()}
+                          </span>
                           <span className="text-xs">{getRecommendationEmoji(score.recommendation)}</span>
                         </div>
                         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-                          {score.model.description}
+                          {(() => {
+                            const key = `modelRegistry.${score.model.id}.description`;
+                            const translation = i18nStore.t(key);
+                            return translation !== key ? translation : score.model.description;
+                          })()}
                         </p>
                         <div className="flex items-center gap-3 mt-2 text-xs text-[var(--color-text-tertiary)]">
                           <span>{score.model.sizeGB.toFixed(2)}GB</span>
@@ -502,11 +512,21 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{score.model.displayName}</span>
+                          <span className="font-medium">
+                            {(() => {
+                              const key = `modelRegistry.${score.model.id}.name`;
+                              const translation = i18nStore.t(key);
+                              return translation !== key ? translation : score.model.displayName;
+                            })()}
+                          </span>
                           <span className="text-xs">{getRecommendationEmoji(score.recommendation)}</span>
                         </div>
                         <div className="text-xs text-[var(--color-text-secondary)] mt-1">
-                          {score.model.description}
+                          {(() => {
+                            const key = `modelRegistry.${score.model.id}.description`;
+                            const translation = i18nStore.t(key);
+                            return translation !== key ? translation : score.model.description;
+                          })()}
                         </div>
                         <div className="text-xs text-[var(--color-text-tertiary)] mt-1">
                           {score.model.sizeGB.toFixed(2)}GB • {i18nStore.t('wizard.semanticSearch')}

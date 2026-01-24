@@ -1,6 +1,6 @@
 import { signal, computed } from '@preact/signals';
-import { translations, type Language } from '@/lib/i18n/translations';
-import { setSetting, getSetting } from '@/lib/db/settings';
+import { translations, type Language } from '../i18n/translations';
+import { setSetting, getSetting } from '../db/settings';
 
 // Default language
 const DEFAULT_LANG: Language = 'es';

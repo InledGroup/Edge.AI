@@ -3,6 +3,7 @@
 
 import * as webllm from '@mlc-ai/web-llm';
 import { probeActualLimits, getWebGPUConfig } from './gpu-limits';
+import { i18nStore } from '../stores/i18n';
 
 /**
  * Get all available model IDs from the current WebLLM version
@@ -59,7 +60,7 @@ export class WebLLMEngine {
 
     try {
       console.log('🚀 Initializing WebLLM with model:', modelName);
-      onProgress?.(0, 'Inicializando WebLLM...');
+      onProgress?.(0, i18nStore.t('models.progress.initializing'));
 
       // Probe actual GPU limits
       const gpuLimits = await probeActualLimits();
@@ -70,7 +71,7 @@ export class WebLLMEngine {
       console.log('✅ WebGPU available, using GPU backend');
       console.log(`🎯 GPU Tier: ${gpuLimits.tier.toUpperCase()}`);
 
-      onProgress?.(10, 'Usando backend: GPU (WebGPU)');
+      onProgress?.(10, i18nStore.t('models.progress.backendGpu'));
 
       // Get optimal WebGPU configuration based on GPU tier
       const webgpuConfig = getWebGPUConfig(gpuLimits.tier);
@@ -96,7 +97,7 @@ export class WebLLMEngine {
       // Create MLCEngine instance - requires WebGPU
       this.engine = new webllm.MLCEngine();
 
-      onProgress?.(20, `Verificando caché del modelo...`);
+      onProgress?.(20, i18nStore.t('models.progress.verifyingCache'));
 
       // Load the model with optimized configuration
       // WebLLM automatically uses IndexedDB cache for models
@@ -113,16 +114,18 @@ export class WebLLMEngine {
           }
 
           const progress = Math.round(report.progress * 70) + 20; // 20-90%
-          let status = report.text || 'Cargando...';
+          let status = report.text || i18nStore.t('models.progress.downloading');
 
           // Detect cache usage based on progress speed
           const elapsed = Date.now() - loadStartTime;
           const isLikelyFromCache = elapsed < 3000 && report.progress > 0.1;
 
-          if (isLikelyFromCache && !status.includes('caché')) {
-            status += ' (desde caché IndexedDB ⚡)';
+          if (isLikelyFromCache && !status.includes('caché') && !status.includes('cache')) {
+            status += ' ' + i18nStore.t('models.progress.fromCache') + ' IndexedDB ⚡';
           } else if (!isLikelyFromCache && report.text?.includes('download')) {
-            status += ' (descargando...)';
+             // Keep original text but append localized note if needed, 
+             // but usually report.text is English. We might want to just show status.
+             // For now, let's leave report.text if it exists, as it contains details.
           }
 
           onProgress?.(progress, status);
@@ -140,7 +143,7 @@ export class WebLLMEngine {
 
       // WARM-UP: Generate 1 token to initialize GPU pipeline
       console.log('🔥 Warming up GPU pipeline...');
-      onProgress?.(95, 'Calentando modelo...');
+      onProgress?.(95, i18nStore.t('models.progress.warmingUp'));
 
       if (isEmbeddingModel) {
         // Warm up embedding pipeline
@@ -167,7 +170,7 @@ export class WebLLMEngine {
       this.isInitialized = true;
 
       console.log(`✅ WebLLM initialized successfully with ${this.backend.toUpperCase()}`);
-      onProgress?.(100, 'Modelo listo (GPU)');
+      onProgress?.(100, i18nStore.t('models.progress.modelReady') + ' (GPU)');
     } catch (error) {
       console.error('❌ Failed to initialize WebLLM:', error);
       this.isInitialized = false;
@@ -260,7 +263,7 @@ export class WebLLMEngine {
       for (let i = 0; i < texts.length; i++) {
         const res = await this.generateEmbedding(texts[i]);
         results.push(res);
-        onProgress?.(Math.round(((i + 1) / texts.length) * 100), `Embeddings: ${i + 1}/${texts.length}`);
+        onProgress?.(Math.round(((i + 1) / texts.length) * 100), `${i18nStore.t('models.progress.embeddings')}: ${i + 1}/${texts.length}`);
       }
       return results;
     }
