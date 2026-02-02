@@ -135,6 +135,24 @@ export const MODEL_REGISTRY: ModelMetadata[] = [
   // CHAT MODELS - Medium (1-2GB)
   // ========================================================================
   {
+    id: 'lfm-2-audio-1.5b',
+    name: 'LFM2-Audio-1.5B',
+    displayName: 'LFM2 Audio 1.5B (Live)',
+    description: 'Modelo especializado en conversación por voz. Ideal para el modo Live.',
+    type: 'chat',
+    engine: 'wllama',
+    ggufUrl: 'https://huggingface.co/LiquidAI/LFM2-Audio-1.5B-GGUF/resolve/main/LFM2-Audio-1.5B-Q8_0.gguf',
+    sizeGB: 1.6,
+    speed: 'fast',
+    quality: 'good',
+    quantization: 'q8',
+    minMemoryGB: 3,
+    preferredMemoryGB: 6,
+    requiresWebGPU: false,
+    contextSize: 4096,
+    tags: ['medium', 'audio', 'live']
+  },
+  {
     id: 'lfm-2.5-1.6b-q4',
     name: 'LFM-2.5-1.6B-Q4',
     displayName: 'LFM 2.5 1.6B (Ligero)',

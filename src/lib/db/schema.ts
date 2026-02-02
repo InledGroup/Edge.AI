@@ -49,6 +49,19 @@ export interface EdgeAIDB extends DBSchema {
       'by-created': number;
     };
   };
+  memories: {
+    key: string;
+    value: {
+      id: string;
+      content: string;
+      createdAt: number;
+      source: 'user' | 'system';
+      tags?: string[];
+    };
+    indexes: {
+      'by-created': number;
+    };
+  };
   settings: {
     key: string;
     value: any;
@@ -56,7 +69,7 @@ export interface EdgeAIDB extends DBSchema {
 }
 
 const DB_NAME = 'edge-ai-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase<EdgeAIDB> | null = null;
 
@@ -107,6 +120,14 @@ export async function getDB(): Promise<IDBPDatabase<EdgeAIDB>> {
         });
         conversationsStore.createIndex('by-updated', 'updatedAt');
         conversationsStore.createIndex('by-created', 'createdAt');
+      }
+
+      // Memories store
+      if (!db.objectStoreNames.contains('memories')) {
+        const memoriesStore = db.createObjectStore('memories', {
+          keyPath: 'id'
+        });
+        memoriesStore.createIndex('by-created', 'createdAt');
       }
 
       // Settings store (key-value)
@@ -163,19 +184,21 @@ export async function deleteDatabase(): Promise<void> {
 export async function getDBStats() {
   const db = await getDB();
 
-  const [documentsCount, chunksCount, embeddingsCount, conversationsCount] =
+  const [documentsCount, chunksCount, embeddingsCount, conversationsCount, memoriesCount] =
     await Promise.all([
       db.count('documents'),
       db.count('chunks'),
       db.count('embeddings'),
-      db.count('conversations')
+      db.count('conversations'),
+      db.count('memories')
     ]);
 
   return {
     documents: documentsCount,
     chunks: chunksCount,
     embeddings: embeddingsCount,
-    conversations: conversationsCount
+    conversations: conversationsCount,
+    memories: memoriesCount
   };
 }
 
@@ -185,12 +208,13 @@ export async function getDBStats() {
 export async function exportDatabase() {
   const db = await getDB();
 
-  const [documents, chunks, embeddings, conversations, settings] =
+  const [documents, chunks, embeddings, conversations, memories, settings] =
     await Promise.all([
       db.getAll('documents'),
       db.getAll('chunks'),
       db.getAll('embeddings'),
       db.getAll('conversations'),
+      db.getAll('memories'),
       getAllSettings()
     ]);
 
@@ -201,6 +225,7 @@ export async function exportDatabase() {
     chunks,
     embeddings,
     conversations,
+    memories,
     settings
   };
 }
@@ -211,7 +236,7 @@ export async function exportDatabase() {
 export async function importDatabase(data: any): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(
-    ['documents', 'chunks', 'embeddings', 'conversations', 'settings'],
+    ['documents', 'chunks', 'embeddings', 'conversations', 'memories', 'settings'],
     'readwrite'
   );
 
@@ -234,6 +259,11 @@ export async function importDatabase(data: any): Promise<void> {
     // Import conversations
     for (const conv of data.conversations || []) {
       await tx.objectStore('conversations').put(conv);
+    }
+    
+    // Import memories
+    for (const memory of data.memories || []) {
+      await tx.objectStore('memories').put(memory);
     }
 
     // Import settings

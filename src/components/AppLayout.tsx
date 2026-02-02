@@ -9,6 +9,7 @@ import { DocumentCanvas } from './DocumentCanvas';
 import { FirstRunWizard } from './FirstRunWizard';
 import { ModelLoadingIndicator } from './ModelLoadingIndicator';
 import { ExtensionStatus } from './ExtensionStatus';
+import LiveMode from './chat/LiveMode';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
 import { i18nStore } from '@/lib/stores/i18n';
@@ -123,6 +124,9 @@ export function AppLayout() {
 
       {/* Extension Status Notification (top-right toast) */}
       <ExtensionStatus />
+
+      {/* Live Mode Overlay */}
+      <LiveMode />
     </>
   );
 }

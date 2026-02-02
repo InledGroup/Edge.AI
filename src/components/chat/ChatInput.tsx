@@ -1,10 +1,11 @@
 // ChatInput Component - Message input with auto-resize
 
 import { useState, useRef, useEffect } from 'preact/hooks';
-import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle } from 'lucide-preact';
+import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle, AudioWaveform, MoreHorizontal } from 'lucide-preact';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
+import { uiStore, uiSignal } from '@/lib/stores';
 import { speechService, voiceState, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 
 export interface ChatInputProps {
@@ -29,13 +30,27 @@ export function ChatInput({
   const [message, setMessage] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [mode, setMode] = useState<'web' | 'local' | 'smart' | 'conversation'>('conversation');
+  const [showMenu, setShowMenu] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to language changes
   const lang = languageSignal.value;
   const vState = voiceState.value;
   const vMode = isVoiceModeEnabled.value;
+  const showLiveMode = uiSignal.value.showLiveMode;
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -48,6 +63,9 @@ export function ChatInput({
 
   // Handle voice results
   useEffect(() => {
+    // If Live Mode is active, do NOT interfere with speech service
+    if (showLiveMode) return;
+
     // Si estamos en modo continuo, el speechService se encargará de reiniciar
     // Si solo estamos dictando, actualizamos el input
     if (vState === 'listening') {
@@ -63,7 +81,7 @@ export function ChatInput({
         }
       });
     }
-  }, [vState, mode, onSend, selectedImage]);
+  }, [vState, mode, onSend, selectedImage, showLiveMode]);
 
   function handleSubmit(e: Event) {
     e.preventDefault();
@@ -189,112 +207,138 @@ export function ChatInput({
           onChange={handleImageSelect}
         />
 
-        {/* Image Upload Button */}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || loading}
-          className={cn(
-            'flex-shrink-0 p-2 rounded-lg transition-all duration-200',
-            'hover:bg-[var(--color-bg-hover)] active:scale-95',
-            'text-[var(--color-text-secondary)]',
-            (disabled || loading) && 'opacity-50 cursor-not-allowed',
-            !supportsVision && 'opacity-50'
+        {/* Options Dropdown */}
+        <div className="relative flex-shrink-0" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setShowMenu(!showMenu)}
+            disabled={disabled || loading}
+            className={cn(
+              'p-2 rounded-lg transition-all duration-200',
+              'hover:bg-[var(--color-bg-hover)] active:scale-95',
+              'text-[var(--color-text-secondary)]',
+              showMenu && 'bg-[var(--color-bg-hover)] text-[var(--color-primary)]',
+              (disabled || loading) && 'opacity-50 cursor-not-allowed'
+            )}
+            title={i18nStore.t('common.settings')}
+          >
+            <MoreHorizontal size={20} />
+          </button>
+
+          {/* Dropdown Menu */}
+          {showMenu && (
+            <div className="absolute bottom-full left-0 mb-2 w-64 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 p-1.5 flex flex-col gap-0.5">
+              {/* Image Upload */}
+              <button
+                type="button"
+                onClick={() => { fileInputRef.current?.click(); setShowMenu(false); }}
+                disabled={disabled || loading || !supportsVision}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left',
+                  'hover:bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]',
+                  (!supportsVision || disabled || loading) && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                <ImageIcon size={18} />
+                <div className="flex flex-col">
+                  <span>{i18nStore.t('chat.uploadImage') || 'Subir imagen'}</span>
+                  {!supportsVision && <span className="text-[10px] text-amber-500 font-medium">No soportado por el modelo</span>}
+                </div>
+              </button>
+
+              <div className="h-[1px] bg-[var(--color-border)] my-1 mx-2" />
+
+              {/* Strategy Modes */}
+              <button
+                type="button"
+                onClick={() => { setModeAndNotify('conversation'); setShowMenu(false); }}
+                disabled={disabled || loading}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left',
+                  mode === 'conversation' 
+                    ? 'bg-gray-500/10 text-gray-600 dark:text-gray-400' 
+                    : 'hover:bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                )}
+              >
+                <MessageCircle size={18} />
+                <span>{i18nStore.t('chat.pureChat')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setModeAndNotify('local'); setShowMenu(false); }}
+                disabled={disabled || loading}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left',
+                  mode === 'local' 
+                    ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
+                    : 'hover:bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                )}
+              >
+                <FileSearchCorner size={18} />
+                <span>{i18nStore.t('chat.localSearch')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setModeAndNotify('web'); setShowMenu(false); }}
+                disabled={disabled || loading}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left',
+                  mode === 'web' 
+                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' 
+                    : 'hover:bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                )}
+              >
+                <Globe size={18} />
+                <span>{i18nStore.t('chat.webSearch')}</span>
+              </button>
+
+              <div className="h-[1px] bg-[var(--color-border)] my-1 mx-2" />
+
+              {/* Voice & Live features */}
+              <button
+                type="button"
+                onClick={() => { speechService.toggleVoiceMode(); setShowMenu(false); }}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left',
+                  vMode 
+                    ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-1 ring-purple-500/20' 
+                    : 'hover:bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                )}
+              >
+                <Volume2 size={18} />
+                <span>{i18nStore.t('chat.voiceModeContinuous')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { uiStore.toggleLiveMode(); setShowMenu(false); }}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left',
+                  'hover:bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-blue-500'
+                )}
+              >
+                <AudioWaveform size={18} />
+                <span>Live Mode</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { toggleDictation(); setShowMenu(false); }}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left',
+                  vState === 'listening' && !vMode 
+                    ? 'bg-red-500/10 text-red-600 animate-pulse' 
+                    : 'hover:bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                )}
+              >
+                {vState === 'listening' && !vMode ? <MicOff size={18} /> : <Mic size={18} />}
+                <span>{i18nStore.t('chat.dictate')}</span>
+              </button>
+            </div>
           )}
-          title={!supportsVision ? 'El modelo seleccionado no soporta imágenes' : i18nStore.t('chat.uploadImage')}
-        >
-          <ImageIcon size={20} className={!supportsVision ? 'text-gray-400' : ''} />
-        </button>
-
-        <div className="w-[1px] h-8 bg-[var(--color-border)] mx-1 hidden sm:block" />
-
-        {/* Conversation mode button */}
-        <button
-          type="button"
-          onClick={() => setModeAndNotify('conversation')}
-          disabled={disabled || loading}
-          className={cn(
-            'hidden sm:block flex-shrink-0 p-2 rounded-lg transition-all duration-200',
-            'hover:bg-[var(--color-bg-hover)] active:scale-95',
-            mode === 'conversation'
-              ? 'text-gray-600 dark:text-gray-400 bg-gray-500/10'
-              : 'text-[var(--color-text-secondary)]',
-            (disabled || loading) && 'opacity-50 cursor-not-allowed'
-          )}
-          title={i18nStore.t('chat.modeConversation')}
-        >
-          <MessageCircle size={20} />
-        </button>
-
-        {/* Local RAG button */}
-        <button
-          type="button"
-          onClick={() => setModeAndNotify('local')}
-          disabled={disabled || loading}
-          className={cn(
-            'hidden sm:block flex-shrink-0 p-2 rounded-lg transition-all duration-200',
-            'hover:bg-[var(--color-bg-hover)] active:scale-95',
-            mode === 'local'
-              ? 'text-green-600 dark:text-green-400 bg-green-500/10'
-              : 'text-[var(--color-text-secondary)]',
-            (disabled || loading) && 'opacity-50 cursor-not-allowed'
-          )}
-          title={i18nStore.t('chat.localSearch')}
-        >
-          <span className="text-lg"><FileSearchCorner size={20} /></span>
-        </button>
-
-        {/* Web search button */}
-        <button
-          type="button"
-          onClick={() => setModeAndNotify('web')}
-          disabled={disabled || loading}
-          className={cn(
-            'hidden sm:block flex-shrink-0 p-2 rounded-lg transition-all duration-200',
-            'hover:bg-[var(--color-bg-hover)] active:scale-95',
-            mode === 'web'
-              ? 'text-blue-600 dark:text-blue-400 bg-blue-500/10'
-              : 'text-[var(--color-text-secondary)]',
-            (disabled || loading) && 'opacity-50 cursor-not-allowed'
-          )}
-          title={i18nStore.t('chat.webSearch')}
-        >
-          <Globe size={20} />
-        </button>
-
-        <div className="w-[1px] h-8 bg-[var(--color-border)] mx-1 hidden sm:block" />
-
-        {/* Voice Mode Toggle (Continuous) */}
-        <button
-          type="button"
-          onClick={() => speechService.toggleVoiceMode()}
-          className={cn(
-            'flex-shrink-0 p-2 rounded-lg transition-all duration-200',
-            'hover:bg-[var(--color-bg-hover)] active:scale-95',
-            vMode
-              ? 'text-purple-600 dark:text-purple-400 bg-purple-500/10 ring-1 ring-purple-500/50'
-              : 'text-[var(--color-text-secondary)]'
-          )}
-          title={i18nStore.t('chat.voiceModeContinuous')}
-        >
-          <Volume2 size={20} />
-        </button>
-
-        {/* Dictation Button */}
-        <button
-          type="button"
-          onClick={toggleDictation}
-          className={cn(
-            'flex-shrink-0 p-2 rounded-lg transition-all duration-200',
-            'hover:bg-[var(--color-bg-hover)] active:scale-95',
-            vState === 'listening' && !vMode
-              ? 'text-red-600 animate-pulse bg-red-500/10'
-              : 'text-[var(--color-text-secondary)]'
-          )}
-          title={i18nStore.t('chat.dictate')}
-        >
-          {vState === 'listening' && !vMode ? <MicOff size={20} /> : <Mic size={20} />}
-        </button>
+        </div>
 
         <textarea
           ref={textareaRef}

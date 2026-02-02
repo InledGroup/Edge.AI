@@ -9,10 +9,12 @@ export const isVoiceModeEnabled = signal<boolean>(false); // El modo "Conversaci
 export const autoSpeakEnabled = signal<boolean>(false); // Ajuste "Siempre hablar"
 
 class SpeechService {
-  private synthesis: SpeechSynthesis;
+  private synthesis: SpeechSynthesis | null = null;
   private recognition: any | null = null;
   private voices: SpeechSynthesisVoice[] = [];
   private currentLang: 'es-ES' | 'en-US' = 'es-ES';
+  private currentCallback: ((text: string) => void) | null = null;
+  private isExplicitlyStopped: boolean = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -20,9 +22,11 @@ class SpeechService {
       this.initRecognition();
       
       // Cargar voces (a veces es asíncrono en Chrome)
-      if (this.synthesis.onvoiceschanged !== undefined) {
+      if (this.synthesis && this.synthesis.onvoiceschanged !== undefined) {
         this.synthesis.onvoiceschanged = () => {
-          this.voices = this.synthesis.getVoices();
+          if (this.synthesis) {
+            this.voices = this.synthesis.getVoices();
+          }
         };
       }
     }
@@ -39,18 +43,44 @@ class SpeechService {
       this.recognition.lang = this.currentLang;
 
       this.recognition.onstart = () => {
+        console.log('🎤 Mic started');
         voiceState.value = 'listening';
         voiceError.value = null;
+        this.isExplicitlyStopped = false;
+      };
+
+      this.recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('🎤 Result:', transcript);
+        if (transcript && this.currentCallback) {
+          this.currentCallback(transcript);
+        }
       };
 
       this.recognition.onend = () => {
+        console.log('🎤 Mic ended. State:', voiceState.value);
+        
+        // Only transition to idle if we weren't already moved to processing/speaking
         if (voiceState.value === 'listening') {
           voiceState.value = 'idle';
+        }
+
+        // Auto-restart logic for continuous mode
+        if (isVoiceModeEnabled.value && !this.isExplicitlyStopped) {
+          // Don't restart if AI is speaking or processing
+          if (voiceState.value === 'idle') {
+            console.log('🎤 Auto-restarting...');
+            setTimeout(() => this.startListening(), 100);
+          }
         }
       };
 
       this.recognition.onerror = (event: any) => {
         console.error('Speech recognition error', event.error);
+        if (event.error === 'no-speech') {
+           // Silence - just let onend restart it
+           return;
+        }
         voiceError.value = `Error: ${event.error}`;
         voiceState.value = 'idle';
       };
@@ -80,19 +110,26 @@ class SpeechService {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = this.currentLang;
     
-    // Seleccionar una voz adecuada si es posible
-    const voice = this.voices.find(v => v.lang.startsWith(this.currentLang.split('-')[0]));
+    // Improved voice selection
+    let voice = this.voices.find(v => 
+      v.lang.startsWith(this.currentLang.split('-')[0]) && 
+      (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Premium'))
+    );
+
+    if (!voice) voice = this.voices.find(v => v.lang === this.currentLang);
+    if (!voice) voice = this.voices.find(v => v.lang.startsWith(this.currentLang.split('-')[0]));
+
     if (voice) utterance.voice = voice;
 
-    // Configuración para que suene más natural
-    utterance.rate = 1.0; 
+    utterance.rate = 1.1; 
     utterance.pitch = 1.0;
 
     utterance.onend = () => {
+      console.log('🔊 TTS Finished');
       voiceState.value = 'idle';
-      // Si estamos en modo conversación continua, volver a escuchar
+      // Restart listening after speaking
       if (isVoiceModeEnabled.value) {
-        // Pequeña pausa antes de escuchar de nuevo para no captarse a sí mismo
+        this.isExplicitlyStopped = false;
         setTimeout(() => this.startListening(), 500);
       }
     };
@@ -106,17 +143,12 @@ class SpeechService {
 
   /**
    * Habla un fragmento de texto sin cancelar lo que ya se está hablando.
-   * Útil para streaming de respuestas largas.
    */
   speakFragment(text: string, isLastChunk: boolean = false) {
     if (!this.synthesis || !text.trim()) {
-      // Si es el último chunk pero está vacío, necesitamos simular el final
-      // para reactivar el micrófono si es necesario.
       if (isLastChunk && isVoiceModeEnabled.value) {
-        // Pequeña pausa y reiniciar
         setTimeout(() => {
-          if (voiceState.value !== 'listening') {
-             voiceState.value = 'idle';
+          if (voiceState.value === 'idle') {
              this.startListening();
           }
         }, 500);
@@ -124,37 +156,36 @@ class SpeechService {
       return;
     }
 
-    // NO cancelamos audio anterior
     voiceState.value = 'speaking';
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = this.currentLang;
     
-    const voice = this.voices.find(v => v.lang.startsWith(this.currentLang.split('-')[0]));
+    let voice = this.voices.find(v => 
+      v.lang.startsWith(this.currentLang.split('-')[0]) && 
+      (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Premium'))
+    );
+
+    if (!voice) voice = this.voices.find(v => v.lang === this.currentLang);
+    if (!voice) voice = this.voices.find(v => v.lang.startsWith(this.currentLang.split('-')[0]));
+
     if (voice) utterance.voice = voice;
 
-    utterance.rate = 1.0;
+    utterance.rate = 1.1;
     utterance.pitch = 1.0;
 
     utterance.onend = () => {
-      // Solo si es el último fragmento gestionamos el estado 'idle' y reinicio de escucha
       if (isLastChunk) {
+        console.log('🔊 Final TTS Fragment Finished');
         voiceState.value = 'idle';
         if (isVoiceModeEnabled.value) {
+          this.isExplicitlyStopped = false;
           setTimeout(() => this.startListening(), 500);
-        }
-      } else {
-        // Si no es el último, verificamos si la cola se vació
-        if (!this.synthesis.pending) {
-           // Mantenemos 'speaking' visualmente si sabemos que vendrá más, 
-           // pero el navegador disparará este evento cuando termine este fragmento.
-           // No hacemos nada, dejamos que llegue el siguiente fragmento.
         }
       }
     };
 
     utterance.onerror = () => {
-      console.error('TTS Error');
       if (isLastChunk) voiceState.value = 'idle';
     };
 
@@ -172,35 +203,29 @@ class SpeechService {
   startListening(onResult?: (text: string) => void) {
     if (!this.recognition) return;
 
-    // UPDATE CALLBACK ALWAYS: Even if already listening, we might want to update who receives the result
-    this.recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      if (transcript && onResult) {
-        onResult(transcript);
-      }
-    };
+    this.isExplicitlyStopped = false;
 
-    // Prevent double-start
-    if (voiceState.value === 'listening') {
-      console.log('🎤 Already listening, callback updated');
-      return;
+    if (onResult) {
+      this.currentCallback = onResult;
     }
+
+    if (voiceState.value === 'listening') return;
 
     try {
       this.recognition.start();
     } catch (e: any) {
-      if (e.message && e.message.includes('already started')) {
-        console.log('🎤 Recognition already active (caught error)');
-        voiceState.value = 'listening'; // Sync state just in case
-      } else {
+      if (!e.message.includes('already started')) {
         console.error('Error starting recognition:', e);
       }
     }
   }
 
   stopListening() {
+    this.isExplicitlyStopped = true;
     if (this.recognition) {
-      this.recognition.stop();
+      try {
+        this.recognition.stop();
+      } catch (e) {}
     }
     voiceState.value = 'idle';
   }
@@ -211,7 +236,6 @@ class SpeechService {
       this.stopListening();
       this.stopSpeaking();
     } else {
-      // Iniciar escucha automáticamente al activar el modo
       this.startListening();
     }
   }

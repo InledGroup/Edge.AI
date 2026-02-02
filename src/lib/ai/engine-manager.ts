@@ -13,8 +13,10 @@ import { getModelById } from './model-registry';
 class EngineManager {
   private static chatEngineInstance: WebLLMEngine | WllamaEngine | null = null;
   private static embeddingEngineInstance: WllamaEngine | null = null;
+  private static liveEngineInstance: WllamaEngine | null = null; // Dedicated instance for Live Mode
   private static chatModelName: string = '';
   private static embeddingModelName: string = '';
+  private static liveModelName: string = '';
 
   /**
    * Initialize or get the chat engine (WebLLM with Wllama fallback)
@@ -106,6 +108,37 @@ class EngineManager {
   }
 
   /**
+   * Initialize or get the Live Mode engine (Dedicated Wllama instance)
+   * This runs alongside the main chat engine and embedding engine.
+   */
+  static async getLiveEngine(
+    modelName: string = 'lfm-2-audio-1.5b',
+    onProgress?: ProgressCallback
+  ): Promise<WllamaEngine> {
+    if (!this.liveEngineInstance) {
+      console.log('🆕 Creating new Wllama LIVE engine instance');
+      this.liveEngineInstance = new WllamaEngine();
+    }
+
+    if (modelName !== this.liveModelName) {
+      console.log(`🔄 Initializing LIVE engine with model: ${modelName}`);
+      const modelMeta = getModelById(modelName);
+      if (!modelMeta || !modelMeta.ggufUrl) {
+        throw new Error(`Live model ${modelName} not found or missing GGUF URL`);
+      }
+      
+      await this.liveEngineInstance.initialize(modelMeta.ggufUrl, onProgress);
+      this.liveModelName = modelName;
+    }
+
+    if (!this.liveEngineInstance.isReady()) {
+      throw new Error('Live engine not initialized.');
+    }
+
+    return this.liveEngineInstance;
+  }
+
+  /**
    * Initialize or get the embedding engine (Wllama)
    * Returns existing instance if already initialized
    */
@@ -141,6 +174,13 @@ class EngineManager {
    */
   static isChatEngineReady(): boolean {
     return this.chatEngineInstance?.isReady() ?? false;
+  }
+
+  /**
+   * Check if live engine is ready
+   */
+  static isLiveEngineReady(): boolean {
+    return this.liveEngineInstance?.isReady() ?? false;
   }
 
   /**
@@ -181,6 +221,18 @@ class EngineManager {
   }
 
   /**
+   * Reset live engine (free memory)
+   */
+  static async resetLiveEngine(): Promise<void> {
+    if (this.liveEngineInstance) {
+      await this.liveEngineInstance.reset();
+      this.liveEngineInstance = null;
+      this.liveModelName = '';
+      console.log('🔄 Live engine reset');
+    }
+  }
+
+  /**
    * Reset embedding engine (free memory)
    */
   static async resetEmbeddingEngine(): Promise<void> {
@@ -198,6 +250,7 @@ class EngineManager {
   static async resetAll(): Promise<void> {
     await Promise.all([
       this.resetChatEngine(),
+      this.resetLiveEngine(),
       this.resetEmbeddingEngine()
     ]);
     console.log('🔄 All engines reset');
@@ -206,10 +259,11 @@ class EngineManager {
   /**
    * Get current model names
    */
-  static getModelNames(): { chat: string; embedding: string } {
+  static getModelNames(): { chat: string; embedding: string; live: string } {
     return {
       chat: this.chatModelName,
-      embedding: this.embeddingModelName
+      embedding: this.embeddingModelName,
+      live: this.liveModelName
     };
   }
 }

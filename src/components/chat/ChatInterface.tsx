@@ -15,6 +15,7 @@ import { completeRAGFlow } from '@/lib/rag/rag-pipeline';
 import EngineManager from '@/lib/ai/engine-manager';
 import { addMessage, getOrCreateConversation, getConversation, generateTitle, updateConversationTitle } from '@/lib/db/conversations';
 import { getRAGSettings, getWebSearchSettings } from '@/lib/db/settings';
+import { getMemories, addMemory } from '@/lib/db/memories';
 import { WebRAGOrchestrator } from '@/lib/web-search';
 import type { WebSearchStep } from '@/lib/web-search/types';
 import { generateUUID } from '@/lib/utils';
@@ -403,6 +404,19 @@ RESPONDE SOLO CON: WEB, LOCAL o DIRECT`;
       const chatEngine = await EngineManager.getChatEngine();
 
       // ============================================================
+      // MEMORY INJECTION
+      // ============================================================
+      const memories = await getMemories();
+      const memoryContext = memories.length > 0 
+        ? `\n\nRECUERDOS SOBRE EL USUARIO:\n${memories.map(m => `- ${m.content}`).join('\n')}`
+        : '';
+        
+      const memoryInstruction = `\n\nSISTEMA DE MEMORIA:
+Si el usuario menciona explícitamente información personal nueva (nombre, preferencias, trabajo, ubicación, etc.) que deba ser recordada para futuras conversaciones, añade al FINAL de tu respuesta un bloque con el formato: [[MEMORY: contenido del recuerdo]].
+Ejemplo: "Entendido, recordaré eso. [[MEMORY: El usuario prefiere respuestas cortas]]"
+NO inventes recuerdos. Solo guarda lo que el usuario diga explícitamente.`;
+
+      // ============================================================
       // PREPARE CANVAS CONTEXT (Shared across modes)
       // ============================================================
       let canvasContextString = '';
@@ -446,6 +460,30 @@ INSTRUCCIONES DE EDICIÓN:
       }
 
       let assistantMessage: MessageType;
+      
+      // Helper function to extract memories
+      const extractMemories = async (text: string): Promise<string> => {
+        const memoryRegex = /\[\[MEMORY:\s*(.*?)\]\]/g;
+        let match;
+        const newMemories: string[] = [];
+        
+        while ((match = memoryRegex.exec(text)) !== null) {
+          if (match[1]) {
+            newMemories.push(match[1].trim());
+          }
+        }
+        
+        if (newMemories.length > 0) {
+          console.log('🧠 New memories detected:', newMemories);
+          for (const mem of newMemories) {
+            await addMemory(mem, 'system');
+          }
+          // Remove memory tags from text
+          return text.replace(memoryRegex, '').trim();
+        }
+        
+        return text;
+      };
 
       if (effectiveMode === 'web') {
         // ... (web mode implementation remains the same)
@@ -478,7 +516,22 @@ INSTRUCCIONES DE EDICIÓN:
         setMessages(prev => [...prev, tempMessage]);
 
         // Perform web search + RAG with streaming
-        const webResult = await orchestrator.search(content, {
+        // We inject memory context into the query or system prompt inside the orchestrator if possible
+        // But the orchestrator might not expose system prompt easily. 
+        // For now, let's append memory context to the user query for web search as a fallback "Context"
+        // actually, WebRAGOrchestrator probably constructs its own prompt.
+        // Let's modify the prompt passed to search? No, search takes query.
+        // We'll leave web search without explicit memory injection for now to keep it simple, 
+        // or we assume the chatEngine has no persistent memory state. 
+        // Ideally we should pass system prompt to search(). 
+        // Let's assume for now memory is less critical for web search or we add it to the query:
+        // "Context regarding user: ... Query: ..."
+        
+        const enhancedQuery = memories.length > 0 
+           ? `Contexto del usuario: ${memories.map(m => m.content).join('; ')}. \n\nPregunta: ${content}`
+           : content;
+
+        const webResult = await orchestrator.search(enhancedQuery, {
           sources: webSearchSettings.webSearchSources,
           maxUrlsToFetch: webSearchSettings.webSearchMaxUrls,
           topK: 10, // Aumentado a 10 para mejor contexto (chunks de ~600 chars = ~6000 chars total)
@@ -512,11 +565,13 @@ INSTRUCCIONES DE EDICIÓN:
           }
         });
 
+        const cleanedContent = await extractMemories(webResult.answer);
+
         // Update with final message including sources
         assistantMessage = {
           id: tempAssistantId,
           role: 'assistant',
-          content: webResult.answer,
+          content: cleanedContent,
           timestamp: Date.now(),
           model: 'webllm',
           streaming: false,
@@ -542,7 +597,7 @@ INSTRUCCIONES DE EDICIÓN:
 
         // Auto-speak if enabled
         if (isVoiceModeEnabled.value) {
-          speechService.speak(webResult.answer);
+          speechService.speak(cleanedContent);
         }
 
       } else if (effectiveMode === 'local') {
@@ -559,6 +614,10 @@ INSTRUCCIONES DE EDICIÓN:
 
         // Perform RAG flow with streaming
         let streamedText = '';
+        
+        // Combine contexts
+        const combinedContext = (canvasContextString || '') + (memoryContext || '') + (memoryInstruction || '');
+
         const { answer, ragResult } = await completeRAGFlow(
           content,
           embeddingEngine,
@@ -572,22 +631,28 @@ INSTRUCCIONES DE EDICIÓN:
             setCurrentResponse(streamedText);
           },
           {
-            additionalContext: canvasContextString // Pass canvas context here
+            additionalContext: combinedContext // Pass combined context here
           }
         );
+
+        const cleanedContent = await extractMemories(answer);
+        if (cleanedContent !== answer) {
+             // Update the display to show cleaned content
+             setCurrentResponse(cleanedContent);
+        }
 
         // Create assistant message with local sources
         assistantMessage = {
           id: generateUUID(),
           role: 'assistant',
-          content: answer,
+          content: cleanedContent,
           timestamp: Date.now(),
           sources: ragResult.chunks,
           model: 'webllm'
         };
 
         // Auto-speak if enabled
-        finishAudioStreaming(answer);
+        finishAudioStreaming(cleanedContent);
 
       } else {
         // ============================================================
@@ -625,6 +690,10 @@ INSTRUCCIONES DE EDICIÓN:
         if (canvasContextString) {
           systemContent += `\n\n${canvasContextString}`;
         }
+        
+        // Append Memory Context and Instructions
+        systemContent += memoryContext;
+        systemContent += memoryInstruction;
 
         chatMessages.push({
           role: 'system',
@@ -652,17 +721,22 @@ INSTRUCCIONES DE EDICIÓN:
           }
         });
 
+        const cleanedContent = await extractMemories(answer);
+        if (cleanedContent !== answer) {
+             setCurrentResponse(cleanedContent);
+        }
+
         // Create assistant message without sources
         assistantMessage = {
           id: generateUUID(),
           role: 'assistant',
-          content: answer,
+          content: cleanedContent,
           timestamp: Date.now(),
           model: 'webllm'
         };
 
         // Auto-speak if enabled
-        finishAudioStreaming(answer);
+        finishAudioStreaming(cleanedContent);
       }
 
       // Only add message if it wasn't already added (web mode adds it during streaming)

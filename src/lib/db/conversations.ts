@@ -207,3 +207,43 @@ export async function searchConversations(
     conv.title.toLowerCase().includes(lowerQuery)
   );
 }
+
+/**
+ * Export all conversations to JSON-compatible object
+ */
+export async function exportConversations(): Promise<{ version: number; conversations: Conversation[] }> {
+  const conversations = await getAllConversations();
+  return {
+    version: 1,
+    conversations
+  };
+}
+
+/**
+ * Import conversations from JSON object
+ * Merges with existing conversations. Overwrites if ID matches.
+ */
+export async function importConversations(data: { version: number; conversations: Conversation[] }): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction('conversations', 'readwrite');
+  
+  try {
+    if (!data.conversations || !Array.isArray(data.conversations)) {
+      throw new Error('Invalid data format');
+    }
+
+    for (const conv of data.conversations) {
+      // Basic validation
+      if (!conv.id || !conv.messages) {
+        console.warn('Skipping invalid conversation:', conv);
+        continue;
+      }
+      await tx.store.put(conv);
+    }
+    
+    await tx.done;
+  } catch (error) {
+    console.error('Failed to import conversations:', error);
+    throw error;
+  }
+}

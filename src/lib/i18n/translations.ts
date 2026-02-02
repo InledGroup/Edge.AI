@@ -60,7 +60,9 @@ export const translations = {
       voiceModeActive: 'Modo Voz Activo',
       listening: 'Escuchando...',
       dictate: 'Dictar',
-      voiceModeContinuous: 'Modo Voz Continua'
+      voiceModeContinuous: 'Modo Voz Continua',
+      uploadImage: 'Subir imagen',
+      moreOptions: 'Más opciones'
     },
     documents: {
       title: 'Subir Documentos',
@@ -85,6 +87,14 @@ export const translations = {
         language: 'Idioma',
         selectLanguage: 'Seleccionar idioma',
         browserDetected: 'Detectado del navegador',
+    },
+    data: {
+      title: 'Gestión de Datos',
+      export: 'Exportar Historial',
+      import: 'Restaurar Historial',
+      exportSuccess: 'Historial exportado correctamente',
+      importSuccess: 'Historial restaurado correctamente',
+      importError: 'Error al importar el archivo. Asegúrate de que sea un JSON válido.',
     },
     models: {
       configure: 'Configurar modelos',
@@ -139,6 +149,16 @@ export const translations = {
       openCanvas: 'Abrir en canvas',
       source: 'fuente',
       sources: 'fuentes',
+    },
+    memory: {
+      title: 'Memoria de IA',
+      subtitle: 'Contexto personalizado para tus chats',
+      add: 'Añadir nuevo recuerdo',
+      savedMemories: 'Recuerdos guardados',
+      empty: 'No hay recuerdos guardados aún.',
+      emptyHint: 'La IA aprenderá automáticamente de tus conversaciones, o puedes añadir recuerdos manualmente.',
+      systemSource: 'Sistema',
+      userSource: 'Usuario'
     },
     webSearch: {
       title: 'Fuentes web consultadas',
@@ -420,7 +440,9 @@ export const translations = {
       voiceModeActive: 'Voice Mode Active',
       listening: 'Listening...',
       dictate: 'Dictate',
-      voiceModeContinuous: 'Continuous Voice Mode'
+      voiceModeContinuous: 'Continuous Voice Mode',
+      uploadImage: 'Upload image',
+      moreOptions: 'More options'
     },
     documents: {
       title: 'Upload Documents',
@@ -445,6 +467,14 @@ export const translations = {
         language: 'Language',
         selectLanguage: 'Select language',
         browserDetected: 'Browser detected',
+    },
+    data: {
+      title: 'Data Management',
+      export: 'Export Chat History',
+      import: 'Restore Chat History',
+      exportSuccess: 'Chat history exported successfully',
+      importSuccess: 'Chat history restored successfully',
+      importError: 'Error importing file. Make sure it is a valid JSON.',
     },
     models: {
       configure: 'Configure models',
@@ -499,6 +529,16 @@ export const translations = {
       openCanvas: 'Open in canvas',
       source: 'source',
       sources: 'sources',
+    },
+    memory: {
+      title: 'AI Memory',
+      subtitle: 'Personalized context for your chats',
+      add: 'Add new memory',
+      savedMemories: 'Saved memories',
+      empty: 'No memories saved yet.',
+      emptyHint: 'The AI will automatically learn from your conversations, or you can add memories manually.',
+      systemSource: 'System',
+      userSource: 'User'
     },
     webSearch: {
       title: 'Web sources consulted',

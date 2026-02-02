@@ -189,12 +189,14 @@ interface UIState {
   sidebarOpen: boolean;
   theme: 'light' | 'dark' | 'auto';
   showSettings: boolean;
+  showLiveMode: boolean;
 }
 
 export const uiSignal = signal<UIState>({
   sidebarOpen: true,
   theme: 'auto',
-  showSettings: false
+  showSettings: false,
+  showLiveMode: false
 });
 
 export const uiStore = {
@@ -208,6 +210,10 @@ export const uiStore = {
 
   get showSettings() {
     return uiSignal.value.showSettings;
+  },
+
+  get showLiveMode() {
+    return uiSignal.value.showLiveMode;
   },
 
   toggleSidebar() {
@@ -230,6 +236,13 @@ export const uiStore = {
     uiSignal.value = {
       ...uiSignal.value,
       showSettings: !uiSignal.value.showSettings
+    };
+  },
+
+  toggleLiveMode() {
+    uiSignal.value = {
+      ...uiSignal.value,
+      showLiveMode: !uiSignal.value.showLiveMode
     };
   }
 };

@@ -3,11 +3,11 @@
  * Allows users to reconfigure models after initial setup
  */
 
-import { useState } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { Settings, RefreshCw, Trash2, Download, Info } from 'lucide-preact';
-import { modelsStore, modelsReady } from '@/lib/stores';
+import { Settings, RefreshCw, Trash2, Download, Info, Upload, Database } from 'lucide-preact';
+import { modelsStore, modelsReady, conversationsStore } from '@/lib/stores';
 import {
   getDefaultModelIds,
   clearModelSettings,
@@ -16,6 +16,11 @@ import {
 } from '@/lib/ai/model-settings';
 import EngineManager from '@/lib/ai/engine-manager';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
+import { 
+  exportConversations, 
+  importConversations, 
+  getConversationsSorted 
+} from '@/lib/db/conversations';
 
 interface ModelConfigMenuProps {
   onOpenWizard: () => void;
@@ -24,6 +29,7 @@ interface ModelConfigMenuProps {
 export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Subscribe to language changes
   const lang = languageSignal.value;
@@ -93,6 +99,53 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
     onOpenWizard();
   }
 
+  async function handleExport() {
+    try {
+      const data = await exportConversations();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `edgeai-conversations-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed');
+    }
+  }
+
+  function handleImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileChange(e: Event) {
+    const target = e.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      await importConversations(data);
+      
+      // Refresh conversations store
+      const conversations = await getConversationsSorted();
+      conversationsStore.set(conversations);
+      
+      alert(i18nStore.t('data.importSuccess'));
+      
+      // Reset input
+      target.value = '';
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert(i18nStore.t('data.importError'));
+    }
+  }
+
   if (!showMenu) {
     return (
       <Button
@@ -121,76 +174,117 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
             </button>
           </div>
 
-          {/* Current Models Status */}
-          <div className="space-y-3">
-            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-4">
-              <h3 className="font-medium mb-3">{i18nStore.t('models.currentModels')}</h3>
+          <div className="flex-1 overflow-y-auto max-h-[70vh] pr-2 -mr-2 space-y-4">
+            {/* Current Models Status */}
+            <div className="space-y-3">
+              <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-4">
+                <h3 className="font-medium mb-3">{i18nStore.t('models.currentModels')}</h3>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-[var(--color-text-secondary)]">{i18nStore.t('models.chat')}:</span>
-                  <span className={modelsStore.chat ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
-                    {modelsStore.chat ? modelsStore.chat.name : i18nStore.t('models.notLoaded')}
-                  </span>
-                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--color-text-secondary)]">{i18nStore.t('models.chat')}:</span>
+                    <span className={modelsStore.chat ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
+                      {modelsStore.chat ? modelsStore.chat.name : i18nStore.t('models.notLoaded')}
+                    </span>
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-[var(--color-text-secondary)]">{i18nStore.t('models.embeddings')}:</span>
-                  <span className={modelsStore.embedding ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
-                    {modelsStore.embedding ? modelsStore.embedding.name : i18nStore.t('models.notLoaded')}
-                  </span>
-                </div>
-              </div>
-
-              {modelsReady.value && (
-                <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
-                  <div className="flex items-center gap-2 text-xs text-[var(--color-success)]">
-                    <span className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
-                    {i18nStore.t('models.allReady')}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--color-text-secondary)]">{i18nStore.t('models.embeddings')}:</span>
+                    <span className={modelsStore.embedding ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
+                      {modelsStore.embedding ? modelsStore.embedding.name : i18nStore.t('models.notLoaded')}
+                    </span>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Info */}
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-2 text-sm">
-              <Info size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
-              <div className="text-blue-500">
-                {i18nStore.t('models.cacheInfo')}
+                {modelsReady.value && (
+                  <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+                    <div className="flex items-center gap-2 text-xs text-[var(--color-success)]">
+                      <span className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
+                      {i18nStore.t('models.allReady')}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Info */}
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-2 text-sm">
+                <Info size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
+                <div className="text-blue-500">
+                  {i18nStore.t('models.cacheInfo')}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Actions */}
-          <div className="space-y-2">
-            <Button
-              variant="secondary"
-              onClick={handleChangeModels}
-              className="w-full"
-            >
-              <Download size={16} />
-              {i18nStore.t('models.change')}
-            </Button>
+            {/* Actions */}
+            <div className="space-y-2">
+              <Button
+                variant="secondary"
+                onClick={handleChangeModels}
+                className="w-full"
+              >
+                <Download size={16} />
+                {i18nStore.t('models.change')}
+              </Button>
 
-            <Button
-              variant="secondary"
-              onClick={handleReload}
-              disabled={!modelsReady.value}
-              className="w-full"
-            >
-              <RefreshCw size={16} />
-              {i18nStore.t('models.reload')}
-            </Button>
+              <Button
+                variant="secondary"
+                onClick={handleReload}
+                disabled={!modelsReady.value}
+                className="w-full"
+              >
+                <RefreshCw size={16} />
+                {i18nStore.t('models.reload')}
+              </Button>
+            </div>
 
-            <Button
-              variant="secondary"
-              onClick={handleReset}
-              disabled={isResetting}
-              className="w-full text-red-500 hover:text-red-600 hover:bg-red-500/10"
-            >
-              <Trash2 size={16} />
-              {i18nStore.t('models.reset')}
-            </Button>
+            {/* Data Management Section */}
+            <div className="pt-4 border-t border-[var(--color-border)] space-y-3">
+              <h3 className="font-medium text-sm flex items-center gap-2">
+                <Database size={16} />
+                {i18nStore.t('data.title')}
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleExport}
+                  className="flex-1"
+                >
+                  <Download size={14} />
+                  {i18nStore.t('data.export')}
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleImportClick}
+                  className="flex-1"
+                >
+                  <Upload size={14} />
+                  {i18nStore.t('data.import')}
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".json"
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-[var(--color-border)]">
+              <Button
+                variant="secondary"
+                onClick={handleReset}
+                disabled={isResetting}
+                className="w-full text-red-500 hover:text-red-600 hover:bg-red-500/10"
+              >
+                <Trash2 size={16} />
+                {i18nStore.t('models.reset')}
+              </Button>
+            </div>
           </div>
 
           <div className="pt-4 border-t border-[var(--color-border)]">
