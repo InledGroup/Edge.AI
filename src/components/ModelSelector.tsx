@@ -86,14 +86,15 @@ export function ModelSelector() {
       setAutoLoadAttempted(true);
       console.log('🚀 Auto-loading models...');
 
-      // Load both models automatically
-      loadChatModel().catch(err => {
-        console.error('Failed to auto-load chat model:', err);
-      });
-
-      loadEmbeddingModel().catch(err => {
-        console.error('Failed to auto-load embedding model:', err);
-      });
+      // Load models sequentially to avoid OPFS access handle conflicts
+      (async () => {
+        try {
+          await loadChatModel();
+          await loadEmbeddingModel();
+        } catch (err) {
+          console.error('Failed to auto-load models:', err);
+        }
+      })();
     }
   }, [initialized, capabilities.value, autoLoadAttempted]);
 
@@ -148,13 +149,28 @@ export function ModelSelector() {
       if (capabilities.value.hasWebGPU) {
         // Use WebLLM with GPU
         console.log('🚀 Using WebLLM (GPU acceleration)');
-        engine = new WebLLMEngine();
-        engineName = 'webllm';
-        modelUrl = recommended.modelName;
+        try {
+          engine = new WebLLMEngine();
+          engineName = 'webllm';
+          modelUrl = recommended.modelName;
 
-        await engine.initialize(modelUrl, (progress, status) => {
-          chatLoadingState.value = { progress, message: status };
-        });
+          await engine.initialize(modelUrl, (progress, status) => {
+            chatLoadingState.value = { progress, message: status };
+          });
+        } catch (webLlmError) {
+          console.warn('⚠️ WebLLM initialization failed, trying fallback to Wllama:', webLlmError);
+          
+          // Fallback to Wllama
+          chatLoadingState.value = { progress: 0, message: i18nStore.t('wizard.webGpuFallback') };
+          
+          engine = new WllamaEngine();
+          engineName = 'wllama';
+          modelUrl = convertToGGUFModel(recommended.modelName);
+          
+          await engine.initialize(modelUrl, (progress, status) => {
+            chatLoadingState.value = { progress, message: status };
+          });
+        }
       } else {
         // Use Wllama with CPU (no WebGPU)
         console.log('🚀 Using Wllama (CPU, no WebGPU available)');

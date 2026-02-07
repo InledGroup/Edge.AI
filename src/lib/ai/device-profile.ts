@@ -22,6 +22,7 @@ export interface DeviceProfile {
   // Derived properties
   recommendedBackend: 'webgpu' | 'wasm' | 'cpu';
   deviceClass: 'high-end' | 'mid-range' | 'low-end';
+  isMobile: boolean;
 }
 
 /**
@@ -34,6 +35,7 @@ export async function detectDeviceProfile(): Promise<DeviceProfile> {
   const logicalCores = detectCores();
   const hasSharedArrayBuffer = checkSharedArrayBuffer();
   const hasWASMThreads = checkWASMThreads();
+  const isMobile = checkIfMobile();
 
   // Calculate available memory (conservative estimate)
   const estimatedAvailableMemoryGB = Math.max(1, memoryGB * 0.3);
@@ -53,7 +55,8 @@ export async function detectDeviceProfile(): Promise<DeviceProfile> {
     hasSharedArrayBuffer,
     hasWASMThreads,
     recommendedBackend,
-    deviceClass
+    deviceClass,
+    isMobile
   };
 
   console.log('🔍 Device Profile:', profile);
@@ -62,7 +65,19 @@ export async function detectDeviceProfile(): Promise<DeviceProfile> {
 }
 
 /**
- * Check if WebGPU is available
+ * Check if the current device is a mobile device
+ */
+export function checkIfMobile(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  
+  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+  
+  // Detection regex for common mobile devices
+  return /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+}
+
+/**
+ * Check if WebGPU is available and meets minimum requirements for WebLLM
  */
 async function checkWebGPU(): Promise<boolean> {
   try {
@@ -71,7 +86,17 @@ async function checkWebGPU(): Promise<boolean> {
     }
 
     const adapter = await navigator.gpu.requestAdapter();
-    return adapter !== null;
+    if (!adapter) return false;
+
+    // WebLLM requires at least 32KB of compute workgroup storage
+    // Some mobile devices only have 16KB
+    const limits = adapter.limits;
+    if (limits.maxComputeWorkgroupStorageSize < 32768) {
+      console.warn(`⚠️ WebGPU available but storage limit too low for WebLLM (${limits.maxComputeWorkgroupStorageSize} < 32768)`);
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.warn('WebGPU check failed:', error);
     return false;

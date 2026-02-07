@@ -14,14 +14,22 @@ import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
 import { i18nStore } from '@/lib/stores/i18n';
 import { canvasSignal, canvasStore } from '@/lib/stores';
+import { checkIfMobile } from '@/lib/ai/device-profile';
+import { AlertTriangle, X } from 'lucide-preact';
 
 export function AppLayout() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [showFirstRunWizard, setShowFirstRunWizard] = useState(false);
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
 
   // Initialize: Check first run OR auto-load saved models
   useEffect(() => {
+    // Check for mobile
+    if (checkIfMobile()) {
+      setShowMobileWarning(true);
+    }
+
     async function initialize() {
       const isFirstRun = !hasCompletedSetup();
 
@@ -127,6 +135,34 @@ export function AppLayout() {
 
       {/* Live Mode Overlay */}
       <LiveMode />
+
+      {/* Mobile Warning Modal */}
+      {showMobileWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
+          <div className="w-full max-w-sm bg-[var(--color-bg)] border-2 border-amber-500/50 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-amber-500 p-4 flex items-center justify-center">
+              <AlertTriangle size={48} className="text-white animate-bounce" />
+            </div>
+            <div className="p-6 text-center space-y-4">
+              <h2 className="text-xl font-bold text-[var(--color-text-primary)] uppercase tracking-wider">
+                ⚠️ Soporte Mobile Experimental
+              </h2>
+              <p className="text-[var(--color-text-secondary)] leading-relaxed">
+                El soporte para dispositivos móviles es <span className="font-bold text-amber-500">muy experimental</span> y puede fallar como una escopeta de feria.
+              </p>
+              <p className="text-xs text-[var(--color-text-tertiary)] italic">
+                Se recomienda usar un ordenador para una experiencia estable.
+              </p>
+              <button
+                onClick={() => setShowMobileWarning(false)}
+                className="w-full py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold rounded-xl transition-all active:scale-95 shadow-lg shadow-[var(--color-primary)]/20"
+              >
+                ENTENDIDO, SOY UN VALIENTE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

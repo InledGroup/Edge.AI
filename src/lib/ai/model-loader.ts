@@ -39,11 +39,10 @@ export async function autoLoadModels(
   console.log('🔄 Auto-loading saved models:', { chatModelId, embeddingModelId });
 
   try {
-    // Load both models in parallel
-    await Promise.all([
-      loadSavedChatModel(chatModelId, onProgress),
-      loadSavedEmbeddingModel(embeddingModelId, onProgress)
-    ]);
+    // Load models sequentially to avoid OPFS access handle conflicts
+    // Especially critical on mobile devices where OPFS resources are limited
+    await loadSavedChatModel(chatModelId, onProgress);
+    await loadSavedEmbeddingModel(embeddingModelId, onProgress);
 
     console.log('✅ Models auto-loaded successfully');
     return true;

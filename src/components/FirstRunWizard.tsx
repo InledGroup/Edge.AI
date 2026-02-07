@@ -122,11 +122,10 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
     setError(null);
 
     try {
-      // Load models in parallel
-      await Promise.all([
-        loadChatModel(selectedChatModel),
-        loadEmbeddingModel(selectedEmbeddingModel)
-      ]);
+      // Load models sequentially to avoid OPFS access handle conflicts
+      // Especially critical on mobile devices where OPFS resources are limited
+      await loadChatModel(selectedChatModel);
+      await loadEmbeddingModel(selectedEmbeddingModel);
 
       // Save defaults
       saveDefaultChatModel(selectedChatModel.id);
@@ -227,26 +226,50 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
 
       // Check if model uses WebLLM (e.g. Snowflake Arctic GPU)
       if (model.engine === 'webllm' && model.webllmModelId) {
-         const webllmEngine = new WebLLMEngine();
-         engine = webllmEngine;
-         engineName = 'webllm';
-         
-         await webllmEngine.initialize(model.webllmModelId, (progress, status) => {
+        try {
+          const webllmEngine = new WebLLMEngine();
+          engine = webllmEngine;
+          engineName = 'webllm';
+          
+          await webllmEngine.initialize(model.webllmModelId, (progress, status) => {
+             setLoadingProgress(prev => ({
+               ...prev,
+               embedding: { progress, message: status }
+             }));
+          });
+        } catch (webLlmError) {
+          console.warn('⚠️ WebLLM embedding initialization failed, trying fallback to Wllama:', webLlmError);
+          
+          // Fallback to Wllama (Qwen2 0.5B is the default safe choice)
+          setLoadingProgress(prev => ({
+            ...prev,
+            embedding: { progress: 0, message: i18nStore.t('wizard.webGpuFallback') }
+          }));
+
+          const wllamaEngine = new WllamaEngine();
+          engine = wllamaEngine;
+          engineName = 'wllama';
+          // Use the default embedding model which is known to work on CPU
+          await wllamaEngine.initialize(undefined, (progress, status) => {
             setLoadingProgress(prev => ({
               ...prev,
               embedding: { progress, message: status }
             }));
-         });
+          });
+          
+          // Update model metadata to reflect the fallback
+          model = {
+            ...model,
+            id: 'qwen2-0.5b-embed',
+            engine: 'wllama'
+          };
+        }
       } else {
         // Default to Wllama (CPU)
         const wllamaEngine = new WllamaEngine();
         engine = wllamaEngine;
         engineName = 'wllama';
         const modelUrl = model.ggufUrl;
-
-        if (!modelUrl) {
-          throw new Error('No GGUF URL for embedding model');
-        }
 
         await wllamaEngine.initialize(modelUrl, (progress, status) => {
           setLoadingProgress(prev => ({

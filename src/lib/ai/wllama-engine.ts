@@ -109,17 +109,25 @@ export class WllamaEngine {
 
       const loadModel = async (attempt: number) => {
         try {
+          console.log(`📡 [Wllama] Starting load attempt ${attempt} for ${this.modelUrl}`);
+          
           await this.wllama!.loadModelFromUrl(this.modelUrl, {
             n_ctx: 4096,
             embeddings: true, // Enable embeddings support
             n_threads: optimalThreads, // Use optimal threads for max speed
-            useCache: true, // Force caching to avoid re-downloading on mobile
+            useCache: attempt === 1, // Only use cache on first attempt
             progressCallback: ({ loaded, total }: any) => {
               if (total > 0) {
                 // Detect if loading from cache (instant progress jumps)
-                if (loaded > lastLoaded + 50 * 1024 * 1024 && Date.now() - loadStartTime < 1000) {
+                if (loaded > lastLoaded + 50 * 1024 * 1024 && Date.now() - loadStartTime < 2000) {
                   isLoadingFromCache = true;
                 }
+                
+                // Log every 10MB to avoid console flooding but keep track
+                if (loaded > lastLoaded + 10 * 1024 * 1024 || loaded === total) {
+                   console.log(`📥 [Wllama] Download progress: ${Math.round(loaded / 1024 / 1024)}MB / ${Math.round(total / 1024 / 1024)}MB`);
+                }
+                
                 lastLoaded = loaded;
 
                 const percent = Math.round((loaded / total) * 70);
@@ -135,37 +143,25 @@ export class WllamaEngine {
               }
             },
           });
-        } catch (err) {
+        } catch (err: any) {
+          console.error(`❌ [Wllama] Load error on attempt ${attempt}:`, err);
+          
           if (attempt < 2) {
-            console.warn(`⚠️ Attempt ${attempt} failed, retrying in 1s...`, err);
+            console.warn(`⚠️ Attempt ${attempt} failed, retrying WITHOUT CACHE in 2s...`);
             onProgress?.(10, `${i18nStore.t('models.progress.retry')} (${attempt}/2)...`);
-            await new Promise(r => setTimeout(r, 1000));
+            
+            // Cleanup and wait before retry
+            try {
+              await this.wllama?.exit();
+            } catch (e) {}
+            
+            await new Promise(r => setTimeout(r, 2000));
+            
+            // Re-create instance for retry
+            this.wllama = new Wllama(config);
             await loadModel(attempt + 1);
           } else {
-            // If all retries failed, try one last time with cache clearing
-            console.warn('⚠️ All standard retries failed. Attempting to clear cache and retry...');
-            onProgress?.(10, i18nStore.t('models.progress.clearingCache'));
-            
-            try {
-              // @ts-ignore - access internal cache methods if available or use generic approach
-              if (this.wllama && this.wllama.cacheManager) {
-                 await this.wllama.cacheManager.delete(this.modelUrl);
-              }
-            } catch (e) {
-              console.warn('Failed to clear cache:', e);
-            }
-            
-            // Force reload without cache
-            await this.wllama!.loadModelFromUrl(this.modelUrl, {
-              n_ctx: 2048,
-              embeddings: true,
-              n_threads: optimalThreads,
-              useCache: false, // FORCE NO CACHE
-              progressCallback: ({ loaded, total }: any) => {
-                const percent = Math.round((loaded / total) * 70);
-                onProgress?.(10 + percent, `${i18nStore.t('models.progress.downloading')} (no cache): ${Math.round(loaded/1024/1024)}MB`);
-              }
-            });
+            throw err;
           }
         }
       };
