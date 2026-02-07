@@ -22,7 +22,7 @@ export function ChatInput({
   onSend,
   disabled = false,
   loading = false,
-  placeholder = 'Escribe tu pregunta...',
+  placeholder = i18nStore.t('chat.placeholder'),
   webSearchEnabled = false,
   onWebSearchToggle,
   supportsVision = true
@@ -320,7 +320,7 @@ export function ChatInput({
                 )}
               >
                 <AudioWaveform size={18} />
-                <span>Live Mode</span>
+                <span>{i18nStore.t('live.title')}</span>
               </button>
 
               <button

@@ -377,6 +377,22 @@ export const translations = {
         subtitle: 'Este domingo lanzamos Edge AI. ¡Apóyanos con tu voto!',
         button: 'Votar en Product Hunt'
       }
+    },
+    live: {
+      title: 'MODO LIVE',
+      initializing: 'Iniciando...',
+      loadingModel: 'Cargando modelo de voz optimizado (LFM2 Audio)',
+      firstTimeInfo: 'Esta descarga solo ocurre la primera vez. El modelo se guardará en la caché de tu navegador.',
+      listening: 'ESCUCHANDO...',
+      thinking: 'PENSANDO...',
+      micDisabled: 'MICRÓFONO DESACTIVADO',
+      subtitles: 'Subtítulos',
+      close: 'Cerrar',
+      errorTitle: 'Error',
+      errorLoading: 'Error al cargar el modelo live',
+      errorConnection: 'Lo siento, hubo un error de conexión con el modelo.',
+      fallbackResponse: 'No he podido generar una respuesta. ¿Podrías repetirlo?',
+      systemPrompt: 'Eres una IA en modo conversación por voz. Responde de forma concisa, natural y DIRECTA. NO uses markdown, ni asteriscos, ni listas, ni formatos especiales. Solo texto plano que sea fácil de leer en voz alta. Evita frases largas.'
     }
   },
   en: {
@@ -757,6 +773,22 @@ export const translations = {
         subtitle: "This Sunday we're launching Edge AI. Support us with your vote!",
         button: 'Vote on Product Hunt'
       }
+    },
+    live: {
+      title: 'LIVE MODE',
+      initializing: 'Initializing...',
+      loadingModel: 'Loading optimized voice model (LFM2 Audio)',
+      firstTimeInfo: 'This download only happens the first time. The model will be saved in your browser cache.',
+      listening: 'LISTENING...',
+      thinking: 'THINKING...',
+      micDisabled: 'MICROPHONE DISABLED',
+      subtitles: 'Subtitles',
+      close: 'Close',
+      errorTitle: 'Error',
+      errorLoading: 'Error loading live model',
+      errorConnection: 'Sorry, there was a connection error with the model.',
+      fallbackResponse: 'I could not generate a response. Could you repeat that?',
+      systemPrompt: 'You are an AI in voice conversation mode. Respond concisely, naturally and DIRECTLY. DO NOT use markdown, asterisks, lists, or special formatting. Only plain text that is easy to read aloud. Avoid long sentences.'
     }
   }
 };

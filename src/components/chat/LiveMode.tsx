@@ -5,14 +5,19 @@ import { uiStore, conversationsStore, activeConversationIdSignal } from '@/lib/s
 import { addMessage, getOrCreateConversation, updateConversationTitle, generateTitle } from '@/lib/db/conversations';
 import { speechService, voiceState, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { Mic, MicOff, PhoneOff, X, MoreHorizontal, Settings, Volume2, Captions, Loader2 } from 'lucide-preact';
+import { ProgressBar } from '@/components/ui/ProgressBar';
+import { useTranslations } from '@/lib/stores/i18n';
 
 export default function LiveMode() {
+  const t = useTranslations();
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [showSubtitles, setShowSubtitles] = useState(false);
   const [modelReady, setModelReady] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [loadMessage, setLoadMessage] = useState(t('live.initializing'));
   
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -20,6 +25,7 @@ export default function LiveMode() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const initRef = useRef(false);
 
   // Close if not enabled
   if (!uiStore.showLiveMode) return null;
@@ -27,21 +33,27 @@ export default function LiveMode() {
   // Initialize Model
   useEffect(() => {
     async function initModel() {
+      if (initRef.current) return;
+      initRef.current = true;
+
       try {
         if (!EngineManager.isLiveEngineReady()) {
           console.log('🔌 Initializing Live Engine...');
           await EngineManager.getLiveEngine('lfm-2-audio-1.5b', (progress, msg) => {
             console.log(`Live Model: ${progress}% - ${msg}`);
+            setLoadProgress(progress);
+            setLoadMessage(msg);
           });
         }
         setModelReady(true);
       } catch (error: any) {
         console.error('Failed to load live model:', error);
-        setLoadingError(error.message || 'Error loading model');
+        setLoadingError(error.message || t('live.errorLoading'));
+        initRef.current = false; // Allow retry if failed
       }
     }
     initModel();
-  }, []);
+  }, []); // Run once on mount
 
   // Initialize Audio Visualizer
   useEffect(() => {
@@ -186,10 +198,10 @@ export default function LiveMode() {
       setTranscript(text);
       setResponse(''); 
       
-      // Stop listening while processing
-      speechService.stopListening();
-      
       try {
+        // Stop listening while processing
+        speechService.stopListening('processing');
+        
         // 1. Get/Create Conversation & Save User Message
         const currentConvId = activeConversationIdSignal.value;
         const conversation = await getOrCreateConversation(currentConvId || undefined, 'lfm-2-audio-1.5b');
@@ -205,9 +217,6 @@ export default function LiveMode() {
           content: text
         });
 
-        // Trigger visualizer intensity
-        voiceState.value = 'processing';
-        
         // Use the dedicated Live Engine
         const engine = await EngineManager.getLiveEngine();
         
@@ -216,7 +225,7 @@ export default function LiveMode() {
         let fullReply = '';
         let speakBuffer = '';
         
-        const systemPrompt = "Eres una IA en modo conversación por voz. Responde de forma concisa, natural y DIRECTA. NO uses markdown, ni asteriscos, ni listas, ni formatos especiales. Solo texto plano que sea fácil de leer en voz alta. Evita frases largas.";
+        const systemPrompt = t('live.systemPrompt');
 
         // Generate with streaming
         await engine.generateText([
@@ -256,7 +265,7 @@ export default function LiveMode() {
         // Fallback for empty response
         if (!fullReply || !fullReply.trim()) {
            console.warn('⚠️ Empty response from model');
-           const fallback = "No he podido generar una respuesta. ¿Podrías repetirlo?";
+           const fallback = t('live.fallbackResponse');
            setResponse(fallback);
            speechService.speak(fallback);
            fullReply = fallback;
@@ -284,7 +293,7 @@ export default function LiveMode() {
       } catch (e) {
         console.error('Error in conversation loop:', e);
         voiceState.value = 'idle';
-        const errorMsg = "Lo siento, hubo un error de conexión con el modelo.";
+        const errorMsg = t('live.errorConnection');
         setResponse(errorMsg);
         speechService.speak(errorMsg);
       }
@@ -297,9 +306,9 @@ export default function LiveMode() {
 
     return () => {
       active = false;
-      isVoiceModeEnabled.value = false; // Disable on exit
-      speechService.stopListening();
-      speechService.stopSpeaking();
+      // We do NOT stop listening/speaking here to allow "background mode" 
+      // and prevent state resets during accidental remounts.
+      // Explicit closing is handled by handleClose().
     };
   }, [isMuted, modelReady]);
 
@@ -324,10 +333,10 @@ export default function LiveMode() {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 text-white">
         <div className="bg-red-900/20 p-6 rounded-xl border border-red-500/50 max-w-md text-center">
-          <h3 className="text-xl font-bold text-red-400 mb-2">Error</h3>
+          <h3 className="text-xl font-bold text-red-400 mb-2">{t('live.errorTitle')}</h3>
           <p className="text-gray-300 mb-4">{loadingError}</p>
           <button onClick={handleClose} className="px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600">
-            Cerrar
+            {t('live.close')}
           </button>
         </div>
       </div>
@@ -336,10 +345,38 @@ export default function LiveMode() {
 
   if (!modelReady) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 text-white">
-        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
-        <h3 className="text-xl font-medium">Iniciando Modo Live...</h3>
-        <p className="text-gray-400 mt-2">Cargando modelo de voz (LFM2 Audio)</p>
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 text-white px-6">
+        <div className="w-full max-w-md space-y-6 text-center">
+          <div className="relative flex justify-center">
+             <Loader2 className="w-16 h-16 text-emerald-500 animate-spin" />
+             <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-emerald-400">
+               {Math.round(loadProgress)}%
+             </div>
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="text-xl font-medium">{t('live.title')}...</h3>
+            <p className="text-gray-400 text-sm">{t('live.loadingModel')}</p>
+          </div>
+
+          <div className="w-full space-y-2">
+            <ProgressBar 
+              progress={loadProgress} 
+              variant="default" 
+              size="lg" 
+              showPercentage={false}
+              className="text-emerald-500"
+            />
+            <div className="flex justify-between text-[10px] text-gray-500 uppercase tracking-widest font-bold">
+              <span>{loadMessage}</span>
+              <span>{Math.round(loadProgress)}%</span>
+            </div>
+          </div>
+          
+          <p className="text-xs text-gray-500 italic">
+            {t('live.firstTimeInfo')}
+          </p>
+        </div>
       </div>
     );
   }
@@ -359,7 +396,7 @@ export default function LiveMode() {
           <X className="w-6 h-6 text-gray-400" />
         </button>
         <div className="flex flex-col items-center">
-          <span className="text-sm font-bold text-emerald-500 uppercase tracking-widest">MODO LIVE</span>
+          <span className="text-sm font-bold text-emerald-500 uppercase tracking-widest">{t('live.title')}</span>
         </div>
         <button className="p-2 rounded-full hover:bg-gray-800 transition-colors">
           <Settings className="w-6 h-6 text-gray-400" />
@@ -372,13 +409,13 @@ export default function LiveMode() {
         {/* State Text */}
         <div className="mb-4 h-6 text-center">
              {voiceState.value === 'listening' && !isMuted && (
-               <span className="text-gray-400 text-sm tracking-wide animate-pulse">ESCUCHANDO...</span>
+               <span className="text-gray-400 text-sm tracking-wide animate-pulse">{t('live.listening')}</span>
              )}
              {voiceState.value === 'processing' && (
-               <span className="text-emerald-400 text-sm tracking-wide animate-pulse">PENSANDO...</span>
+               <span className="text-emerald-400 text-sm tracking-wide animate-pulse">{t('live.thinking')}</span>
              )}
              {isMuted && (
-               <span className="text-red-400 text-sm tracking-wide">MICRÓFONO DESACTIVADO</span>
+               <span className="text-red-400 text-sm tracking-wide">{t('live.micDisabled')}</span>
              )}
         </div>
 
@@ -419,7 +456,7 @@ export default function LiveMode() {
             ? 'bg-emerald-900/50 text-emerald-400 ring-1 ring-emerald-500/50' 
             : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
           }`}
-          title="Subtítulos"
+          title={t('live.subtitles')}
         >
           <Captions className="w-6 h-6" />
         </button>

@@ -14,6 +14,7 @@ class EngineManager {
   private static chatEngineInstance: WebLLMEngine | WllamaEngine | null = null;
   private static embeddingEngineInstance: WllamaEngine | null = null;
   private static liveEngineInstance: WllamaEngine | null = null; // Dedicated instance for Live Mode
+  private static liveInitializationPromise: Promise<WllamaEngine> | null = null;
   private static chatModelName: string = '';
   private static embeddingModelName: string = '';
   private static liveModelName: string = '';
@@ -115,24 +116,48 @@ class EngineManager {
     modelName: string = 'lfm-2-audio-1.5b',
     onProgress?: ProgressCallback
   ): Promise<WllamaEngine> {
+    // If initialization is already in progress, return the existing promise
+    if (this.liveInitializationPromise) {
+      console.log('⏳ Live engine initialization already in progress, waiting...');
+      return this.liveInitializationPromise;
+    }
+
     if (!this.liveEngineInstance) {
       console.log('🆕 Creating new Wllama LIVE engine instance');
       this.liveEngineInstance = new WllamaEngine();
     }
 
-    if (modelName !== this.liveModelName) {
+    if (modelName !== this.liveModelName || !this.liveEngineInstance.isReady()) {
       console.log(`🔄 Initializing LIVE engine with model: ${modelName}`);
+      
       const modelMeta = getModelById(modelName);
       if (!modelMeta || !modelMeta.ggufUrl) {
         throw new Error(`Live model ${modelName} not found or missing GGUF URL`);
       }
-      
-      await this.liveEngineInstance.initialize(modelMeta.ggufUrl, onProgress);
-      this.liveModelName = modelName;
-    }
 
-    if (!this.liveEngineInstance.isReady()) {
-      throw new Error('Live engine not initialized.');
+      // Create initialization promise
+      this.liveInitializationPromise = (async () => {
+        try {
+          // Double check if instance exists inside promise
+          if (!this.liveEngineInstance) {
+            this.liveEngineInstance = new WllamaEngine();
+          }
+          
+          await this.liveEngineInstance.initialize(modelMeta.ggufUrl, onProgress);
+          this.liveModelName = modelName;
+          
+          if (!this.liveEngineInstance.isReady()) {
+            throw new Error('Live engine failed to initialize properly.');
+          }
+          
+          return this.liveEngineInstance;
+        } finally {
+          // Clear promise when done (success or fail)
+          this.liveInitializationPromise = null;
+        }
+      })();
+
+      return this.liveInitializationPromise;
     }
 
     return this.liveEngineInstance;

@@ -15,6 +15,7 @@ class SpeechService {
   private currentLang: 'es-ES' | 'en-US' = 'es-ES';
   private currentCallback: ((text: string) => void) | null = null;
   private isExplicitlyStopped: boolean = false;
+  private activeUtterances: Set<SpeechSynthesisUtterance> = new Set();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -53,24 +54,34 @@ class SpeechService {
         const transcript = event.results[0][0].transcript;
         console.log('🎤 Result:', transcript);
         if (transcript && this.currentCallback) {
+          // Flag as explicitly stopped to prevent immediate race condition in onend
+          // The callback (LiveMode) will call stopListening() anyway, but this is a safety guard
+          this.isExplicitlyStopped = true;
           this.currentCallback(transcript);
         }
       };
 
       this.recognition.onend = () => {
-        console.log('🎤 Mic ended. State:', voiceState.value);
+        const stateAtEnd = voiceState.value;
+        console.log('🎤 Mic ended. State:', stateAtEnd);
         
-        // Only transition to idle if we weren't already moved to processing/speaking
-        if (voiceState.value === 'listening') {
+        // Only transition to idle if we were actually listening
+        if (stateAtEnd === 'listening') {
           voiceState.value = 'idle';
         }
 
         // Auto-restart logic for continuous mode
         if (isVoiceModeEnabled.value && !this.isExplicitlyStopped) {
-          // Don't restart if AI is speaking or processing
+          // CRITICAL: Only restart if the state is idle.
+          // If it's 'processing' or 'speaking', it means the AI is working or replying.
           if (voiceState.value === 'idle') {
-            console.log('🎤 Auto-restarting...');
-            setTimeout(() => this.startListening(), 100);
+            setTimeout(() => {
+              // Double check after delay to allow state transitions to settle
+              if (isVoiceModeEnabled.value && !this.isExplicitlyStopped && voiceState.value === 'idle') {
+                console.log('🎤 Auto-restarting...');
+                this.startListening();
+              }
+            }, 150);
           }
         }
       };
@@ -110,6 +121,9 @@ class SpeechService {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = this.currentLang;
     
+    // Guardar referencia para evitar GC
+    this.activeUtterances.add(utterance);
+
     // Improved voice selection
     let voice = this.voices.find(v => 
       v.lang.startsWith(this.currentLang.split('-')[0]) && 
@@ -126,6 +140,7 @@ class SpeechService {
 
     utterance.onend = () => {
       console.log('🔊 TTS Finished');
+      this.activeUtterances.delete(utterance);
       voiceState.value = 'idle';
       // Restart listening after speaking
       if (isVoiceModeEnabled.value) {
@@ -135,6 +150,7 @@ class SpeechService {
     };
 
     utterance.onerror = () => {
+      this.activeUtterances.delete(utterance);
       voiceState.value = 'idle';
     };
 
@@ -145,13 +161,11 @@ class SpeechService {
    * Habla un fragmento de texto sin cancelar lo que ya se está hablando.
    */
   speakFragment(text: string, isLastChunk: boolean = false) {
-    if (!this.synthesis || !text.trim()) {
+    if (!this.synthesis) return;
+
+    if (!text.trim()) {
       if (isLastChunk && isVoiceModeEnabled.value) {
-        setTimeout(() => {
-          if (voiceState.value === 'idle') {
-             this.startListening();
-          }
-        }, 500);
+        this.ensureListeningRestarts();
       }
       return;
     }
@@ -161,6 +175,9 @@ class SpeechService {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = this.currentLang;
     
+    // Guardar referencia para evitar GC
+    this.activeUtterances.add(utterance);
+
     let voice = this.voices.find(v => 
       v.lang.startsWith(this.currentLang.split('-')[0]) && 
       (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Premium'))
@@ -175,6 +192,7 @@ class SpeechService {
     utterance.pitch = 1.0;
 
     utterance.onend = () => {
+      this.activeUtterances.delete(utterance);
       if (isLastChunk) {
         console.log('🔊 Final TTS Fragment Finished');
         voiceState.value = 'idle';
@@ -186,15 +204,35 @@ class SpeechService {
     };
 
     utterance.onerror = () => {
+      this.activeUtterances.delete(utterance);
       if (isLastChunk) voiceState.value = 'idle';
     };
 
     this.synthesis.speak(utterance);
   }
 
+  private ensureListeningRestarts() {
+    const check = () => {
+      // Si ya no está hablando, podemos reiniciar
+      if (!this.synthesis?.speaking) {
+        console.log('🔊 Queue finished (polled), restarting listening');
+        voiceState.value = 'idle';
+        if (isVoiceModeEnabled.value) {
+          this.isExplicitlyStopped = false;
+          this.startListening();
+        }
+      } else {
+        // Seguir esperando
+        setTimeout(check, 250);
+      }
+    };
+    check();
+  }
+
   stopSpeaking() {
     if (this.synthesis) {
       this.synthesis.cancel();
+      this.activeUtterances.clear();
     }
   }
 
@@ -202,6 +240,13 @@ class SpeechService {
 
   startListening(onResult?: (text: string) => void) {
     if (!this.recognition) return;
+
+    // Safety guard: Don't start listening if we are processing or speaking
+    // This prevents race conditions where an old onend timer fires late
+    if (voiceState.value === 'processing' || voiceState.value === 'speaking') {
+        console.warn('[SpeechService] startListening blocked because state is', voiceState.value);
+        return;
+    }
 
     this.isExplicitlyStopped = false;
 
@@ -220,14 +265,14 @@ class SpeechService {
     }
   }
 
-  stopListening() {
+  stopListening(nextState: VoiceState = 'idle') {
     this.isExplicitlyStopped = true;
     if (this.recognition) {
       try {
         this.recognition.stop();
       } catch (e) {}
     }
-    voiceState.value = 'idle';
+    voiceState.value = nextState;
   }
 
   toggleVoiceMode() {
