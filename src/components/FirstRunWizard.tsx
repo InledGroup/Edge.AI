@@ -47,6 +47,7 @@ type WizardStep = 'welcome' | 'detecting' | 'model-selection' | 'loading' | 'ext
 interface LoadingProgress {
   chat: { progress: number; message: string } | null;
   embedding: { progress: number; message: string } | null;
+  tool: { progress: number; message: string } | null;
 }
 
 export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
@@ -58,7 +59,8 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
   const [selectedEmbeddingModel, setSelectedEmbeddingModel] = useState<ModelMetadata | null>(null);
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress>({
     chat: null,
-    embedding: null
+    embedding: null,
+    tool: null
   });
   const [error, setError] = useState<string | null>(null);
   const [chatModelFilter, setChatModelFilter] = useState<'all' | 'gpu' | 'cpu'>('all');
@@ -126,6 +128,9 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       // Especially critical on mobile devices where OPFS resources are limited
       await loadChatModel(selectedChatModel);
       await loadEmbeddingModel(selectedEmbeddingModel);
+      
+      // Auto-load specialized tool model (LiquidAI LFM2-Tool)
+      await loadToolModel();
 
       // Save defaults
       saveDefaultChatModel(selectedChatModel.id);
@@ -137,6 +142,20 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       console.error('Failed to load models:', err);
       setError(`${i18nStore.t('wizard.errorLoading')}: ${err instanceof Error ? err.message : 'Error unknown'}`);
       setStep('model-selection'); // Go back
+    }
+  }
+
+  async function loadToolModel() {
+    try {
+      await EngineManager.getToolEngine((progress, status) => {
+        setLoadingProgress(prev => ({
+          ...prev,
+          tool: { progress, message: status }
+        }));
+      });
+    } catch (err) {
+      console.error('Failed to load specialized tool model:', err);
+      // Tool model is recommended but not strictly required for core chat
     }
   }
 
@@ -640,6 +659,22 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                   progress={loadingProgress.embedding.progress}
                   label={loadingProgress.embedding.message}
                   size="md"
+                />
+              </div>
+            )}
+
+            {/* Tool Model Progress */}
+            {loadingProgress.tool && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-emerald-500 flex items-center gap-2">
+                  <Zap size={14} />
+                  MCP Tooling Support
+                </div>
+                <ProgressBar
+                  progress={loadingProgress.tool.progress}
+                  label={loadingProgress.tool.message}
+                  size="md"
+                  variant="primary"
                 />
               </div>
             )}

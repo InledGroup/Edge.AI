@@ -175,6 +175,7 @@ export const translations = {
       embedding: 'Generando embeddings',
       vector_search: 'Buscando relevancia',
       answer_generation: 'Generando respuesta',
+      searching: 'Ejecutando herramienta',
       completed: 'Completado',
       error: 'Error'
     },
@@ -393,6 +394,34 @@ export const translations = {
       errorConnection: 'Lo siento, hubo un error de conexión con el modelo.',
       fallbackResponse: 'No he podido generar una respuesta. ¿Podrías repetirlo?',
       systemPrompt: 'Eres una IA en modo conversación por voz. Responde de forma concisa, natural y DIRECTA. NO uses markdown, ni asteriscos, ni listas, ni formatos especiales. Solo texto plano que sea fácil de leer en voz alta. Evita frases largas.'
+    },
+    mcp: {
+      title: 'Servidores MCP',
+      subtitle: 'Conecta con servidores del Model Context Protocol para extender capacidades',
+      addServer: 'Añadir nuevo servidor',
+      editServer: 'Editar servidor',
+      name: 'Nombre (código corto)',
+      transport: 'Transporte',
+      url: 'URL del servidor',
+      headers: 'Cabeceras HTTP (para Auth)',
+      addHeader: 'Añadir cabecera',
+      noHeaders: 'No hay cabeceras configuradas',
+      active: 'Activo',
+      error: 'Error',
+      noServers: 'No hay servidores MCP conectados',
+      connectFirst: 'Conecta tu primer servidor',
+      viewTools: 'Ver herramientas',
+      toolsFor: 'Herramientas para {name}',
+      noTools: 'No se encontraron herramientas para este servidor.',
+      specializedEngine: 'Motor de Herramientas Especializado',
+      specializedDesc: 'Usa LFM2-Tool para una ejecución de MCP más fiable y rápida.',
+      toolResult: 'Resultado de {name}',
+      using: 'Usando: {name}',
+      tipStreamable: 'Consejo: Para Streamable HTTP, asegúrate de que la URL sea correcta (ej. termina en /sse o /mcp)',
+      placeholderName: 'ej. weather',
+      cancel: 'Cancelar',
+      connect: 'Conectar servidor',
+      update: 'Actualizar servidor'
     }
   },
   en: {
@@ -571,6 +600,7 @@ export const translations = {
       embedding: 'Generating embeddings',
       vector_search: 'Searching relevance',
       answer_generation: 'Generating answer',
+      searching: 'Executing tool',
       completed: 'Completed',
       error: 'Error'
     },
@@ -789,6 +819,34 @@ export const translations = {
       errorConnection: 'Sorry, there was a connection error with the model.',
       fallbackResponse: 'I could not generate a response. Could you repeat that?',
       systemPrompt: 'You are an AI in voice conversation mode. Respond concisely, naturally and DIRECTLY. DO NOT use markdown, asterisks, lists, or special formatting. Only plain text that is easy to read aloud. Avoid long sentences.'
+    },
+    mcp: {
+      title: 'MCP Servers',
+      subtitle: 'Connect to Model Context Protocol servers to extend capabilities',
+      addServer: 'Add New Server',
+      editServer: 'Edit Server',
+      name: 'Name (short code)',
+      transport: 'Transport',
+      url: 'Server URL',
+      headers: 'HTTP Headers (for Auth)',
+      addHeader: 'Add Header',
+      noHeaders: 'No custom headers configured',
+      active: 'Active',
+      error: 'Error',
+      noServers: 'No MCP servers connected',
+      connectFirst: 'Connect your first server',
+      viewTools: 'View Tools',
+      toolsFor: 'Tools for {name}',
+      noTools: 'No tools found for this server.',
+      specializedEngine: 'Specialized Tool Engine',
+      specializedDesc: 'Use LFM2-Tool for a more reliable and faster MCP execution.',
+      toolResult: 'Result from {name}',
+      using: 'Using: {name}',
+      tipStreamable: 'Tip: For Streamable HTTP, ensure the URL is correct (e.g., ending in /sse or /mcp)',
+      placeholderName: 'e.g. weather',
+      cancel: 'Cancel',
+      connect: 'Connect Server',
+      update: 'Update Server'
     }
   }
 };

@@ -4,26 +4,15 @@
 import * as webllm from '@mlc-ai/web-llm';
 import { probeActualLimits, getWebGPUConfig } from './gpu-limits';
 import { i18nStore } from '../stores/i18n';
-
-/**
- * Get all available model IDs from the current WebLLM version
- */
-export function getAvailableModelIds(): string[] {
-  try {
-    const models = webllm.prebuiltAppConfig.model_list.map((model) => model.model_id);
-    console.log('📋 Available WebLLM models:', models);
-    return models;
-  } catch (error) {
-    console.error('Failed to get available models:', error);
-    return [];
-  }
-}
+import { getModelById } from './model-registry';
 
 export interface GenerationOptions {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
   stop?: string[];
+  tools?: any[];
+  tool_choice?: any;
   onStream?: (chunk: string) => void;
 }
 
@@ -33,7 +22,6 @@ export interface ProgressCallback {
 
 /**
  * WebLLM Engine for local AI inference
- * Requires WebGPU - no CPU fallback
  */
 export class WebLLMEngine {
   private engine: webllm.MLCEngine | null = null;
@@ -45,355 +33,239 @@ export class WebLLMEngine {
     console.log('🤖 WebLLM Engine created');
   }
 
-  /**
-   * Initialize the WebLLM engine with a specific model
-   * REQUIRES WebGPU - throws error if not available
-   */
-  async initialize(
-    modelName: string,
-    onProgress?: ProgressCallback
-  ): Promise<void> {
-    if (this.isInitialized && this.modelName === modelName) {
-      console.log('✅ WebLLM already initialized with', modelName);
-      return;
-    }
-
+  async initialize(modelName: string, onProgress?: ProgressCallback): Promise<void> {
+    if (this.isInitialized && this.modelName === modelName) return;
     try {
-      console.log('🚀 Initializing WebLLM with model:', modelName);
+      console.log('🚀 Initializing WebLLM:', modelName);
       onProgress?.(0, i18nStore.t('models.progress.initializing'));
-
-      // Probe actual GPU limits
       const gpuLimits = await probeActualLimits();
-      if (!gpuLimits) {
-        throw new Error('WebGPU is required for WebLLM but is not available');
-      }
+      if (!gpuLimits) throw new Error('WebGPU not available');
 
-      console.log('✅ WebGPU available, using GPU backend');
-      console.log(`🎯 GPU Tier: ${gpuLimits.tier.toUpperCase()}`);
-
-      onProgress?.(10, i18nStore.t('models.progress.backendGpu'));
-
-      // Get optimal WebGPU configuration based on GPU tier
       const webgpuConfig = getWebGPUConfig(gpuLimits.tier);
       
-      // Override config for embedding models (Snowflake Arctic)
-      // WebLLM Embedding requires context_window_size === prefill_chunk_size
       const isEmbeddingModel = modelName.toLowerCase().includes('embed');
       const overrideConfig = isEmbeddingModel 
         ? {
-            context_window_size: 512, // Force small context for embeddings
-            // @ts-ignore
-            prefill_chunk_size: 512,  // Must match context window
-            max_batch_size: 32        // Keep batch size reasonable
+            context_window_size: 512,
+            prefill_chunk_size: 512,
           }
         : {
             context_window_size: webgpuConfig.max_window_size,
-            // @ts-ignore
-            max_batch_size: webgpuConfig.max_batch_size,
           };
 
-      console.log('⚙️ WebGPU config:', { ...webgpuConfig, ...overrideConfig });
-
-      // Create MLCEngine instance - requires WebGPU
       this.engine = new webllm.MLCEngine();
-
-      onProgress?.(20, i18nStore.t('models.progress.verifyingCache'));
-
-      // Load the model with optimized configuration
-      // WebLLM automatically uses IndexedDB cache for models
-      console.log(`💾 [WebLLM] Checking IndexedDB cache for model: ${modelName}`);
-      const loadStartTime = Date.now();
-      let firstProgressTime = 0;
-
       await this.engine.reload(modelName, {
         ...overrideConfig,
-        // @ts-ignore - initProgressCallback exists but might not be in types
         initProgressCallback: (report: webllm.InitProgressReport) => {
-          if (firstProgressTime === 0) {
-            firstProgressTime = Date.now();
-          }
-
-          const progress = Math.round(report.progress * 70) + 20; // 20-90%
-          let status = report.text || i18nStore.t('models.progress.downloading');
-
-          // Detect cache usage based on progress speed
-          const elapsed = Date.now() - loadStartTime;
-          const isLikelyFromCache = elapsed < 3000 && report.progress > 0.1;
-
-          if (isLikelyFromCache && !status.includes('caché') && !status.includes('cache')) {
-            status += ' ' + i18nStore.t('models.progress.fromCache') + ' IndexedDB ⚡';
-          } else if (!isLikelyFromCache && report.text?.includes('download')) {
-             // Keep original text but append localized note if needed, 
-             // but usually report.text is English. We might want to just show status.
-             // For now, let's leave report.text if it exists, as it contains details.
-          }
-
-          onProgress?.(progress, status);
-          console.log(`[WebLLM] ${Math.round(report.progress * 100)}% - ${report.text}`);
+          const progress = Math.round(report.progress * 70) + 20;
+          onProgress?.(progress, report.text || i18nStore.t('models.progress.downloading'));
         },
       });
 
-      const loadTime = Date.now() - loadStartTime;
-      if (loadTime < 10000) {
-        console.log(`⚡ [WebLLM] Model loaded in ${Math.round(loadTime / 1000)}s - likely from IndexedDB cache!`);
-      } else {
-        console.log(`📥 [WebLLM] Model downloaded and cached in ${Math.round(loadTime / 1000)}s`);
-      }
-      console.log('✅ WebLLM model loaded successfully');
-
-      // WARM-UP: Generate 1 token to initialize GPU pipeline
-      console.log('🔥 Warming up GPU pipeline...');
-      onProgress?.(95, i18nStore.t('models.progress.warmingUp'));
-
-      if (isEmbeddingModel) {
-        // Warm up embedding pipeline
-        // @ts-ignore
-        if (this.engine.embeddings) {
-           // @ts-ignore
-           await this.engine.embeddings.create({
-             input: "warmup",
-             model: modelName
-           });
-        }
-      } else {
-        // Warm up chat pipeline
-        await this.engine.chat.completions.create({
-          messages: [{ role: 'user', content: 'Hi' }],
-          max_tokens: 1,
-          temperature: 0.7,
-        });
-      }
-
-      console.log('✅ Model warmed up, ready for inference');
-
       this.modelName = modelName;
       this.isInitialized = true;
-
-      console.log(`✅ WebLLM initialized successfully with ${this.backend.toUpperCase()}`);
-      onProgress?.(100, i18nStore.t('models.progress.modelReady') + ' (GPU)');
+      onProgress?.(100, i18nStore.t('models.progress.modelReady'));
     } catch (error) {
-      console.error('❌ Failed to initialize WebLLM:', error);
+      console.error('❌ WebLLM Error:', error);
       this.isInitialized = false;
-      throw new Error(
-        `Failed to initialize WebLLM: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  /**
-   * Generate embeddings for a text (for semantic search)
-   * WebLLM now supports embeddings via the embeddings.create API
-   */
-  async generateEmbedding(text: string): Promise<Float32Array> {
-    if (!this.isInitialized || !this.engine) {
-      throw new Error('WebLLM engine not initialized');
-    }
-
-    try {
-      console.log(`🔢 Generating embedding for ${text.length} chars (WebGPU)...`);
-      const startTime = Date.now();
-
-      // Check if engine supports embeddings
-      // @ts-ignore
-      if (!this.engine.embeddings) {
-        throw new Error('This WebLLM version or model does not support embeddings');
-      }
-
-      // @ts-ignore
-      const response = await this.engine.embeddings.create({
-        input: text,
-        model: this.modelName
-      });
-
-      const embedding = response.data[0].embedding;
-      const result = new Float32Array(embedding);
-
-      const elapsed = Date.now() - startTime;
-      console.log(`✅ Embedding generated in ${elapsed}ms (GPU)`);
-
-      return result;
-    } catch (error) {
-      console.error('❌ WebLLM embedding failed:', error);
       throw error;
     }
   }
 
-  /**
-   * Generate embeddings in batch
-   */
-  async generateEmbeddingsBatch(
-    texts: string[],
-    maxConcurrent = 4, // Ignored for WebLLM as we send full batch
-    onProgress?: (progress: number, status: string) => void
-  ): Promise<Float32Array[]> {
-    if (!this.isInitialized || !this.engine) {
-      throw new Error('WebLLM engine not initialized');
-    }
+  async chat(messages: any[], options: GenerationOptions = {}): Promise<any> {
+    if (!this.isInitialized || !this.engine) throw new Error('WebLLM not initialized');
+    const { temperature = 0.7, maxTokens = 512, topP = 0.95, stop, tools, onStream } = options;
 
     try {
-      console.log(`🔢 Generating ${texts.length} embeddings in batch (WebGPU)...`);
-      const startTime = Date.now();
-
-      // @ts-ignore
-      if (!this.engine.embeddings) {
-        throw new Error('This WebLLM version or model does not support embeddings');
-      }
-
-      // WebLLM supports batch input directly
-      // @ts-ignore
-      const response = await this.engine.embeddings.create({
-        input: texts,
-        model: this.modelName
+      const nativeToolModels = ['Hermes-2-Pro', 'Hermes-3', 'Llama-3.1-8B-Instruct'];
+      const supportsNativeTools = nativeToolModels.some(m => this.modelName.includes(m));
+      
+      let useNativeTools = supportsNativeTools && !!tools;
+      
+      // ALWAYS map 'tool' role to 'user' if not using native tools, 
+      // regardless of whether we are currently requesting tools or summarizing.
+      let processedMessages = messages.map(m => {
+        if (!useNativeTools && m.role === 'tool') {
+          return {
+            role: 'user',
+            content: `[TOOL RESULT]: ${m.content}`
+          };
+        }
+        return m;
       });
 
-      // Map responses to Float32Array
-      // @ts-ignore
-      const results = response.data.map((item: any) => new Float32Array(item.embedding));
+      if (!useNativeTools && tools && tools.length > 0) {
+        console.log('🛠️ WebLLM: Using aggressive prompt tool calling');
+        const toolSignatures = tools.map((t: any) => {
+          const props = t.function?.parameters?.properties || t.parameters?.properties || {};
+          const argList = Object.keys(props).join(', ');
+          return `- ${t.function?.name || t.name}(${argList}): ${t.function?.description || t.description || ''}`;
+        }).join('\n');
 
-      const elapsed = Date.now() - startTime;
-      console.log(`✅ Generated ${texts.length} embeddings in ${elapsed}ms (GPU Batch)`);
-      
-      return results;
-    } catch (error) {
-      console.error('❌ WebLLM batch embedding failed:', error);
-      
-      // Fallback: Process one by one if batch fails
-      console.warn('⚠️ Batch failed, trying sequential processing...');
-      const results: Float32Array[] = [];
-      for (let i = 0; i < texts.length; i++) {
-        const res = await this.generateEmbedding(texts[i]);
-        results.push(res);
-        onProgress?.(Math.round(((i + 1) / texts.length) * 100), `${i18nStore.t('models.progress.embeddings')}: ${i + 1}/${texts.length}`);
+        const toolSystemPrompt = `### CRITICAL PROTOCOL: TOOL CALLING
+You have access to these FUNCTIONS:
+${toolSignatures}
+
+To use a function, you MUST respond ONLY with a JSON object:
+{ "tool": "function_name", "args": { "key": "value" } }
+
+RULES:
+- Respond ONLY with JSON if a function is needed.
+- NO conversational text.
+- NO markdown blocks.
+- If NO function is needed, reply normally.
+
+EXAMPLE:
+User: "list items"
+Assistant: {"tool": "some__list_items", "args": {}}`;
+        
+        const sysIndex = processedMessages.findIndex(m => m.role === 'system');
+        if (sysIndex >= 0) processedMessages[sysIndex].content = `${toolSystemPrompt}\n\n${processedMessages[sysIndex].content}`;
+        else processedMessages.unshift({ role: 'system', content: toolSystemPrompt });
       }
-      return results;
-    }
-  }
 
-  /**
-   * Generate text response using WebLLM
-   * Supports streaming for better UX
-   */
-  async generateText(
-    input: string | { role: string; content: string | any[] }[],
-    options: GenerationOptions = {}
-  ): Promise<string> {
-    if (!this.isInitialized || !this.engine) {
-      throw new Error('WebLLM engine not initialized');
-    }
-
-    const {
-      temperature = 0.7,
-      maxTokens = 512,
-      topP = 0.95,
-      stop,
-      onStream,
-    } = options;
-
-    try {
-      console.log('💬 Generating text with WebLLM...');
-
-      // Prepare messages
-      const messages = Array.isArray(input) 
-        ? input 
-        : [{ role: 'user', content: input }];
-
-      // @ts-ignore - WebLLM types might be strict about role strings
-      const chatMessages = messages.map(m => ({ role: m.role, content: m.content }));
+      let finalMessage: any = { role: 'assistant', content: '' };
 
       if (onStream) {
-        // Streaming mode
-        let fullResponse = '';
-
         const completion = await this.engine.chat.completions.create({
-          messages: chatMessages as any, // Cast to any to allow mixed content types
-          temperature,
+          messages: processedMessages as any,
+          temperature: useNativeTools ? temperature : 0.1,
           max_tokens: maxTokens,
           top_p: topP,
-          stop, // Pass stop tokens
+          stop: useNativeTools ? stop : ['<|end_of_text|>', '<|im_end|>', '```'],
+          tools: useNativeTools ? tools : undefined,
           stream: true,
         });
 
         for await (const chunk of completion) {
-          const content = chunk.choices[0]?.delta?.content || '';
-          if (content) {
-            fullResponse += content;
-            onStream(content);
+          const delta = chunk.choices[0]?.delta;
+          if (delta) {
+             if (delta.content) {
+               finalMessage.content += delta.content;
+               onStream(delta.content);
+             }
+             if (delta.tool_calls) {
+               if (!finalMessage.tool_calls) finalMessage.tool_calls = [];
+               for (const tc of delta.tool_calls) {
+                  const idx = tc.index;
+                  if (!finalMessage.tool_calls[idx]) finalMessage.tool_calls[idx] = { id: tc.id || '', type: 'function', function: { name: '', arguments: '' } };
+                  if (tc.function?.name) finalMessage.tool_calls[idx].function.name += tc.function.name;
+                  if (tc.function?.arguments) finalMessage.tool_calls[idx].function.arguments += tc.function.arguments;
+               }
+             }
           }
         }
-
-        console.log('✅ Generated', fullResponse.length, 'characters');
-        return fullResponse;
       } else {
-        // Non-streaming mode
         const response = await this.engine.chat.completions.create({
-          messages: chatMessages as any,
-          temperature,
+          messages: processedMessages as any,
+          temperature: useNativeTools ? temperature : 0.1,
           max_tokens: maxTokens,
           top_p: topP,
-          stop, // Pass stop tokens
+          stop: useNativeTools ? stop : ['<|end_of_text|>', '<|im_end|>', '```'],
+          tools: useNativeTools ? tools : undefined,
           stream: false,
         });
-
-        const generatedText = response.choices[0]?.message?.content || '';
-        console.log('✅ Generated', generatedText.length, 'characters');
-        return generatedText;
+        const msg = response.choices[0]?.message;
+        finalMessage.content = msg?.content || '';
+        finalMessage.tool_calls = msg?.tool_calls;
       }
+
+      if (!useNativeTools && finalMessage.content.includes('{')) {
+         const tc = this.extractToolCall(finalMessage.content);
+         if (tc) {
+            finalMessage.tool_calls = [tc];
+            finalMessage.content = '';
+         }
+      }
+      return finalMessage;
     } catch (error) {
-      console.error('❌ Text generation failed:', error);
-      throw new Error(
-        `Failed to generate text: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      console.error('❌ Chat completion failed:', error);
+      throw error;
     }
   }
 
-  /**
-   * Get the current backend being used
-   */
-  getBackend(): 'webgpu' {
-    return this.backend;
+  private extractToolCall(text: string): any | null {
+    const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace <= firstBrace) return null;
+
+    for (let i = lastBrace; i > firstBrace; i--) {
+      if (cleaned[i] === '}') {
+        const candidate = cleaned.substring(firstBrace, i + 1);
+        try {
+          const data = JSON.parse(candidate);
+          if (data.tool) return {
+            id: 'call_' + Math.random().toString(36).substr(2, 9),
+            type: 'function',
+            function: { name: data.tool, arguments: typeof data.args === 'string' ? data.args : JSON.stringify(data.args || {}) }
+          };
+        } catch (e) {}
+      }
+    }
+    return null;
   }
 
-  /**
-   * Check if the engine is initialized
-   */
-  isReady(): boolean {
-    return this.isInitialized && this.engine !== null;
-  }
-
-  /**
-   * Get the current model name
-   */
-  getModelName(): string {
-    return this.modelName;
-  }
-
-  /**
-   * Reset/unload the model (free memory)
-   */
-  async reset(): Promise<void> {
-    if (this.engine) {
-      console.log('🔄 Resetting WebLLM engine...');
-      // WebLLM doesn't have an explicit unload, but we can recreate the engine
-      this.engine = null;
-      this.isInitialized = false;
-      this.modelName = '';
-      console.log('✅ WebLLM engine reset');
+  async generateText(input: string | { role: string; content: string | any[] }[], options: GenerationOptions = {}): Promise<string> {
+    if (!this.isInitialized || !this.engine) throw new Error('WebLLM not initialized');
+    
+    let messages = Array.isArray(input) ? input : [{ role: 'user', content: input }];
+    
+    // Fix for "Role is not supported: tool" in generateText
+    // Map tool outputs to user messages for non-native models
+    const nativeToolModels = ['Hermes-2-Pro', 'Hermes-3', 'Llama-3.1-8B-Instruct'];
+    const supportsNativeTools = nativeToolModels.some(m => this.modelName.includes(m));
+    
+    if (!supportsNativeTools) {
+      messages = messages.map(m => {
+        if (m.role === 'tool') {
+          return { role: 'user', content: `[TOOL RESULT]: ${m.content}` };
+        }
+        return m;
+      });
+    }
+    
+    if (options.onStream) {
+      let fullResponse = '';
+      const completion = await this.engine.chat.completions.create({ 
+        messages: messages as any, 
+        ...options, 
+        stream: true 
+      });
+      for await (const chunk of completion) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          fullResponse += content;
+          options.onStream(content);
+        }
+      }
+      return fullResponse;
+    } else {
+      const response = await this.engine.chat.completions.create({ 
+        messages: messages as any, 
+        ...options, 
+        stream: false 
+      });
+      return response.choices[0]?.message?.content || '';
     }
   }
 
-  /**
-   * Get runtime statistics (if available)
-   */
-  async getRuntimeStats(): Promise<any> {
-    if (!this.engine) return null;
-
-    try {
-      // @ts-ignore - runtimeStatsText might not be in types
-      const stats = await this.engine.runtimeStatsText?.();
-      return stats;
-    } catch (error) {
-      console.warn('Could not get runtime stats:', error);
-      return null;
-    }
+  async generateEmbedding(text: string): Promise<Float32Array> {
+    if (!this.isInitialized || !this.engine) throw new Error('WebLLM not initialized');
+    // @ts-ignore
+    const res = await this.engine.embeddings.create({ input: text });
+    return new Float32Array(res.data[0].embedding);
   }
+
+  async generateEmbeddingsBatch(texts: string[], maxConcurrent = 4, onProgress?: any): Promise<Float32Array[]> {
+    if (!this.isInitialized || !this.engine) throw new Error('WebLLM not initialized');
+    // @ts-ignore
+    const res = await this.engine.embeddings.create({ input: texts });
+    return res.data.map((item: any) => new Float32Array(item.embedding));
+  }
+
+  getBackend(): 'webgpu' { return this.backend; }
+  isReady(): boolean { return this.isInitialized && this.engine !== null; }
+  getModelName(): string { return this.modelName; }
+  async reset() { this.engine = null; this.isInitialized = false; }
 }

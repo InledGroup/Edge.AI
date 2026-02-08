@@ -141,6 +141,7 @@ export interface Settings {
   // Browser extension settings
   extensionId?: string; // Browser extension ID for web search
   extensionEnabled?: boolean; // Whether to use extension for searches
+  useSpecializedToolModel?: boolean; // Whether to use LFM2-Tool for MCP requests
 }
 
 /**
@@ -223,4 +224,20 @@ export interface ExportData {
   embeddings: StoredEmbedding[];
   conversations: Conversation[];
   settings: Settings;
+  mcp_servers: MCPServer[];
+}
+
+/**
+ * MCP Server Configuration
+ */
+export interface MCPServer {
+  id: string;
+  name: string; // Short name for invocation (e.g. "weather")
+  url: string;
+  transport: 'http' | 'websocket';
+  headers?: Record<string, string>;
+  enabled: boolean;
+  status: 'connected' | 'disconnected' | 'error';
+  errorMessage?: string;
+  createdAt: number;
 }

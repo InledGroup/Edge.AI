@@ -315,9 +315,13 @@ export async function initializeStores() {
     const { getConversationsSorted } = await import('@/lib/db/conversations');
     const { getSetting } = await import('@/lib/db/settings');
     const { i18nStore } = await import('@/lib/stores/i18n');
+    const { mcpManager } = await import('@/lib/ai/mcp-manager');
 
     // Initialize language
     await i18nStore.init();
+
+    // Initialize MCP Manager
+    await mcpManager.initialize();
 
     // Load documents
     const documents = await getAllDocuments();

@@ -28,6 +28,7 @@ import {
 import type { Conversation } from '@/types';
 import { ModelConfigMenu } from './ModelConfigMenu';
 import { MemoryManager } from './MemoryManager';
+import { MCPSettings } from './mcp/MCPSettings';
 
 interface SidebarProps {
   onDocumentClick?: (documentId: string) => void;
@@ -40,6 +41,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
   const [isOpen, setIsOpen] = useState(true);
   const [showDocuments, setShowDocuments] = useState(false);
   const [showMemoryManager, setShowMemoryManager] = useState(false);
+  const [showMCPSettings, setShowMCPSettings] = useState(false);
 
   // Subscribe to language changes for re-rendering
   const lang = languageSignal.value;
@@ -129,6 +131,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
   return (
     <>
       {showMemoryManager && <MemoryManager onClose={() => setShowMemoryManager(false)} />}
+      {showMCPSettings && <MCPSettings onClose={() => setShowMCPSettings(false)} />}
       
       {/* Mobile toggle button */}
       <button
@@ -271,6 +274,14 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
         {/* Bottom Actions */}
         <div className="border-t border-[var(--color-border)] p-3 space-y-2">
           
+          <button
+            onClick={() => setShowMCPSettings(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          >
+            <Settings size={16} />
+            <span>MCP Servers</span>
+          </button>
+
           <button
             onClick={() => setShowMemoryManager(true)}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"

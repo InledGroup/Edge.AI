@@ -1,12 +1,14 @@
 // ChatInput Component - Message input with auto-resize
 
 import { useState, useRef, useEffect } from 'preact/hooks';
-import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle, AudioWaveform, MoreHorizontal } from 'lucide-preact';
+import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle, AudioWaveform, MoreHorizontal, Server } from 'lucide-preact';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import { uiStore, uiSignal } from '@/lib/stores';
 import { speechService, voiceState, isVoiceModeEnabled } from '@/lib/voice/speech-service';
+import { getEnabledMCPServers } from '@/lib/db/mcp';
+import type { MCPServer } from '@/types';
 
 export interface ChatInputProps {
   onSend: (message: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[]) => void;
@@ -31,6 +33,9 @@ export function ChatInput({
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [mode, setMode] = useState<'web' | 'local' | 'smart' | 'conversation'>('conversation');
   const [showMenu, setShowMenu] = useState(false);
+  const [mcpServers, setMcpServers] = useState<MCPServer[]>([]);
+  const [showMCPAutocomplete, setShowMCPAutocomplete] = useState(false);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -58,6 +63,16 @@ export function ChatInput({
     if (textarea) {
       textarea.style.height = 'auto';
       textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+    }
+
+    // MCP Autocomplete Logic
+    if (message.startsWith('/') && !message.includes(' ')) {
+      if (mcpServers.length === 0) {
+        getEnabledMCPServers().then(setMcpServers);
+      }
+      setShowMCPAutocomplete(true);
+    } else {
+      setShowMCPAutocomplete(false);
     }
   }, [message]);
 
@@ -138,8 +153,36 @@ export function ChatInput({
     }
   }
 
+  const mcpMatches = mcpServers.filter(s => 
+    ('/' + s.name).toLowerCase().startsWith(message.toLowerCase())
+  );
+
   return (
     <form onSubmit={handleSubmit} className="relative">
+      {/* MCP Autocomplete Popup */}
+      {showMCPAutocomplete && mcpMatches.length > 0 && (
+        <div className="absolute bottom-full left-0 mb-2 w-64 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="px-3 py-2 text-xs font-medium text-[var(--color-text-secondary)] bg-[var(--color-bg-tertiary)]/50 border-b border-[var(--color-border)]">
+            MCP Servers
+          </div>
+          {mcpMatches.map(server => (
+            <button
+              key={server.id}
+              type="button"
+              onClick={() => {
+                setMessage('/' + server.name + ' ');
+                setShowMCPAutocomplete(false);
+                textareaRef.current?.focus();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors text-left"
+            >
+              <Server size={14} className="text-[var(--color-primary)]" />
+              <span>{server.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Mode indicator */}
       <div className="mb-2 px-3 py-1.5 rounded-lg flex items-center justify-between text-sm transition-all"
         style={{

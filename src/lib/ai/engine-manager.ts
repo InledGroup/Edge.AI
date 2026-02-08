@@ -1,296 +1,167 @@
 // Engine Manager - Singleton pattern for AI model instances
-// Ensures models are initialized once and reused across the app
-
 import { WebLLMEngine } from './webllm-engine';
 import { WllamaEngine } from './wllama-engine';
 import type { ProgressCallback } from './webllm-engine';
 import { getModelById } from './model-registry';
+import { modelsStore } from '../stores';
 
-/**
- * Global singleton instances of AI engines
- * These are shared across the entire application
- */
-class EngineManager {
-  private static chatEngineInstance: WebLLMEngine | WllamaEngine | null = null;
-  private static embeddingEngineInstance: WllamaEngine | null = null;
-  private static liveEngineInstance: WllamaEngine | null = null; // Dedicated instance for Live Mode
-  private static liveInitializationPromise: Promise<WllamaEngine> | null = null;
-  private static chatModelName: string = '';
-  private static embeddingModelName: string = '';
-  private static liveModelName: string = '';
+let chatEngineInstance: WebLLMEngine | WllamaEngine | null = null;
+let embeddingEngineInstance: WebLLMEngine | WllamaEngine | null = null;
+let toolEngineInstance: WllamaEngine | null = null; // Specialized for MCP tools
+let liveEngineInstance: WllamaEngine | null = null;
+let liveInitializationPromise: Promise<WllamaEngine> | null = null;
+let toolInitializationPromise: Promise<WllamaEngine> | null = null;
+
+let chatModelName: string = '';
+let embeddingModelName: string = '';
+let liveModelName: string = '';
+const TOOL_MODEL_URL = 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_0.gguf';
+
+export const EngineManager = {
+  async getChatEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine> {
+    const targetId = modelName || modelsStore.chat?.id || chatModelName;
+    if (!targetId) throw new Error('No chat model selected');
+
+    if (!chatEngineInstance || targetId !== chatModelName) {
+      console.log(`🔄 Initializing chat engine with model: ${targetId}`);
+      const meta = getModelById(targetId);
+      if (!meta) throw new Error(`Model ${targetId} not found`);
+      const useGPU = meta.engine === 'webllm' || meta.requiresWebGPU;
+      
+      if (useGPU) {
+        chatEngineInstance = new WebLLMEngine();
+        await (chatEngineInstance as WebLLMEngine).initialize(meta.webllmModelId || targetId, onProgress);
+      } else {
+        chatEngineInstance = new WllamaEngine();
+        await (chatEngineInstance as WllamaEngine).initialize(meta.ggufUrl || targetId, onProgress);
+      }
+      chatModelName = targetId;
+    }
+    return chatEngineInstance!;
+  },
+
+  async getEmbeddingEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine> {
+    const targetId = modelName || modelsStore.embedding?.id || embeddingModelName;
+    if (!targetId) throw new Error('No embedding model selected');
+
+    if (!embeddingEngineInstance || targetId !== embeddingModelName) {
+      console.log(`🔄 Initializing embedding engine with model: ${targetId}`);
+      const meta = getModelById(targetId);
+      if (!meta) throw new Error(`Model ${targetId} not found`);
+      const useGPU = meta.engine === 'webllm' || meta.webllmModelId;
+
+      if (useGPU) {
+        embeddingEngineInstance = new WebLLMEngine();
+        await (embeddingEngineInstance as WebLLMEngine).initialize(meta.webllmModelId || targetId, onProgress);
+      } else {
+        embeddingEngineInstance = new WllamaEngine();
+        await (embeddingEngineInstance as WllamaEngine).initialize(meta.ggufUrl || targetId, onProgress);
+      }
+      embeddingModelName = targetId;
+    }
+    return embeddingEngineInstance!;
+  },
 
   /**
-   * Initialize or get the chat engine (WebLLM with Wllama fallback)
-   * Returns existing instance if already initialized with same model
+   * Get the specialized Tool Engine (LiquidAI LFM2-1.2B-Tool)
    */
-  static async getChatEngine(
-    modelName?: string,
-    onProgress?: ProgressCallback
-  ): Promise<WebLLMEngine | WllamaEngine> {
-    // If no instance exists, start with WebLLM
-    if (!this.chatEngineInstance) {
-      console.log('🆕 Creating new WebLLM chat engine instance');
-      this.chatEngineInstance = new WebLLMEngine();
-    }
+  async getToolEngine(onProgress?: ProgressCallback): Promise<WllamaEngine> {
+    if (toolInitializationPromise) return toolInitializationPromise;
+    if (toolEngineInstance && toolEngineInstance.isReady()) return toolEngineInstance;
 
-    // If model name provided and different from current, reinitialize
-    if (modelName && modelName !== this.chatModelName) {
-      console.log(`🔄 Initializing chat engine with model: ${modelName}`);
-      
+    toolInitializationPromise = (async () => {
       try {
-        // First try: WebLLM (GPU)
-        // Only try WebLLM if the current instance is a WebLLMEngine or if we haven't decided yet
-        if (this.chatEngineInstance instanceof WebLLMEngine) {
-           await this.chatEngineInstance.initialize(modelName, onProgress);
-        } else {
-           // If we are already using Wllama, maybe we should try WebLLM again?
-           // No, if we are in Wllama mode, it's likely because GPU failed previously or user chose it.
-           // BUT if the user explicitly selected a model that is WebLLM-capable, we should maybe try GPU again?
-           // For now, let's assume if we are switching models, we try WebLLM first unless we know it fails.
-           // Actually, easiest is to force try WebLLM if the model supports it.
-           
-           // Check if model requires WebGPU or if we should try it
-           const modelMeta = getModelById(modelName);
-           if (modelMeta?.engine === 'webllm') {
-             console.log('🔄 Attempting to switch back to WebLLM for this model...');
-             this.chatEngineInstance = new WebLLMEngine();
-             await this.chatEngineInstance.initialize(modelName, onProgress);
-           } else {
-             // It's a Wllama model
-             const wllamaInstance = this.chatEngineInstance as WllamaEngine;
-             if (modelMeta?.ggufUrl) {
-                await wllamaInstance.initialize(modelMeta.ggufUrl, onProgress);
-             } else {
-                throw new Error(`Model ${modelName} missing GGUF URL`);
-             }
-           }
-        }
-      } catch (error: any) {
-        console.error('❌ WebLLM initialization failed:', error);
-        
-        // Check for GPU limit errors or other fatal WebGPU errors
-        const isGpuLimitError = error.message?.includes('maxComputeWorkgroupStorageSize') || 
-                                error.message?.includes('WebGPU') ||
-                                error.message?.includes('adapter');
-                                
-        if (isGpuLimitError) {
-          console.warn('⚠️ GPU limitations detected. Falling back to CPU (Wllama)...');
-          onProgress?.(10, 'GPU no compatible/soportada. Cambiando a modo CPU...');
-          
-          // Find GGUF URL for fallback
-          const modelMeta = getModelById(modelName);
-          if (modelMeta && modelMeta.ggufUrl) {
-            console.log(`🔄 Fallback: Using GGUF version of ${modelName}: ${modelMeta.ggufUrl}`);
-            
-            // Switch to WllamaEngine
-            this.chatEngineInstance = new WllamaEngine();
-            await this.chatEngineInstance.initialize(modelMeta.ggufUrl, onProgress);
-            console.log('✅ Fallback to Wllama successful');
-          } else {
-            throw new Error(`WebLLM failed and no CPU fallback (GGUF URL) found for model ${modelName}`);
-          }
-        } else {
-          // Re-throw if it's not a GPU error (e.g. network error)
-          throw error;
-        }
+        console.log('🛠️ Initializing Specialized Tool Engine...');
+        const engine = new WllamaEngine();
+        await engine.initialize(TOOL_MODEL_URL, onProgress);
+        toolEngineInstance = engine;
+        return engine;
+      } finally {
+        toolInitializationPromise = null;
       }
-      
-      this.chatModelName = modelName;
+    })();
+    return toolInitializationPromise;
+  },
+
+  setChatEngine(engine: WebLLMEngine | WllamaEngine, name: string) {
+    chatEngineInstance = engine;
+    chatModelName = name;
+  },
+
+  setEmbeddingEngine(engine: WebLLMEngine | WllamaEngine, name: string) {
+    embeddingEngineInstance = engine;
+    embeddingModelName = name;
+  },
+
+  async getLiveEngine(modelName: string = 'lfm-2-audio-1.5b', onProgress?: ProgressCallback): Promise<WllamaEngine> {
+    if (liveInitializationPromise) return liveInitializationPromise;
+    if (liveEngineInstance && modelName === liveModelName && liveEngineInstance.isReady()) {
+      return liveEngineInstance;
     }
 
-    // Verify engine is ready
-    if (!this.chatEngineInstance.isReady()) {
-      throw new Error(
-        'Chat engine not initialized. Please load the chat model first from Model Selector.'
-      );
-    }
-
-    return this.chatEngineInstance;
-  }
-
-  /**
-   * Initialize or get the Live Mode engine (Dedicated Wllama instance)
-   * This runs alongside the main chat engine and embedding engine.
-   */
-  static async getLiveEngine(
-    modelName: string = 'lfm-2-audio-1.5b',
-    onProgress?: ProgressCallback
-  ): Promise<WllamaEngine> {
-    // If initialization is already in progress, return the existing promise
-    if (this.liveInitializationPromise) {
-      console.log('⏳ Live engine initialization already in progress, waiting...');
-      return this.liveInitializationPromise;
-    }
-
-    if (!this.liveEngineInstance) {
-      console.log('🆕 Creating new Wllama LIVE engine instance');
-      this.liveEngineInstance = new WllamaEngine();
-    }
-
-    if (modelName !== this.liveModelName || !this.liveEngineInstance.isReady()) {
-      console.log(`🔄 Initializing LIVE engine with model: ${modelName}`);
-      
-      const modelMeta = getModelById(modelName);
-      if (!modelMeta || !modelMeta.ggufUrl) {
-        throw new Error(`Live model ${modelName} not found or missing GGUF URL`);
+    liveInitializationPromise = (async () => {
+      try {
+        const engine = new WllamaEngine();
+        const meta = getModelById(modelName);
+        await engine.initialize(meta?.ggufUrl || modelName, onProgress);
+        liveEngineInstance = engine;
+        liveModelName = modelName;
+        return engine;
+      } finally {
+        liveInitializationPromise = null;
       }
+    })();
+    return liveInitializationPromise;
+  },
 
-      // Create initialization promise
-      this.liveInitializationPromise = (async () => {
-        try {
-          // Double check if instance exists inside promise
-          if (!this.liveEngineInstance) {
-            this.liveEngineInstance = new WllamaEngine();
-          }
-          
-          await this.liveEngineInstance.initialize(modelMeta.ggufUrl, onProgress);
-          this.liveModelName = modelName;
-          
-          if (!this.liveEngineInstance.isReady()) {
-            throw new Error('Live engine failed to initialize properly.');
-          }
-          
-          return this.liveEngineInstance;
-        } finally {
-          // Clear promise when done (success or fail)
-          this.liveInitializationPromise = null;
-        }
-      })();
+  isChatEngineReady() { return !!chatEngineInstance?.isReady(); },
+  isLiveEngineReady() { return !!liveEngineInstance?.isReady(); },
+  isToolEngineReady() { return !!toolEngineInstance?.isReady(); },
+  isEmbeddingEngineReady() { return !!embeddingEngineInstance?.isReady(); },
 
-      return this.liveInitializationPromise;
+  async resetChatEngine() {
+    if (chatEngineInstance) {
+      await chatEngineInstance.reset();
+      chatEngineInstance = null;
+      chatModelName = '';
     }
+  },
 
-    return this.liveEngineInstance;
-  }
-
-  /**
-   * Initialize or get the embedding engine (Wllama)
-   * Returns existing instance if already initialized
-   */
-  static async getEmbeddingEngine(
-    modelName?: string,
-    onProgress?: ProgressCallback
-  ): Promise<WllamaEngine> {
-    // If no instance exists, create one
-    if (!this.embeddingEngineInstance) {
-      console.log('🆕 Creating new Wllama embedding engine instance');
-      this.embeddingEngineInstance = new WllamaEngine();
+  async resetLiveEngine() {
+    if (liveEngineInstance) {
+      await liveEngineInstance.reset();
+      liveEngineInstance = null;
+      liveModelName = '';
     }
+  },
 
-    // If model name provided and different from current, reinitialize
-    if (modelName && modelName !== this.embeddingModelName) {
-      console.log(`🔄 Initializing embedding engine with model: ${modelName || 'default'}`);
-      await this.embeddingEngineInstance.initialize(modelName, onProgress);
-      this.embeddingModelName = modelName || 'default';
+  async resetToolEngine() {
+    if (toolEngineInstance) {
+      await toolEngineInstance.reset();
+      toolEngineInstance = null;
     }
+  },
 
-    // Verify engine is ready
-    if (!this.embeddingEngineInstance.isReady()) {
-      throw new Error(
-        'Embedding engine not initialized. Please load the embedding model first from Model Selector.'
-      );
+  async resetEmbeddingEngine() {
+    if (embeddingEngineInstance) {
+      await embeddingEngineInstance.reset();
+      embeddingEngineInstance = null;
+      embeddingModelName = '';
     }
+  },
 
-    return this.embeddingEngineInstance;
-  }
-
-  /**
-   * Check if chat engine is ready
-   */
-  static isChatEngineReady(): boolean {
-    return this.chatEngineInstance?.isReady() ?? false;
-  }
-
-  /**
-   * Check if live engine is ready
-   */
-  static isLiveEngineReady(): boolean {
-    return this.liveEngineInstance?.isReady() ?? false;
-  }
-
-  /**
-   * Check if embedding engine is ready
-   */
-  static isEmbeddingEngineReady(): boolean {
-    return this.embeddingEngineInstance?.isReady() ?? false;
-  }
-
-  /**
-   * Set the chat engine instance (called by ModelSelector after initialization)
-   */
-  static setChatEngine(engine: WebLLMEngine | WllamaEngine, modelName: string): void {
-    this.chatEngineInstance = engine;
-    this.chatModelName = modelName;
-    console.log('✅ Chat engine instance registered:', modelName);
-  }
-
-  /**
-   * Set the embedding engine instance (called by ModelSelector after initialization)
-   */
-  static setEmbeddingEngine(engine: WllamaEngine, modelName: string): void {
-    this.embeddingEngineInstance = engine;
-    this.embeddingModelName = modelName;
-    console.log('✅ Embedding engine instance registered:', modelName);
-  }
-
-  /**
-   * Reset chat engine (free memory)
-   */
-  static async resetChatEngine(): Promise<void> {
-    if (this.chatEngineInstance) {
-      await this.chatEngineInstance.reset();
-      this.chatEngineInstance = null;
-      this.chatModelName = '';
-      console.log('🔄 Chat engine reset');
-    }
-  }
-
-  /**
-   * Reset live engine (free memory)
-   */
-  static async resetLiveEngine(): Promise<void> {
-    if (this.liveEngineInstance) {
-      await this.liveEngineInstance.reset();
-      this.liveEngineInstance = null;
-      this.liveModelName = '';
-      console.log('🔄 Live engine reset');
-    }
-  }
-
-  /**
-   * Reset embedding engine (free memory)
-   */
-  static async resetEmbeddingEngine(): Promise<void> {
-    if (this.embeddingEngineInstance) {
-      await this.embeddingEngineInstance.reset();
-      this.embeddingEngineInstance = null;
-      this.embeddingModelName = '';
-      console.log('🔄 Embedding engine reset');
-    }
-  }
-
-  /**
-   * Reset all engines
-   */
-  static async resetAll(): Promise<void> {
+  async resetAll() {
     await Promise.all([
-      this.resetChatEngine(),
-      this.resetLiveEngine(),
-      this.resetEmbeddingEngine()
+      resetChatEngine(),
+      resetLiveEngine(),
+      resetToolEngine(),
+      resetEmbeddingEngine()
     ]);
-    console.log('🔄 All engines reset');
-  }
+  },
 
-  /**
-   * Get current model names
-   */
-  static getModelNames(): { chat: string; embedding: string; live: string } {
-    return {
-      chat: this.chatModelName,
-      embedding: this.embeddingModelName,
-      live: this.liveModelName
-    };
+  getModelNames() {
+    return { chat: chatModelName, embedding: embeddingModelName, live: liveModelName };
   }
-}
+};
 
 export default EngineManager;

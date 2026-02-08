@@ -227,6 +227,24 @@ export const MODEL_REGISTRY: ModelMetadata[] = [
     contextSize: 2048,
     tags: ['medium', 'qwen', 'recommended']
   },
+  {
+    id: 'lfm2-1.2b-tool',
+    name: 'LFM2-1.2B-Tool',
+    displayName: 'LFM2 Tool (Agente)',
+    description: 'Modelo especializado en ejecución de herramientas y razonamiento de agentes. Se descarga automáticamente.',
+    type: 'chat',
+    engine: 'wllama',
+    ggufUrl: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_0.gguf',
+    sizeGB: 0.7,
+    speed: 'very-fast',
+    quality: 'excellent',
+    quantization: 'q4',
+    minMemoryGB: 2,
+    preferredMemoryGB: 4,
+    requiresWebGPU: false,
+    contextSize: 8192,
+    tags: ['specialized', 'tool', 'agent']
+  },
 
   // ========================================================================
   // CHAT MODELS - Large (3GB+)

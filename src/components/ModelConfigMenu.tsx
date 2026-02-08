@@ -50,6 +50,10 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
         console.log('✅ Embedding model reloaded');
       }
 
+      // Reload Tool Engine
+      await EngineManager.getToolEngine();
+      console.log('✅ Tool engine reloaded');
+
       alert(i18nStore.t('models.reloaded'));
     } catch (error) {
       console.error('Failed to reload models:', error);
@@ -192,6 +196,13 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
                     <span className="text-[var(--color-text-secondary)]">{i18nStore.t('models.embeddings')}:</span>
                     <span className={modelsStore.embedding ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
                       {modelsStore.embedding ? modelsStore.embedding.name : i18nStore.t('models.notLoaded')}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--color-text-secondary)]">MCP Tools:</span>
+                    <span className={EngineManager.isToolEngineReady() ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
+                      {EngineManager.isToolEngineReady() ? 'LFM2 Tool (Local)' : i18nStore.t('models.notLoaded')}
                     </span>
                   </div>
                 </div>

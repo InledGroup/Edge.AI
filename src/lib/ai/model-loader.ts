@@ -16,7 +16,7 @@ import { detectDeviceProfile } from './device-profile';
  * Returns true if models were loaded, false if not configured yet
  */
 export async function autoLoadModels(
-  onProgress?: (type: 'chat' | 'embedding', progress: number, message: string) => void
+  onProgress?: (type: 'chat' | 'embedding' | 'tool', progress: number, message: string) => void
 ): Promise<boolean> {
   const { chatModelId, embeddingModelId } = getDefaultModelIds();
 
@@ -43,12 +43,33 @@ export async function autoLoadModels(
     // Especially critical on mobile devices where OPFS resources are limited
     await loadSavedChatModel(chatModelId, onProgress);
     await loadSavedEmbeddingModel(embeddingModelId, onProgress);
+    
+    // Auto-load tool model
+    await loadSpecializedToolModel(onProgress);
 
     console.log('✅ Models auto-loaded successfully');
     return true;
   } catch (error) {
     console.error('❌ Failed to auto-load models:', error);
     return false;
+  }
+}
+
+/**
+ * Load specialized tool model
+ */
+async function loadSpecializedToolModel(
+  onProgress?: (type: 'chat' | 'embedding' | 'tool', progress: number, message: string) => void
+): Promise<void> {
+  try {
+    console.log('🚀 Auto-loading specialized tool model...');
+    await EngineManager.getToolEngine((progress, status) => {
+      onProgress?.('tool', progress, status);
+    });
+    console.log('✅ Specialized tool model loaded');
+  } catch (error) {
+    console.error('❌ Failed to load tool model:', error);
+    // Don't throw here, as it's not strictly required for basic chat
   }
 }
 

@@ -62,6 +62,22 @@ export interface EdgeAIDB extends DBSchema {
       'by-created': number;
     };
   };
+  mcp_servers: {
+    key: string;
+    value: {
+      id: string;
+      name: string;
+      url: string;
+      transport: 'http' | 'websocket';
+      headers?: Record<string, string>;
+      enabled: boolean;
+      status: 'connected' | 'disconnected' | 'error';
+      createdAt: number;
+    };
+    indexes: {
+      'by-status': string;
+    };
+  };
   settings: {
     key: string;
     value: any;
@@ -69,7 +85,7 @@ export interface EdgeAIDB extends DBSchema {
 }
 
 const DB_NAME = 'edge-ai-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbInstance: IDBPDatabase<EdgeAIDB> | null = null;
 
@@ -128,6 +144,14 @@ export async function getDB(): Promise<IDBPDatabase<EdgeAIDB>> {
           keyPath: 'id'
         });
         memoriesStore.createIndex('by-created', 'createdAt');
+      }
+
+      // MCP Servers store
+      if (!db.objectStoreNames.contains('mcp_servers')) {
+        const mcpStore = db.createObjectStore('mcp_servers', {
+          keyPath: 'id'
+        });
+        mcpStore.createIndex('by-status', 'status');
       }
 
       // Settings store (key-value)
@@ -236,7 +260,7 @@ export async function exportDatabase() {
 export async function importDatabase(data: any): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(
-    ['documents', 'chunks', 'embeddings', 'conversations', 'memories', 'settings'],
+    ['documents', 'chunks', 'embeddings', 'conversations', 'memories', 'mcp_servers', 'settings'],
     'readwrite'
   );
 
@@ -264,6 +288,11 @@ export async function importDatabase(data: any): Promise<void> {
     // Import memories
     for (const memory of data.memories || []) {
       await tx.objectStore('memories').put(memory);
+    }
+
+    // Import MCP servers
+    for (const server of data.mcp_servers || []) {
+      await tx.objectStore('mcp_servers').put(server);
     }
 
     // Import settings

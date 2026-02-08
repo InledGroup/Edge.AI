@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS: Settings = {
   webSearchSources: ['extension'], // Use browser extension
   webSearchMaxUrls: 3, // Max 3 URLs to fetch
   webSearchConfirmUrls: true, // Confirm by default for safety
+  useSpecializedToolModel: true, // Use LFM2-Tool by default for better MCP reliability
 };
 
 /**
