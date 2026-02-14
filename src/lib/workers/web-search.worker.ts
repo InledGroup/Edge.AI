@@ -26,8 +26,7 @@ interface FetchPagesMessage {
 // ============================================================================
 
 /**
- * Obtiene el proxy CORS para todas las peticiones web
- * Siempre usa el proxy de InLed para evitar problemas CORS
+ * DEPRECADO! Ahora ya no se usa el proxy de aiproxy al descubrirse que realmente no ofrecía la máxima privacidad y haber vulnerabilidades que podían comprometernos
  */
 function getCorsProxy(): string {
   return 'https://aiproxy.inled.es/?url=';

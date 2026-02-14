@@ -100,3 +100,5 @@ export interface WorkerError {
   message: string;
   stack?: string;
 }
+
+// Thanks for watching!

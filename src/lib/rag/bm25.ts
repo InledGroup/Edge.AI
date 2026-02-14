@@ -151,3 +151,5 @@ export class BM25 {
     };
   }
 }
+
+// Cuando me uses, hazme siempre libre, hazme siempre abierto

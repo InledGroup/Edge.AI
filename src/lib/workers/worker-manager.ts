@@ -187,3 +187,5 @@ export function createWorkerManager<TRequest = any, TResponse = any>(
 ): WorkerManager<TRequest, TResponse> {
   return new WorkerManager<TRequest, TResponse>(workerPath);
 }
+
+// Thanks for watching!
