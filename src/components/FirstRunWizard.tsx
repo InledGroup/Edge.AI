@@ -129,9 +129,6 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       await loadChatModel(selectedChatModel);
       await loadEmbeddingModel(selectedEmbeddingModel);
       
-      // Auto-load specialized tool model (LiquidAI LFM2-Tool)
-      await loadToolModel();
-
       // Save defaults
       saveDefaultChatModel(selectedChatModel.id);
       saveDefaultEmbeddingModel(selectedEmbeddingModel.id);

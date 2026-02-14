@@ -50,29 +50,47 @@ export default function LiveMode() {
   // Initialize Model
   useEffect(() => {
     async function initModel() {
+      // Don't re-init if already initializing
       if (initRef.current) return;
       initRef.current = true;
 
       try {
-        if (!EngineManager.isLiveEngineReady()) {
-          console.log('🔌 Initializing Live Engine...');
-          // We always load LFM2-Audio for Live Mode as it's the best for this task
-          // even if using system TTS/STT, it provides better conversational flow.
-          await EngineManager.getLiveEngine('lfm-2-audio-1.5b', (progress, msg) => {
-            console.log(`Live Model: ${progress}% - ${msg}`);
+        if (audioType === 'model') {
+          if (!EngineManager.isLiveEngineReady()) {
+            console.log('🔌 Initializing specialized Live Engine (LFM2-Audio)...');
+            await EngineManager.getLiveEngine('lfm-2-audio-1.5b', (progress, msg) => {
+              console.log(`Live Model: ${progress}% - ${msg}`);
+              setLoadProgress(progress);
+              setLoadMessage(msg);
+            });
+          }
+        } else {
+          // Use the default chat engine
+          console.log('🔌 Ensuring Chat Engine is ready for Live Mode (System TTS)...');
+          setLoadMessage(t('live.loadingModel'));
+          setLoadProgress(50);
+          await EngineManager.getChatEngine(undefined, (progress, msg) => {
             setLoadProgress(progress);
             setLoadMessage(msg);
           });
+          setLoadProgress(100);
         }
         setModelReady(true);
       } catch (error: any) {
-        console.error('Failed to load live model:', error);
+        console.error('Failed to load model for live mode:', error);
         setLoadingError(error.message || t('live.errorLoading'));
         initRef.current = false; // Allow retry if failed
       }
     }
+    
+    // Reset and re-init if audioType changes and we aren't already set up for it
+    if (initRef.current && ((audioType === 'model' && !EngineManager.isLiveEngineReady()) || (audioType === 'system' && !EngineManager.isChatEngineReady()))) {
+      initRef.current = false;
+      setModelReady(false);
+    }
+    
     initModel();
-  }, []); // Run once on mount
+  }, [audioType]); // Re-run if audioType changes
 
   // Initialize Audio Visualizer
   useEffect(() => {
@@ -236,10 +254,12 @@ export default function LiveMode() {
           content: text
         });
 
-        // Use the dedicated Live Engine
-        const engine = await EngineManager.getLiveEngine();
+        // Use the appropriate engine based on settings
+        const engine = audioType === 'model' 
+          ? await EngineManager.getLiveEngine()
+          : await EngineManager.getChatEngine();
         
-        console.log('🤔 Generating response (streaming)...');
+        console.log(`🤔 Generating response using ${audioType === 'model' ? 'Live' : 'Chat'} Engine (streaming)...`);
         
         let fullReply = '';
         let lastSpokenIndex = 0;

@@ -247,7 +247,30 @@ export function ChatInterface() {
         if (isMcpIntent && mcpTools.length > 0) {
            const useSpecialized = await getSetting('useSpecializedToolModel');
            const canHandleNative = chatEngine instanceof WebLLMEngine && chatModelId?.includes('8b');
-           const toolEngine = (useSpecialized && !canHandleNative) ? await EngineManager.getToolEngine() : chatEngine;
+           
+           let toolEngine;
+           if (useSpecialized && !canHandleNative) {
+             // If tool engine is not ready, it will download. Show progress.
+             if (!EngineManager.isToolEngineReady()) {
+               setWebSearchProgress({ 
+                 step: 'searching', 
+                 progress: 0, 
+                 message: 'Descargando modelo de herramientas LFM2 (Emergencia)...' 
+               });
+               toolEngine = await EngineManager.getToolEngine((progress, msg) => {
+                 setWebSearchProgress({ 
+                   step: 'searching', 
+                   progress, 
+                   message: `Descargando LFM2 Tool: ${msg} (${Math.round(progress)}%)` 
+                 });
+               });
+               setWebSearchProgress(null);
+             } else {
+               toolEngine = await EngineManager.getToolEngine();
+             }
+           } else {
+             toolEngine = chatEngine;
+           }
            
            let currentMsgs = [...chatMsgs];
            if (toolEngine !== chatEngine) {

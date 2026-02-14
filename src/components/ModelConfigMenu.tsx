@@ -50,9 +50,11 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
         console.log('✅ Embedding model reloaded');
       }
 
-      // Reload Tool Engine
-      await EngineManager.getToolEngine();
-      console.log('✅ Tool engine reloaded');
+      // Reload Tool Engine only if it's already ready
+      if (EngineManager.isToolEngineReady()) {
+        await EngineManager.getToolEngine();
+        console.log('✅ Tool engine reloaded');
+      }
 
       alert(i18nStore.t('models.reloaded'));
     } catch (error) {
