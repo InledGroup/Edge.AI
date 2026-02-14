@@ -4,9 +4,10 @@ import EngineManager from '@/lib/ai/engine-manager';
 import { uiStore, conversationsStore, activeConversationIdSignal } from '@/lib/stores';
 import { addMessage, getOrCreateConversation, updateConversationTitle, generateTitle } from '@/lib/db/conversations';
 import { speechService, voiceState, isVoiceModeEnabled } from '@/lib/voice/speech-service';
-import { Mic, MicOff, PhoneOff, X, MoreHorizontal, Settings, Volume2, Captions, Loader2 } from 'lucide-preact';
+import { Mic, MicOff, PhoneOff, X, MoreHorizontal, Settings, Volume2, Captions, Loader2, Check } from 'lucide-preact';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { useTranslations } from '@/lib/stores/i18n';
+import { getSetting, setSetting } from '@/lib/db/settings';
 
 export default function LiveMode() {
   const t = useTranslations();
@@ -14,11 +15,16 @@ export default function LiveMode() {
   const [response, setResponse] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [showSubtitles, setShowSubtitles] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [modelReady, setModelReady] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadMessage, setLoadMessage] = useState(t('live.initializing'));
   
+  // Settings state
+  const [audioType, setAudioType] = useState<'system' | 'model'>('system');
+  const [sttType, setSttType] = useState<'system' | 'model'>('system');
+
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -30,6 +36,17 @@ export default function LiveMode() {
   // Close if not enabled
   if (!uiStore.showLiveMode) return null;
 
+  // Load settings on mount
+  useEffect(() => {
+    async function loadSettings() {
+      const savedAudioType = await getSetting('liveModeAudioType');
+      const savedSttType = await getSetting('liveModeSttType');
+      if (savedAudioType) setAudioType(savedAudioType);
+      if (savedSttType) setSttType(savedSttType);
+    }
+    loadSettings();
+  }, []);
+
   // Initialize Model
   useEffect(() => {
     async function initModel() {
@@ -39,6 +56,8 @@ export default function LiveMode() {
       try {
         if (!EngineManager.isLiveEngineReady()) {
           console.log('🔌 Initializing Live Engine...');
+          // We always load LFM2-Audio for Live Mode as it's the best for this task
+          // even if using system TTS/STT, it provides better conversational flow.
           await EngineManager.getLiveEngine('lfm-2-audio-1.5b', (progress, msg) => {
             console.log(`Live Model: ${progress}% - ${msg}`);
             setLoadProgress(progress);
@@ -223,43 +242,92 @@ export default function LiveMode() {
         console.log('🤔 Generating response (streaming)...');
         
         let fullReply = '';
-        let speakBuffer = '';
+        let lastSpokenIndex = 0;
+        let hasStartedStreamingTTS = false;
+        let generationStartTime = Date.now();
         
         const systemPrompt = t('live.systemPrompt');
 
-        // Generate with streaming
-        await engine.generateText([
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: text }
-        ], {
-          onStream: (chunk) => {
-            if (!active) return;
-            
-            fullReply += chunk;
-            speakBuffer += chunk;
-            setResponse(fullReply);
+        // Function to handle streaming system TTS
+        const speakNextFragment = (isFinal = false) => {
+          if (audioType !== 'system' || !active) return;
 
-            // Periodically speak chunks when we have a good break point
-            // or if the buffer gets too long
-            if (speakBuffer.match(/[.!?\n]/) || speakBuffer.length > 100) {
-              const toSpeak = speakBuffer.trim();
-              if (toSpeak) {
-                speechService.speakFragment(toSpeak, false);
-                speakBuffer = '';
+          const timeElapsed = Date.now() - generationStartTime;
+          
+          // Trigger if 4 seconds passed OR if it's the final chunk
+          if (!hasStartedStreamingTTS && (timeElapsed >= 4000 || isFinal)) {
+            const textToSpeak = fullReply.trim();
+            if (textToSpeak) {
+              hasStartedStreamingTTS = true;
+              speechService.speakFragment(textToSpeak, isFinal);
+              lastSpokenIndex = fullReply.length;
+            }
+          } else if (hasStartedStreamingTTS) {
+            // If already streaming, look for completed sentences or long chunks
+            const remainingText = fullReply.substring(lastSpokenIndex);
+            
+            // Speak if we have a sentence end OR if it's final
+            if (isFinal || /[.!?]\s$/.test(remainingText) || remainingText.length > 120) {
+              const fragment = remainingText.trim();
+              if (fragment) {
+                speechService.speakFragment(fragment, isFinal);
+                lastSpokenIndex = fullReply.length;
               }
             }
           }
-        });
+        };
+
+        // Fallback timer to ensure TTS starts at 4s even if model is slow
+        const ttsTimer = setTimeout(() => {
+          if (active && !hasStartedStreamingTTS && audioType === 'system') {
+            speakNextFragment();
+          }
+        }, 4100);
+
+        // Generate with streaming
+        let mimiBatch: number[][] = [];
+        try {
+          await engine.generateText([
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: text }
+          ], {
+            onStream: (chunk: string) => {
+              if (!active) return;
+              fullReply += chunk;
+              setResponse((prev) => prev + chunk);
+              
+              // Handle streaming TTS trigger
+              if (audioType === 'system') {
+                speakNextFragment();
+              }
+            },
+            onAudio: (codes: Uint8Array) => {
+              if (!active || isMuted || audioType === 'system') return;
+              
+              // Add frame to batch
+              mimiBatch.push(Array.from(codes));
+              
+              // Decode in batches of 10 frames for efficiency
+              if (mimiBatch.length >= 10) {
+                speechService.playMimiCodes([...mimiBatch]);
+                mimiBatch = [];
+              }
+            }
+          } as any);
+        } finally {
+          clearTimeout(ttsTimer);
+        }
+
+        // Play remaining codes
+        if (mimiBatch.length > 0 && active && audioType === 'model') {
+          speechService.playMimiCodes(mimiBatch);
+        }
 
         if (!active) return;
 
-        // Finalize speech
-        if (speakBuffer.trim()) {
-          speechService.speakFragment(speakBuffer.trim(), true);
-        } else {
-          // If buffer was empty but we finished, send empty fragment with isLastChunk=true
-          // to trigger listening restart
-          speechService.speakFragment('', true);
+        // Final speaking trigger for remaining text
+        if (audioType === 'system') {
+          speakNextFragment(true);
         }
 
         // Fallback for empty response
@@ -398,10 +466,98 @@ export default function LiveMode() {
         <div className="flex flex-col items-center">
           <span className="text-sm font-bold text-emerald-500 uppercase tracking-widest">{t('live.title')}</span>
         </div>
-        <button className="p-2 rounded-full hover:bg-gray-800 transition-colors">
+        <button 
+          onClick={() => setShowSettings(true)}
+          className="p-2 rounded-full hover:bg-gray-800 transition-colors"
+        >
           <Settings className="w-6 h-6 text-gray-400" />
         </button>
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-gray-800 flex justify-between items-center">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Settings className="w-5 h-5 text-emerald-500" />
+                {t('live.settings.title')}
+              </h3>
+              <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* TTS Setting */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('live.settings.ttsLabel')}</label>
+                <div className="grid grid-cols-1 gap-2">
+                  <button 
+                    onClick={async () => {
+                      setAudioType('system');
+                      await setSetting('liveModeAudioType', 'system');
+                    }}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                      audioType === 'system' 
+                      ? 'bg-emerald-500/10 border-emerald-500/50 text-white' 
+                      : 'bg-gray-800/50 border-transparent text-gray-400 hover:bg-gray-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Volume2 className="w-5 h-5" />
+                      <span className="text-sm font-medium">{t('live.settings.systemOption')}</span>
+                    </div>
+                    {audioType === 'system' && <Check className="w-4 h-4 text-emerald-500" />}
+                  </button>
+
+                  <button 
+                    onClick={async () => {
+                      setAudioType('model');
+                      await setSetting('liveModeAudioType', 'model');
+                    }}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                      audioType === 'model' 
+                      ? 'bg-emerald-500/10 border-emerald-500/50 text-white' 
+                      : 'bg-gray-800/50 border-transparent text-gray-400 hover:bg-gray-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5" />
+                      <div className="text-left">
+                        <span className="text-sm font-medium block">{t('live.settings.mimicTokens')}</span>
+                        <span className="text-[10px] text-gray-500 leading-tight">{t('live.settings.mimicDesc')}</span>
+                      </div>
+                    </div>
+                    {audioType === 'model' && <Check className="w-4 h-4 text-emerald-500" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* STT Setting (Planned) */}
+              <div className="space-y-3 opacity-50 pointer-events-none">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('live.settings.sttLabel')}</label>
+                <div className="p-3 rounded-xl bg-gray-800/50 border border-transparent text-gray-400 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Mic className="w-5 h-5" />
+                    <span className="text-sm font-medium">{t('live.settings.systemOption')}</span>
+                  </div>
+                  <Check className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-800/30 text-center">
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold transition-colors"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Visualizer Area */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-md px-6">

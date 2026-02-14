@@ -393,7 +393,16 @@ export const translations = {
       errorLoading: 'Error al cargar el modelo live',
       errorConnection: 'Lo siento, hubo un error de conexión con el modelo.',
       fallbackResponse: 'No he podido generar una respuesta. ¿Podrías repetirlo?',
-      systemPrompt: 'Eres una IA en modo conversación por voz. Responde de forma concisa, natural y DIRECTA. NO uses markdown, ni asteriscos, ni listas, ni formatos especiales. Solo texto plano que sea fácil de leer en voz alta. Evita frases largas.'
+      systemPrompt: 'Eres una IA en modo conversación por voz. Responde de forma concisa, natural y DIRECTA. NO uses markdown, ni asteriscos, ni listas, ni formatos especiales. Solo texto plano que sea fácil de leer en voz alta. Evita frases largas.',
+      settings: {
+        title: 'Ajustes de Voz',
+        ttsLabel: 'Motor de Voz (TTS)',
+        sttLabel: 'Reconocimiento (STT)',
+        systemOption: 'Sistema (Predeterminado)',
+        modelOption: 'Modelo LFM (Experimental)',
+        mimicTokens: 'Usar tokens Mimic (Audio nativo)',
+        mimicDesc: 'Permite que el modelo genere audio directamente sin usar la voz del sistema.'
+      }
     },
     mcp: {
       title: 'Servidores MCP',
@@ -413,8 +422,8 @@ export const translations = {
       viewTools: 'Ver herramientas',
       toolsFor: 'Herramientas para {name}',
       noTools: 'No se encontraron herramientas para este servidor.',
-      specializedEngine: 'Motor de Herramientas Especializado',
-      specializedDesc: 'Usa LFM2-Tool para una ejecución de MCP más fiable y rápida.',
+      specializedEngine: 'Motor LFM2 Tool (Solo emergencia)',
+      specializedDesc: 'Activar solo en caso de fallo repetitivo de otros modelos. Nota: Este modelo es más lento.',
       toolResult: 'Resultado de {name}',
       using: 'Usando: {name}',
       tipStreamable: 'Consejo: Para Streamable HTTP, asegúrate de que la URL sea correcta (ej. termina en /sse o /mcp)',
@@ -422,6 +431,12 @@ export const translations = {
       cancel: 'Cancelar',
       connect: 'Conectar servidor',
       update: 'Actualizar servidor'
+    },
+    pwa: {
+      title: 'Instala la App Local',
+      description: 'Para que la descarga de modelos no se interrumpa y funcionen offline, instala esta aplicación en tu pantalla de inicio.',
+      note: 'Las apps instaladas reciben más recursos del sistema y evitan que el navegador borre los modelos descargados.',
+      install: 'Instalar Aplicación'
     }
   },
   en: {
@@ -818,7 +833,16 @@ export const translations = {
       errorLoading: 'Error loading live model',
       errorConnection: 'Sorry, there was a connection error with the model.',
       fallbackResponse: 'I could not generate a response. Could you repeat that?',
-      systemPrompt: 'You are an AI in voice conversation mode. Respond concisely, naturally and DIRECTLY. DO NOT use markdown, asterisks, lists, or special formatting. Only plain text that is easy to read aloud. Avoid long sentences.'
+      systemPrompt: 'You are an AI in voice conversation mode. Respond concisely, naturally and DIRECTLY. DO NOT use markdown, asterisks, lists, or special formatting. Only plain text that is easy to read aloud. Avoid long sentences.',
+      settings: {
+        title: 'Voice Settings',
+        ttsLabel: 'Voice Engine (TTS)',
+        sttLabel: 'Recognition (STT)',
+        systemOption: 'System (Default)',
+        modelOption: 'LFM Model (Experimental)',
+        mimicTokens: 'Use Mimic tokens (Native Audio)',
+        mimicDesc: 'Allows the model to generate audio directly without using system voice.'
+      }
     },
     mcp: {
       title: 'MCP Servers',
@@ -838,8 +862,8 @@ export const translations = {
       viewTools: 'View Tools',
       toolsFor: 'Tools for {name}',
       noTools: 'No tools found for this server.',
-      specializedEngine: 'Specialized Tool Engine',
-      specializedDesc: 'Use LFM2-Tool for a more reliable and faster MCP execution.',
+      specializedEngine: 'LFM2 Tool Engine (Emergency Only)',
+      specializedDesc: 'Enable only if other models repeatedly fail. Note: This model is slower.',
       toolResult: 'Result from {name}',
       using: 'Using: {name}',
       tipStreamable: 'Tip: For Streamable HTTP, ensure the URL is correct (e.g., ending in /sse or /mcp)',
@@ -847,6 +871,12 @@ export const translations = {
       cancel: 'Cancel',
       connect: 'Connect Server',
       update: 'Update Server'
+    },
+    pwa: {
+      title: 'Install Local App',
+      description: 'To ensure model downloads are not interrupted and work offline, install this application on your home screen.',
+      note: 'Installed apps receive more system resources and prevent the browser from deleting downloaded models.',
+      install: 'Install Application'
     }
   }
 };

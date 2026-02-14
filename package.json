@@ -14,10 +14,12 @@
   },
   "dependencies": {
     "@astrojs/preact": "^3.0.1",
+    "@huggingface/transformers": "^3.8.1",
     "@mlc-ai/web-llm": "^0.2.80",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@preact/signals": "^1.2.2",
     "@types/uuid": "^10.0.0",
+    "@vite-pwa/astro": "^1.2.0",
     "@wllama/wllama": "^2.3.7",
     "astro": "^4.0.8",
     "clsx": "^2.1.1",

@@ -7,6 +7,7 @@ import { getDefaultModelIds } from './model-settings';
 import { getModelById } from './model-registry';
 import { WebLLMEngine } from './webllm-engine';
 import { WllamaEngine } from './wllama-engine';
+import { TransformersEngine } from './transformers-engine';
 import EngineManager from './engine-manager';
 import { modelsStore } from '@/lib/stores';
 import { detectDeviceProfile } from './device-profile';
@@ -91,11 +92,20 @@ async function loadSavedChatModel(
     // Detect device capabilities to choose engine
     const deviceProfile = await detectDeviceProfile();
 
-    let engine: WebLLMEngine | WllamaEngine;
+    let engine: WebLLMEngine | WllamaEngine | TransformersEngine;
     let engineName: string;
     let modelUrl: string;
 
-    if (deviceProfile.hasWebGPU && model.webllmModelId) {
+    if (model.engine === 'transformers' && model.hfModelId) {
+      console.log('🚀 Loading chat model with Transformers.js');
+      engine = new TransformersEngine();
+      engineName = 'transformers';
+      modelUrl = model.hfModelId;
+
+      await engine.initialize(modelUrl, (progress, status) => {
+        onProgress?.('chat', progress, status);
+      });
+    } else if (deviceProfile.hasWebGPU && model.webllmModelId) {
       // Use WebLLM with GPU
       console.log('🚀 Loading chat model with WebLLM (GPU)');
       engine = new WebLLMEngine();
@@ -154,11 +164,19 @@ async function loadSavedEmbeddingModel(
   modelsStore.setEmbeddingLoading(true);
 
   try {
-    let engine: WllamaEngine | WebLLMEngine;
+    let engine: WllamaEngine | WebLLMEngine | TransformersEngine;
     let engineName: string;
 
-    // Check if model uses WebLLM (e.g. Snowflake Arctic GPU)
-    if (model.engine === 'webllm' && model.webllmModelId) {
+    if (model.engine === 'transformers' && model.hfModelId) {
+       console.log('🚀 Loading embedding model with Transformers.js');
+       const transformersEngine = new TransformersEngine();
+       engine = transformersEngine;
+       engineName = 'transformers';
+       
+       await transformersEngine.initialize(model.hfModelId, (progress, status) => {
+          onProgress?.('embedding', progress, status);
+       });
+    } else if (model.engine === 'webllm' && model.webllmModelId) {
        console.log('🚀 Loading embedding model with WebLLM (GPU)');
        const webllmEngine = new WebLLMEngine();
        engine = webllmEngine;

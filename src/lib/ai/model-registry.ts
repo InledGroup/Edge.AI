@@ -14,11 +14,13 @@ export interface ModelMetadata {
   type: 'chat' | 'embedding';
 
   // Engine
-  engine: 'webllm' | 'wllama';
+  engine: 'webllm' | 'wllama' | 'transformers';
+  secondaryEngine?: 'transformers'; // For multimodal processing
 
   // Model URLs
   webllmModelId?: string;  // For WebLLM (MLC models)
   ggufUrl?: string;        // For Wllama (GGUF models)
+  hfModelId?: string;      // For Transformers.js (HF Repo ID)
 
   // Size
   sizeGB: number;
@@ -141,7 +143,9 @@ export const MODEL_REGISTRY: ModelMetadata[] = [
     description: 'Modelo especializado en conversación por voz. Ideal para el modo Live.',
     type: 'chat',
     engine: 'wllama',
+    secondaryEngine: 'transformers',
     ggufUrl: 'https://huggingface.co/LiquidAI/LFM2-Audio-1.5B-GGUF/resolve/main/LFM2-Audio-1.5B-Q8_0.gguf',
+    hfModelId: 'kyutai/mimi', // Using the standard Mimi repo for decoding
     sizeGB: 1.6,
     speed: 'fast',
     quality: 'good',
@@ -230,8 +234,8 @@ export const MODEL_REGISTRY: ModelMetadata[] = [
   {
     id: 'lfm2-1.2b-tool',
     name: 'LFM2-1.2B-Tool',
-    displayName: 'LFM2 Tool (Agente)',
-    description: 'Modelo especializado en ejecución de herramientas y razonamiento de agentes. Se descarga automáticamente.',
+    displayName: 'LFM2 Tool (Agente/Emergencia)',
+    description: 'Activar solo en caso de fallo repetitivo de otros modelos. Nota: Este modelo es más lento.',
     type: 'chat',
     engine: 'wllama',
     ggufUrl: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_0.gguf',

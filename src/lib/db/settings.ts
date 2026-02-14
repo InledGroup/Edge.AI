@@ -21,7 +21,9 @@ const DEFAULT_SETTINGS: Settings = {
   webSearchSources: ['extension'], // Use browser extension
   webSearchMaxUrls: 3, // Max 3 URLs to fetch
   webSearchConfirmUrls: true, // Confirm by default for safety
-  useSpecializedToolModel: true, // Use LFM2-Tool by default for better MCP reliability
+  useSpecializedToolModel: false, // Disabled by default - use only as fallback
+  liveModeAudioType: 'system', // Use system TTS by default
+  liveModeSttType: 'system', // Use system STT by default
 };
 
 /**

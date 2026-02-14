@@ -1,6 +1,7 @@
 ---
 // Edge.AI - Local-first AI Platform (ChatGPT-style Design)
 import { AppLayout } from '@/components/AppLayout';
+import { pwaInfo } from 'virtual:pwa-info';
 import '@/styles/global.css';
 ---
 
@@ -11,7 +12,21 @@ import '@/styles/global.css';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edge.AI - 100% Local AI Platform</title>
     <meta name="description" content="Plataforma de IA conversacional 100% local - Sin backend, sin cuentas, sin envío de datos">
-    <link rel="icon" href="/inledai.png">
+    <link rel="icon" type="image/png" href="/icon-192.png">
+    <link rel="shortcut icon" href="/icon-192.png">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Edge.AI">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
+    
+    {pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} />}
+    {!pwaInfo && <link rel="manifest" href="/manifest.json" />}
+    <script>
+        import '../pwa.ts';
+    </script>
 </head>
 <body>
     <!-- Main App Layout -->

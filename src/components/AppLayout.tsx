@@ -22,11 +22,22 @@ export function AppLayout() {
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [showFirstRunWizard, setShowFirstRunWizard] = useState(false);
   const [showMobileWarning, setShowMobileWarning] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // Initialize: Check first run OR auto-load saved models
   useEffect(() => {
-    // Check for mobile
-    if (checkIfMobile()) {
+    // Listen for PWA installation prompt
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      console.log('✨ PWA install prompt deferred');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Check for mobile and if NOT installed as PWA
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    if (checkIfMobile() && !isStandalone) {
       setShowMobileWarning(true);
     }
 
@@ -53,7 +64,36 @@ export function AppLayout() {
     }
 
     initialize();
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      // Check if it's iOS
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      if (isIOS) {
+        alert('Para instalar en iOS: Pulsa el botón "Compartir" (cuadrado con flecha) y selecciona "Añadir a la pantalla de inicio".');
+      } else {
+        alert('Tu navegador no permite la instalación automática. Busca "Instalar aplicación" en el menú del navegador.');
+      }
+      setShowMobileWarning(false);
+      return;
+    }
+
+    // Show the installation prompt
+    deferredPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`👤 PWA install choice: ${outcome}`);
+    
+    // Clear the deferred prompt
+    setDeferredPrompt(null);
+    setShowMobileWarning(false);
+  };
 
   const canvasOpen = canvasSignal.value.isOpen;
 
@@ -139,26 +179,39 @@ export function AppLayout() {
       {/* Mobile Warning Modal */}
       {showMobileWarning && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
-          <div className="w-full max-w-sm bg-[var(--color-bg)] border-2 border-amber-500/50 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div className="bg-amber-500 p-4 flex items-center justify-center">
-              <AlertTriangle size={48} className="text-white animate-bounce" />
-            </div>
-            <div className="p-6 text-center space-y-4">
-              <h2 className="text-xl font-bold text-[var(--color-text-primary)] uppercase tracking-wider">
-                ⚠️ Soporte Mobile Experimental
+          <div className="w-full max-w-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-[var(--color-bg-secondary)] p-8 flex flex-col items-center justify-center space-y-4">
+              {/* App Icon Mockup */}
+              <div className="w-20 h-20 bg-white rounded-2xl p-3 shadow-xl flex items-center justify-center border border-gray-100">
+                <img src="/inledai.png" alt="Edge.AI Logo" className="w-full h-full object-contain" />
+              </div>
+              <h2 className="text-xl font-bold text-[var(--color-text-primary)] text-center">
+                {i18nStore.t('pwa.title')}
               </h2>
+            </div>
+            
+            <div className="p-6 text-center space-y-4">
               <p className="text-[var(--color-text-secondary)] leading-relaxed">
-                El soporte para dispositivos móviles es <span className="font-bold text-amber-500">muy experimental</span> y puede fallar como una escopeta de feria.
+                {i18nStore.t('pwa.description')}
               </p>
-              <p className="text-xs text-[var(--color-text-tertiary)] italic">
-                Se recomienda usar un ordenador para una experiencia estable.
+              <p className="text-sm text-[var(--color-text-tertiary)] bg-[var(--color-bg-secondary)] p-3 rounded-xl border border-[var(--color-border)]">
+                {i18nStore.t('pwa.note')}
               </p>
-              <button
-                onClick={() => setShowMobileWarning(false)}
-                className="w-full py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold rounded-xl transition-all active:scale-95 shadow-lg shadow-[var(--color-primary)]/20"
-              >
-                ENTENDIDO, SOY UN VALIENTE
-              </button>
+              
+              <div className="pt-2 flex flex-col space-y-2">
+                <button
+                  onClick={handleInstallClick}
+                  className="w-full py-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold rounded-2xl transition-all active:scale-95 shadow-lg shadow-[var(--color-primary)]/20"
+                >
+                  {i18nStore.t('pwa.install')}
+                </button>
+                <button
+                  onClick={() => setShowMobileWarning(false)}
+                  className="w-full py-2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors text-sm font-medium"
+                >
+                  {i18nStore.t('common.close')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

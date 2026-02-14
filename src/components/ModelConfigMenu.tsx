@@ -202,7 +202,7 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
                   <div className="flex items-center justify-between">
                     <span className="text-[var(--color-text-secondary)]">MCP Tools:</span>
                     <span className={EngineManager.isToolEngineReady() ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
-                      {EngineManager.isToolEngineReady() ? 'LFM2 Tool (Local)' : i18nStore.t('models.notLoaded')}
+                      {EngineManager.isToolEngineReady() ? 'LFM2 Tool (Emergencia)' : i18nStore.t('models.notLoaded')}
                     </span>
                   </div>
                 </div>

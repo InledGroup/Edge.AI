@@ -1,15 +1,15 @@
-// Engine Manager - Singleton pattern for AI model instances
 import { WebLLMEngine } from './webllm-engine';
 import { WllamaEngine } from './wllama-engine';
+import { TransformersEngine } from './transformers-engine';
 import type { ProgressCallback } from './webllm-engine';
 import { getModelById } from './model-registry';
 import { modelsStore } from '../stores';
 
-let chatEngineInstance: WebLLMEngine | WllamaEngine | null = null;
-let embeddingEngineInstance: WebLLMEngine | WllamaEngine | null = null;
+let chatEngineInstance: WebLLMEngine | WllamaEngine | TransformersEngine | null = null;
+let embeddingEngineInstance: WebLLMEngine | WllamaEngine | TransformersEngine | null = null;
 let toolEngineInstance: WllamaEngine | null = null; // Specialized for MCP tools
-let liveEngineInstance: WllamaEngine | null = null;
-let liveInitializationPromise: Promise<WllamaEngine> | null = null;
+let liveEngineInstance: WllamaEngine | TransformersEngine | null = null;
+let liveInitializationPromise: Promise<WllamaEngine | TransformersEngine> | null = null;
 let toolInitializationPromise: Promise<WllamaEngine> | null = null;
 
 let chatModelName: string = '';
@@ -18,7 +18,7 @@ let liveModelName: string = '';
 const TOOL_MODEL_URL = 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_0.gguf';
 
 export const EngineManager = {
-  async getChatEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine> {
+  async getChatEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine | TransformersEngine> {
     const targetId = modelName || modelsStore.chat?.id || chatModelName;
     if (!targetId) throw new Error('No chat model selected');
 
@@ -26,9 +26,11 @@ export const EngineManager = {
       console.log(`🔄 Initializing chat engine with model: ${targetId}`);
       const meta = getModelById(targetId);
       if (!meta) throw new Error(`Model ${targetId} not found`);
-      const useGPU = meta.engine === 'webllm' || meta.requiresWebGPU;
       
-      if (useGPU) {
+      if (meta.engine === 'transformers') {
+        chatEngineInstance = new TransformersEngine();
+        await (chatEngineInstance as TransformersEngine).initialize(meta.hfModelId || targetId, onProgress);
+      } else if (meta.engine === 'webllm' || meta.requiresWebGPU) {
         chatEngineInstance = new WebLLMEngine();
         await (chatEngineInstance as WebLLMEngine).initialize(meta.webllmModelId || targetId, onProgress);
       } else {
@@ -40,7 +42,7 @@ export const EngineManager = {
     return chatEngineInstance!;
   },
 
-  async getEmbeddingEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine> {
+  async getEmbeddingEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine | TransformersEngine> {
     const targetId = modelName || modelsStore.embedding?.id || embeddingModelName;
     if (!targetId) throw new Error('No embedding model selected');
 
@@ -48,9 +50,11 @@ export const EngineManager = {
       console.log(`🔄 Initializing embedding engine with model: ${targetId}`);
       const meta = getModelById(targetId);
       if (!meta) throw new Error(`Model ${targetId} not found`);
-      const useGPU = meta.engine === 'webllm' || meta.webllmModelId;
 
-      if (useGPU) {
+      if (meta.engine === 'transformers') {
+        embeddingEngineInstance = new TransformersEngine();
+        await (embeddingEngineInstance as TransformersEngine).initialize(meta.hfModelId || targetId, onProgress);
+      } else if (meta.engine === 'webllm' || meta.webllmModelId) {
         embeddingEngineInstance = new WebLLMEngine();
         await (embeddingEngineInstance as WebLLMEngine).initialize(meta.webllmModelId || targetId, onProgress);
       } else {
@@ -83,17 +87,17 @@ export const EngineManager = {
     return toolInitializationPromise;
   },
 
-  setChatEngine(engine: WebLLMEngine | WllamaEngine, name: string) {
+  setChatEngine(engine: WebLLMEngine | WllamaEngine | TransformersEngine, name: string) {
     chatEngineInstance = engine;
     chatModelName = name;
   },
 
-  setEmbeddingEngine(engine: WebLLMEngine | WllamaEngine, name: string) {
+  setEmbeddingEngine(engine: WebLLMEngine | WllamaEngine | TransformersEngine, name: string) {
     embeddingEngineInstance = engine;
     embeddingModelName = name;
   },
 
-  async getLiveEngine(modelName: string = 'lfm-2-audio-1.5b', onProgress?: ProgressCallback): Promise<WllamaEngine> {
+  async getLiveEngine(modelName: string = 'lfm-2-audio-1.5b', onProgress?: ProgressCallback): Promise<WllamaEngine | TransformersEngine> {
     if (liveInitializationPromise) return liveInitializationPromise;
     if (liveEngineInstance && modelName === liveModelName && liveEngineInstance.isReady()) {
       return liveEngineInstance;
@@ -101,9 +105,17 @@ export const EngineManager = {
 
     liveInitializationPromise = (async () => {
       try {
-        const engine = new WllamaEngine();
         const meta = getModelById(modelName);
-        await engine.initialize(meta?.ggufUrl || modelName, onProgress);
+        let engine: WllamaEngine | TransformersEngine;
+        
+        if (meta?.engine === 'transformers') {
+           engine = new TransformersEngine();
+           await engine.initialize(meta.hfModelId || modelName, onProgress);
+        } else {
+           engine = new WllamaEngine();
+           await engine.initialize(meta?.ggufUrl || modelName, onProgress);
+        }
+        
         liveEngineInstance = engine;
         liveModelName = modelName;
         return engine;
@@ -152,10 +164,10 @@ export const EngineManager = {
 
   async resetAll() {
     await Promise.all([
-      resetChatEngine(),
-      resetLiveEngine(),
-      resetToolEngine(),
-      resetEmbeddingEngine()
+      this.resetChatEngine(),
+      this.resetLiveEngine(),
+      this.resetToolEngine(),
+      this.resetEmbeddingEngine()
     ]);
   },
 

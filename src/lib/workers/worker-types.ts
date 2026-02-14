@@ -76,6 +76,24 @@ export type SearchWorkerMessage = {
 };
 
 /**
+ * Audio Decoder worker messages
+ */
+export type AudioDecoderWorkerMessage = 
+  | {
+      type: 'init';
+      payload: {
+        modelId?: string;
+        device?: 'webgpu' | 'wasm';
+      };
+    }
+  | {
+      type: 'decode';
+      payload: {
+        tokens: number[][]; // Batch of [8] codes
+      };
+    };
+
+/**
  * Generic worker error
  */
 export interface WorkerError {

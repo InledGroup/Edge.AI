@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import preact from '@astrojs/preact';
 import tailwind from '@astrojs/tailwind';
+import AstroPWA from '@vite-pwa/astro';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -41,6 +42,58 @@ export default defineConfig({
     }),
     tailwind({
       applyBaseStyles: true,
+    }),
+    AstroPWA({
+      registerType: 'autoUpdate',
+      injectRegister: null,
+      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
+      manifestFilename: 'manifest.json',
+      manifest: {
+        id: '/',
+        name: 'Edge.AI',
+        short_name: 'EdgeAI',
+        description: '100% Local-first Local AI Platform',
+        theme_color: '#0f172a',
+        background_color: '#0f172a',
+        display: 'standalone',
+        start_url: '/',
+        scope: '/',
+        lang: 'es',
+        icons: [
+          {
+            src: '/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
+        maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
+        navigateFallback: '/',
+        cleanupOutdatedCaches: true,
+        // Evitar cachear llamadas de desarrollo
+        navigateFallbackDenylist: [/^\/node_modules/],
+      },
+      devOptions: {
+        enabled: true, // Habilitar en desarrollo para pruebas de PWA
+        suppressWarnings: true,
+        type: 'module',
+        navigateFallbackAllowlist: [/^\//],
+      },
     })
   ],
   vite: {

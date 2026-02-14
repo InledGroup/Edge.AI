@@ -142,6 +142,9 @@ export interface Settings {
   extensionId?: string; // Browser extension ID for web search
   extensionEnabled?: boolean; // Whether to use extension for searches
   useSpecializedToolModel?: boolean; // Whether to use LFM2-Tool for MCP requests
+  // Live Mode settings
+  liveModeAudioType?: 'system' | 'model'; // Use system TTS or model-generated audio
+  liveModeSttType?: 'system' | 'model'; // Use system STT or model-based STT
 }
 
 /**

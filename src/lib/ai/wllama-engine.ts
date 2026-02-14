@@ -105,7 +105,7 @@ export class WllamaEngine {
   async chat(messages: any[], options: any = {}): Promise<any> {
     if (!this.isInitialized || !this.wllama) throw new Error('Wllama not initialized');
 
-    const { temperature = 0.7, maxTokens = 1024, topP = 0.95, tools, onStream } = options;
+    const { temperature = 0.7, maxTokens = 1024, topP = 0.95, tools, onStream, onAudio } = options;
 
     try {
        // Convert messages to tool-friendly format
@@ -159,7 +159,8 @@ Asistente: { "tool": "search", "args": { "query": "notas" } }
          maxTokens,
          topP,
          stop: ['<|end_of_text|>', '<|im_end|>', '```'],
-         onStream: wrappedOnStream
+         onStream: wrappedOnStream,
+         onAudio
        });
 
        const toolCall = this.extractToolCall(fullContent);
@@ -212,7 +213,7 @@ Asistente: { "tool": "search", "args": { "query": "notas" } }
   ): Promise<string> {
     if (!this.isInitialized || !this.wllama) throw new Error('Wllama not initialized');
 
-    const { temperature = 0.7, maxTokens = 512, stop = [], onStream } = options;
+    const { temperature = 0.7, maxTokens = 512, stop = [], onStream, onAudio } = options;
 
     try {
       await this.wllama.setOptions({ embeddings: false });
@@ -230,22 +231,58 @@ Asistente: { "tool": "search", "args": { "query": "notas" } }
       const prompt = messages.map(msg => `<|im_start|>${msg.role}\n${msg.content}<|im_end|>`).join('\n') + '\n<|im_start|>assistant\n';
       const effectiveStop = [...(stop || []), '<|im_end|>', '<|im_start|>', '<|end_of_text|>'];
       
+      const isAudioModel = this.modelUrl.includes('lfm-2-audio');
+      // Audio streaming state
+      let inAudioSegment = false;
+      let mimiBuffer: number[] = [];
+      const AUDIO_VOCAB_START = 65536;
+      const CODEBOOKS = 8;
+      const CODEBOOK_SIZE = 2048;
+
       let fullResponse = '';
       if (onStream) {
         await this.wllama.createCompletion(prompt, {
           nPredict: maxTokens,
           temp: temperature,
           stop: effectiveStop,
-          onNewToken: (_token: any, _piece: any, currentText: any) => {
-            const newChunk = currentText.slice(fullResponse.length);
-            if (newChunk) {
-              fullResponse = currentText;
-              onStream(newChunk);
+          onNewToken: (tokenId: number, piece: Uint8Array | number[], _currentText: any) => {
+            
+            // --- LFM Audio Token Handling ---
+            if (isAudioModel && tokenId >= AUDIO_VOCAB_START) {
+              // Extract codebook index and value
+              // Assuming tokens are interleaved: C0, C1, ..., C7
+              const audioVal = tokenId - AUDIO_VOCAB_START;
+              const codebookIdx = Math.floor(audioVal / CODEBOOK_SIZE);
+              const codeValue = audioVal % CODEBOOK_SIZE;
+              
+              mimiBuffer.push(codeValue);
+              
+              // When we have a full frame (8 codebooks)
+              if (mimiBuffer.length === CODEBOOKS) {
+                if (onAudio) {
+                  // Pass as an array of 8 codes
+                  onAudio(new Uint8Array(mimiBuffer)); 
+                }
+                mimiBuffer = [];
+              }
+              return; // Don't detokenize audio codes as text
+            }
+            // --------------------------------
+
+            // Detokenize text
+            let textChunk = '';
+            if (piece instanceof Uint8Array || Array.isArray(piece)) {
+               textChunk = new TextDecoder().decode(new Uint8Array(piece));
+            }
+
+            if (textChunk) {
+              fullResponse += textChunk;
+              onStream(textChunk);
             }
           },
-        });
+        } as any);
       } else {
-        fullResponse = await this.wllama.createCompletion(prompt, { nPredict: maxTokens, temp: temperature, stop: effectiveStop });
+        fullResponse = await this.wllama.createCompletion(prompt, { nPredict: maxTokens, temp: temperature, stop: effectiveStop } as any);
       }
 
       await this.wllama.setOptions({ embeddings: true });

@@ -14,6 +14,7 @@ export interface GenerationOptions {
   tools?: any[];
   tool_choice?: any;
   onStream?: (chunk: string) => void;
+  onAudio?: (audio: Float32Array | Uint8Array) => void;
 }
 
 export interface ProgressCallback {
