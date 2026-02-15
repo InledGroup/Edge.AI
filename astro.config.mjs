@@ -32,7 +32,7 @@ export default defineConfig({
     port: 4321,
     https: httpsConfig,
     headers: {
-      "Cross-Origin-Embedder-Policy": "credentialless",
+      "Cross-Origin-Embedder-Policy": "unsafe-none",
       "Cross-Origin-Opener-Policy": "same-origin"
     }
   },

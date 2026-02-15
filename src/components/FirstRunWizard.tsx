@@ -487,7 +487,8 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                         <div className="flex items-center gap-2">
                           <span className="font-medium">
                             {(() => {
-                              const key = `modelRegistry.${score.model.id}.name`;
+                              const sanitizedId = score.model.id.replace(/[\.\-]/g, '');
+                              const key = `modelRegistry.${sanitizedId}.name`;
                               const translation = i18nStore.t(key);
                               return translation !== key ? translation : score.model.displayName;
                             })()}
@@ -496,7 +497,8 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                         </div>
                         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
                           {(() => {
-                            const key = `modelRegistry.${score.model.id}.description`;
+                            const sanitizedId = score.model.id.replace(/[\.\-]/g, '');
+                            const key = `modelRegistry.${sanitizedId}.description`;
                             const translation = i18nStore.t(key);
                             return translation !== key ? translation : score.model.description;
                           })()}
@@ -553,7 +555,8 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                         <div className="flex items-center gap-2">
                           <span className="font-medium">
                             {(() => {
-                              const key = `modelRegistry.${score.model.id}.name`;
+                              const sanitizedId = score.model.id.replace(/[\.\-]/g, '');
+                              const key = `modelRegistry.${sanitizedId}.name`;
                               const translation = i18nStore.t(key);
                               return translation !== key ? translation : score.model.displayName;
                             })()}
@@ -562,7 +565,8 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                         </div>
                         <div className="text-xs text-[var(--color-text-secondary)] mt-1">
                           {(() => {
-                            const key = `modelRegistry.${score.model.id}.description`;
+                            const sanitizedId = score.model.id.replace(/[\.\-]/g, '');
+                            const key = `modelRegistry.${sanitizedId}.description`;
                             const translation = i18nStore.t(key);
                             return translation !== key ? translation : score.model.description;
                           })()}

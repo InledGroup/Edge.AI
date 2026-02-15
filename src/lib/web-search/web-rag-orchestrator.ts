@@ -97,7 +97,7 @@ export class WebRAGOrchestrator {
     options: WebRAGOptions = {}
   ): Promise<WebRAGResult> {
     const {
-      sources = ['wikipedia'],
+      sources, // Si es undefined, WebSearchService usará todos los disponibles
       maxSearchResults = 10,
       maxUrlsToFetch = 3,
       topK = 5,

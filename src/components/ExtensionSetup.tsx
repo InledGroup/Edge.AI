@@ -9,6 +9,7 @@ import { Button } from './ui/Button';
 import { Download, CheckCircle2, AlertCircle, ExternalLink, RefreshCw } from 'lucide-preact';
 import { getExtensionSettings, saveExtensionSettings } from '@/lib/db/settings';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
+import { extensionBridge } from '@/lib/extension-bridge';
 
 export interface ExtensionSetupProps {
   onComplete: () => void;
@@ -73,28 +74,28 @@ export function ExtensionSetup({ onComplete, onSkip }: ExtensionSetupProps) {
     if (!extId) return false;
 
     return new Promise((resolve) => {
-      try {
-        chrome.runtime.sendMessage(
-          extId,
-          { type: 'PING' },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              console.log('[ExtensionSetup] Extension not responding:', chrome.runtime.lastError.message);
-              resolve(false);
-            } else if (response && response.success) {
-              resolve(true);
-            } else {
-              resolve(false);
-            }
-          }
-        );
-
-        // Timeout after 2 seconds
-        setTimeout(() => resolve(false), 2000);
-      } catch (error) {
-        console.log('[ExtensionSetup] Error testing extension:', error);
-        resolve(false);
+      // Use the extension bridge instead of chrome.runtime.sendMessage
+      const isConnected = extensionBridge.isConnected();
+      if (isConnected) {
+        resolve(true);
+        return;
       }
+
+      // If not immediately connected, try to reconnect and wait a bit
+      extensionBridge.reconnect();
+      
+      const unsubscribe = extensionBridge.onStatusChange((status) => {
+        if (status === 'connected') {
+          unsubscribe();
+          resolve(true);
+        }
+      });
+
+      // Timeout after 3 seconds
+      setTimeout(() => {
+        unsubscribe();
+        resolve(extensionBridge.isConnected());
+      }, 3000);
     });
   }
 

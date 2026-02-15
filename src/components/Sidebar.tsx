@@ -14,9 +14,13 @@ import {
   Brain,
   Check,
   Languages,
-  MessageCircle
+  MessageCircle,
+  LayoutGrid,
+  Linkedin,
+  QrCode,
+  Sparkles
 } from 'lucide-preact';
-import { conversationsStore, documentsStore, uiStore } from '@/lib/stores';
+import { conversationsStore, documentsStore, uiStore, extensionsStore, generatingTitleIdSignal } from '@/lib/stores';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import {
   createConversation,
@@ -37,14 +41,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWizard }: SidebarProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isOpen, setIsOpen] = useState(true);
-  const [showDocuments, setShowDocuments] = useState(false);
+  const [activeTab, setActiveTab] = useState<'conversations' | 'documents' | 'extensions'>('conversations');
   const [showMemoryManager, setShowMemoryManager] = useState(false);
   const [showMCPSettings, setShowMCPSettings] = useState(false);
 
-  // Subscribe to language changes for re-rendering
+  // Subscribe to language changes and conversations for re-rendering
   const lang = languageSignal.value;
+  const allConversations = conversationsStore.all;
 
   function openFeedbackPopup() {
     // Only run on client-side to avoid SSR errors
@@ -62,22 +66,10 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
     );
   }
 
-  // Load conversations
-
-  useEffect(() => {
-    loadConversations();
-  }, [conversationsStore.all.length]);
-
-  async function loadConversations() {
-    const sorted = await getConversationsSorted();
-    setConversations(sorted);
-  }
-
   async function handleNewChat() {
     const conversation = await createConversation(i18nStore.t('common.newConversation'));
     conversationsStore.add(conversation);
     conversationsStore.setActive(conversation.id);
-    await loadConversations();
   }
 
   async function handleDeleteConversation(id: string, e: Event) {
@@ -89,11 +81,18 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
 
     await deleteConversation(id);
     conversationsStore.remove(id);
-    await loadConversations();
   }
 
   function handleSelectConversation(id: string) {
     conversationsStore.setActive(id);
+  }
+
+  function handleOpenInLinked() {
+    extensionsStore.open('inlinked', 'https://insuite.inled.es/inlinked/?client=edgeai');
+  }
+
+  function handleOpenInQR() {
+    extensionsStore.open('inqr', 'https://insuite.inled.es/inqr/?client=edgeai');
   }
 
   function formatDate(timestamp: number): string {
@@ -116,8 +115,10 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
     }
   }
 
-  // Group conversations by date
-  const groupedConversations = conversations.reduce((groups, conv) => {
+  // Sort and group conversations by date
+  const sortedConversations = [...allConversations].sort((a, b) => b.updatedAt - a.updatedAt);
+
+  const groupedConversations = sortedConversations.reduce((groups, conv) => {
     const label = formatDate(conv.updatedAt);
     if (!groups[label]) {
       groups[label] = [];
@@ -168,33 +169,44 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex gap-2 px-3 pb-3 border-b border-[var(--color-border)]">
+        <div className="flex gap-1 px-3 pb-3 border-b border-[var(--color-border)]">
           <button
-            onClick={() => setShowDocuments(false)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${!showDocuments
-              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
-              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]/50'
+            onClick={() => setActiveTab('conversations')}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 p-2 rounded-lg text-[10px] font-medium transition-colors ${activeTab === 'conversations'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] shadow-sm'
+              : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)]/50'
               }`}
           >
-            <MessageSquare size={14} />
-            <span>{i18nStore.t('common.conversations')}</span>
+            <MessageSquare size={16} />
+            <span>Chats</span>
           </button>
           <button
-            onClick={() => setShowDocuments(true)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${showDocuments
-              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
-              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]/50'
+            onClick={() => setActiveTab('documents')}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 p-2 rounded-lg text-[10px] font-medium transition-colors ${activeTab === 'documents'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] shadow-sm'
+              : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)]/50'
               }`}
           >
-            <FileText size={14} />
-            <span>{i18nStore.t('common.documents')} ({documentsStore.all.length})</span>
+            <FileText size={16} />
+            <span>Docs</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('extensions')}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 p-2 rounded-lg text-[10px] font-medium transition-colors ${activeTab === 'extensions'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] shadow-sm'
+              : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-tertiary)]/50'
+              }`}
+          >
+            <LayoutGrid size={16} />
+            <span>{i18nStore.t('apps.title')}</span>
           </button>
         </div>
 
-        {/* Conversations List */}
-        {!showDocuments ? (
-          <div className="flex-1 overflow-y-auto px-3 py-2">
-            {Object.keys(groupedConversations).length === 0 ? (
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto px-3 py-2">
+          {activeTab === 'conversations' ? (
+            /* Conversations List */
+            Object.keys(groupedConversations).length === 0 ? (
               <div className="text-center py-8 text-sm text-[var(--color-text-secondary)]">
                 <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
                 <p>{i18nStore.t('common.noConversations')}</p>
@@ -217,9 +229,18 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                           }`}
                       >
                         <MessageSquare size={14} className="flex-shrink-0 text-[var(--color-text-secondary)]" />
-                        <span className="flex-1 text-sm truncate">
-                          {conv.title}
-                        </span>
+                        <div className="flex-1 truncate">
+                          {generatingTitleIdSignal.value === conv.id ? (
+                            <div className="flex items-center gap-2 text-[var(--color-primary)] animate-pulse">
+                              <Sparkles size={12} className="animate-spin-slow" />
+                              <span className="text-sm italic">{i18nStore.t('chat.generatingTitle') || 'Generando título...'}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm">
+                              {conv.title}
+                            </span>
+                          )}
+                        </div>
                         <button
                           onClick={(e) => handleDeleteConversation(conv.id, e)}
                           className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-6 h-6 rounded-md hover:bg-[var(--color-error)]/20 flex items-center justify-center transition-all"
@@ -232,12 +253,10 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                   </div>
                 </div>
               ))
-            )}
-          </div>
-        ) : (
-          /* Documents List */
-          <div className="flex-1 overflow-y-auto px-3 py-2">
-            {documentsStore.all.length === 0 ? (
+            )
+          ) : activeTab === 'documents' ? (
+            /* Documents List */
+            documentsStore.all.length === 0 ? (
               <div className="text-center py-8 text-sm text-[var(--color-text-secondary)]">
                 <FileText size={32} className="mx-auto mb-2 opacity-50" />
                 <p>{i18nStore.t('common.noDocuments')}</p>
@@ -267,9 +286,45 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
+            )
+          ) : (
+            /* Extensions List */
+            <div className="space-y-4">
+              <div className="px-2 py-1 text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                {i18nStore.t('apps.insuite')}
+              </div>
+              <div className="space-y-1">
+                <div
+                  onClick={handleOpenInLinked}
+                  className="group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer hover:bg-[var(--color-bg-tertiary)]/50 transition-all border border-transparent hover:border-[var(--color-border)]"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-white p-1.5 shadow-sm flex-shrink-0 border border-gray-100">
+                    <img src="https://hosted.inled.es/INLINKED.png" alt="InLinked" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{i18nStore.t('apps.inlinkedName')}</p>
+                    <p className="text-xs text-[var(--color-text-tertiary)] truncate">{i18nStore.t('apps.inlinkedDesc')}</p>
+                  </div>
+                  <ChevronRight size={14} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100" />
+                </div>
+
+                <div
+                  onClick={handleOpenInQR}
+                  className="group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer hover:bg-[var(--color-bg-tertiary)]/50 transition-all border border-transparent hover:border-[var(--color-border)]"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-white p-1.5 shadow-sm flex-shrink-0 border border-gray-100">
+                    <img src="https://hosted.inled.es/inqr.png" alt="InQR" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{i18nStore.t('apps.inqrName')}</p>
+                    <p className="text-xs text-[var(--color-text-tertiary)] truncate">{i18nStore.t('apps.inqrDesc')}</p>
+                  </div>
+                  <ChevronRight size={14} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Bottom Actions */}
         <div className="border-t border-[var(--color-border)] p-3 space-y-2">

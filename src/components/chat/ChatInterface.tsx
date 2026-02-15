@@ -7,19 +7,20 @@ import { ChatInput } from './ChatInput';
 import { WebSearchProgress } from './WebSearchProgress';
 import { UrlConfirmationModal } from './UrlConfirmationModal';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
-import { conversationsStore, modelsReady, hasReadyDocuments, canvasStore, canvasSignal, modelsStore } from '@/lib/stores';
+import { conversationsStore, modelsReady, hasReadyDocuments, canvasStore, canvasSignal, modelsStore, generatingTitleIdSignal } from '@/lib/stores';
 import { i18nStore } from '@/lib/stores/i18n';
 import type { Message as MessageType } from '@/types';
 import { completeRAGFlow } from '@/lib/rag/rag-pipeline';
 import EngineManager from '@/lib/ai/engine-manager';
 import { WebLLMEngine } from '@/lib/ai/webllm-engine';
-import { addMessage, getOrCreateConversation, getConversation, generateTitle, updateConversationTitle } from '@/lib/db/conversations';
+import { addMessage, getOrCreateConversation, getConversation, generateTitle, updateConversationTitle, aiGenerateTitle } from '@/lib/db/conversations';
 import { getRAGSettings, getWebSearchSettings, getSetting } from '@/lib/db/settings';
 import { getMemories, addMemory } from '@/lib/db/memories';
 import { WebRAGOrchestrator } from '@/lib/web-search';
 import { generateUUID } from '@/lib/utils';
 import { speechService, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { mcpManager } from '@/lib/ai/mcp-manager';
+import { processExtensionIntent, INSUITE_SYSTEM_PROMPT } from '@/lib/insuite-utils';
 
 // Helper functions moved out of component
 const isDocumentGenerationRequest = (message: string): boolean => {
@@ -172,28 +173,67 @@ export function ChatInterface() {
     const userMessage: MessageType = { id: generateUUID(), role: 'user', content: originalContent, images, timestamp: Date.now() };
     setMessages(prev => [...prev, userMessage]);
 
-    let conversationId = conversationsStore.activeId;
-    let isNewConversation = false;
-    if (!conversationId) {
-      const conv = await getOrCreateConversation();
-      conversationId = conv.id;
-      isNewConversation = true;
-      conversationsStore.add(conv);
-    }
-    await addMessage(conversationId, userMessage);
+        let conversationId = conversationsStore.activeId;
 
-    if (isNewConversation) {
-      const title = generateTitle(originalContent);
-      await updateConversationTitle(conversationId, title);
-      const updatedConv = await getConversation(conversationId);
-      if (updatedConv) {
-        conversationsStore.update(conversationId, updatedConv);
-        conversationsStore.setActive(conversationId);
-      }
-    } else {
-      const updatedConv = await getConversation(conversationId);
-      if (updatedConv) conversationsStore.update(conversationId, updatedConv);
-    }
+        let isFirstMessage = false;
+
+    
+
+        if (!conversationId) {
+
+          const conv = await getOrCreateConversation();
+
+          conversationId = conv.id;
+
+          isFirstMessage = true;
+
+          conversationsStore.add(conv);
+
+        } else {
+
+          // Check if the current active conversation has no messages yet
+
+          const activeConv = conversationsStore.active;
+
+          if (!activeConv || !activeConv.messages || activeConv.messages.length === 0) {
+
+            isFirstMessage = true;
+
+          }
+
+        }
+
+    
+
+        await addMessage(conversationId, userMessage);
+
+    
+
+        if (isFirstMessage) {
+
+          // Set a temporary title based on truncation
+
+          const tempTitle = generateTitle(originalContent);
+
+          await updateConversationTitle(conversationId, tempTitle);
+
+          const updatedConv = await getConversation(conversationId);
+
+          if (updatedConv) {
+
+            conversationsStore.update(conversationId, updatedConv);
+
+            conversationsStore.setActive(conversationId);
+
+          }
+
+        } else {
+
+          const updatedConv = await getConversation(conversationId);
+
+          if (updatedConv) conversationsStore.update(conversationId, updatedConv);
+
+        }
 
     setIsGenerating(true);
     setCurrentResponse('');
@@ -217,14 +257,30 @@ export function ChatInterface() {
         const orchestrator = await WebRAGOrchestrator.create(chatEngine, embeddingEngine);
         const tempId = generateUUID();
         setMessages(prev => [...prev, { id: tempId, role: 'assistant', content: '', timestamp: Date.now(), streaming: true }]);
+        
         const res = await orchestrator.search(originalContent, {
           onToken: (t) => {
             setCurrentResponse(prev => prev + t);
             processAudioChunk(t);
             setMessages(prev => prev.map(m => m.id === tempId ? { ...m, content: m.content + t } : m));
+          },
+          onProgress: (step, progress, message) => {
+            setWebSearchProgress({ step, progress, message });
+          },
+          confirmUrls: true,
+          onConfirmationRequest: async (urls) => {
+            setPendingUrls(urls);
+            return new Promise((resolve) => {
+              setConfirmationResolver(() => (confirmedUrls: string[] | null) => {
+                setPendingUrls(null);
+                setConfirmationResolver(null);
+                resolve(confirmedUrls || []);
+              });
+            });
           }
         });
         assistantMessage = { id: tempId, role: 'assistant', content: res.answer, timestamp: Date.now() } as any;
+        setWebSearchProgress(null); // Clear progress when done
       } else if (effectiveMode === 'local') {
         const embeddingEngine = await EngineManager.getEmbeddingEngine();
         const settings = await getRAGSettings();
@@ -237,7 +293,7 @@ export function ChatInterface() {
         assistantMessage = { id: generateUUID(), role: 'assistant', content: answer, timestamp: Date.now(), sources: ragResult.chunks };
       } else {
         const history = [...messages.slice(-10), userMessage].map(m => ({ role: m.role, content: m.content }));
-        const systemPrompt = `Eres un asistente inteligente local. ${canvasContext}${memoryContext}`;
+        const systemPrompt = `Eres un asistente inteligente local. ${canvasContext}${memoryContext}\n${INSUITE_SYSTEM_PROMPT}`;
         const chatMsgs = [{ role: 'system', content: systemPrompt }, ...history];
         
         let answer = '';
@@ -356,10 +412,30 @@ export function ChatInterface() {
         setWebSearchProgress(null);
         finishAudioStreaming(assistantMessage.content);
         await addMessage(conversationId, assistantMessage);
-      }
 
-      if (assistantMessage && isDocumentGenerationRequest(originalContent)) {
-        canvasStore.open(markdownToHTML(assistantMessage.content));
+        // 0. Generate AI title for new conversations in background
+        if (isFirstMessage) {
+          generatingTitleIdSignal.value = conversationId!;
+          aiGenerateTitle(originalContent).then(async (aiTitle) => {
+            await updateConversationTitle(conversationId!, aiTitle);
+            const updated = await getConversation(conversationId!);
+            if (updated) conversationsStore.update(conversationId!, updated);
+          }).catch(err => console.error("Title generation failed", err))
+            .finally(() => {
+              generatingTitleIdSignal.value = null;
+            });
+        }
+
+        // 1. First, show in canvas if it's a generation request
+        if (isDocumentGenerationRequest(originalContent)) {
+          canvasStore.open(markdownToHTML(assistantMessage.content));
+        }
+        
+        // 2. Then, after a small delay, process extension intent (which might close canvas)
+        // This ensures the user "sees" the output as requested
+        setTimeout(() => {
+          processExtensionIntent(assistantMessage.content);
+        }, 500);
       }
     } catch (error: any) {
       console.error(error);

@@ -62,7 +62,8 @@ export const translations = {
       dictate: 'Dictar',
       voiceModeContinuous: 'Modo Voz Continua',
       uploadImage: 'Subir imagen',
-      moreOptions: 'Más opciones'
+      moreOptions: 'Más opciones',
+      generatingTitle: 'Generando título...'
     },
     documents: {
       title: 'Subir Documentos',
@@ -187,55 +188,63 @@ export const translations = {
       openLink: 'Abrir enlace en nueva pestaña',
     },
     modelRegistry: {
-      'phi-3.5-vision': {
+      phi35vision: {
         name: 'Phi-3.5 Vision (Multimodal)',
         description: 'Modelo avanzado de Microsoft con capacidad de visión nativa. Puede ver y analizar imágenes.'
       },
-      'smollm2-135m': {
+      smollm2135m: {
         name: 'SmolLM2 135M (Ultra Rápido)',
         description: 'Modelo ultraligero ideal para dispositivos limitados. Respuestas muy rápidas con calidad básica.'
       },
-      'smollm2-360m': {
+      smollm2360m: {
         name: 'SmolLM2 360M (Rápido)',
         description: 'Modelo pequeño pero capaz. Buen equilibrio entre velocidad y calidad.'
       },
-      'qwen2-0.5b': {
+      qwen205b: {
         name: 'Qwen2.5 0.5B (Rápido)',
         description: 'Modelo ligero de Alibaba. Excelente para tareas simples con poca latencia.'
       },
-      'lfm-2.5-1.6b-q4': {
+      lfm212btool: {
+        name: 'LFM2 1.2B Tool (Especializado)',
+        description: 'Modelo optimizado para uso de herramientas y MCP. Alta precisión en funciones.'
+      },
+      lfm2516bq4: {
         name: 'LFM 2.5 1.6B (Ligero)',
         description: 'Modelo LiquidAI eficiente. Arquitectura innovadora y rápida (1.1GB).'
       },
-      'tinyllama-1.1b': {
+      tinyllama11b: {
         name: 'TinyLlama 1.1B (Equilibrado)',
         description: 'Modelo compacto basado en Llama. Buena calidad con requisitos moderados.'
       },
-      'llama-3.2-1b': {
+      llama321b: {
         name: 'Llama 3.2 1B (Alta Calidad)',
         description: 'Modelo oficial de Meta. Excelente calidad en tamaño compacto.'
       },
-      'qwen2-1.5b': {
+      qwen215b: {
         name: 'Qwen2.5 1.5B (Recomendado)',
         description: 'Modelo equilibrado de Alibaba. Excelente relación calidad/rendimiento.'
       },
-      'llama-3.2-3b': {
+      llama323b: {
         name: 'Llama 3.2 3B (Máxima Calidad)',
         description: 'Modelo grande de Meta. Máxima calidad, requiere WebGPU y buena memoria.'
       },
-      'phi-3.5-mini': {
+      phi35mini: {
         name: 'Phi 3.5 Mini (Avanzado)',
         description: 'Modelo de Microsoft Research. Alta capacidad de razonamiento, requiere WebGPU.'
       },
-      'qwen2-0.5b-embed': {
+      lfm2audio15b: {
+        name: 'LFM2 Audio (Voz Nativa)',
+        description: 'Modelo especializado en procesamiento de audio y voz en tiempo real.'
+      },
+      qwen205bembed: {
         name: 'Qwen2 0.5B (CPU / Seguro)',
         description: 'Opción clásica y segura. Funciona siempre en CPU.'
       },
-      'snowflake-arctic-embed-m-gpu': {
+      snowflakeArcticEmbedMGpu: {
         name: 'Arctic Embed M (GPU / Ultra Rápido)',
         description: 'Modelo profesional de embeddings. Requiere WebGPU. Muy alta precisión.'
       },
-      'snowflake-arctic-embed-s-gpu': {
+      snowflakeArcticEmbedSGpu: {
         name: 'Arctic Embed S (GPU / Instantáneo)',
         description: 'Versión ligera de Arctic. Instantáneo en WebGPU.'
       },
@@ -437,6 +446,17 @@ export const translations = {
       description: 'Para que la descarga de modelos no se interrumpa y funcionen offline, instala esta aplicación en tu pantalla de inicio.',
       note: 'Las apps instaladas reciben más recursos del sistema y evitan que el navegador borre los modelos descargados.',
       install: 'Instalar Aplicación'
+    },
+    apps: {
+      title: 'Apps',
+      insuite: 'Herramientas InSuite',
+      inlinkedName: 'InLinked',
+      inlinkedDesc: 'Formateador de LinkedIn',
+      inqrName: 'InQR',
+      inqrDesc: 'Generador de QR y Barras',
+      sendToInLinked: 'Enviar a InLinked',
+      sendToInQR: 'Enviar a InQR',
+      extension: 'Extensión'
     }
   },
   en: {
@@ -502,7 +522,8 @@ export const translations = {
       dictate: 'Dictate',
       voiceModeContinuous: 'Continuous Voice Mode',
       uploadImage: 'Upload image',
-      moreOptions: 'More options'
+      moreOptions: 'More options',
+      generatingTitle: 'Generating title...'
     },
     documents: {
       title: 'Upload Documents',
@@ -627,55 +648,63 @@ export const translations = {
       openLink: 'Open link in new tab',
     },
     modelRegistry: {
-      'phi-3.5-vision': {
+      phi35vision: {
         name: 'Phi-3.5 Vision (Multimodal)',
         description: 'Advanced Microsoft model with native vision capabilities. Can see and analyze images.'
       },
-      'smollm2-135m': {
+      smollm2135m: {
         name: 'SmolLM2 135M (Ultra Fast)',
         description: 'Ultralight model ideal for limited devices. Very fast responses with basic quality.'
       },
-      'smollm2-360m': {
+      smollm2360m: {
         name: 'SmolLM2 360M (Fast)',
         description: 'Small but capable model. Good balance between speed and quality.'
       },
-      'qwen2-0.5b': {
+      qwen205b: {
         name: 'Qwen2.5 0.5B (Fast)',
         description: 'Lightweight model from Alibaba. Excellent for simple tasks with low latency.'
       },
-      'lfm-2.5-1.6b-q4': {
+      lfm212btool: {
+        name: 'LFM2 1.2B Tool (Specialized)',
+        description: 'Optimized model for tools and MCP. High precision in function calling.'
+      },
+      lfm2516bq4: {
         name: 'LFM 2.5 1.6B (Light)',
         description: 'Efficient LiquidAI model. Innovative and fast architecture (1.1GB).'
       },
-      'tinyllama-1.1b': {
+      tinyllama11b: {
         name: 'TinyLlama 1.1B (Balanced)',
         description: 'Compact model based on Llama. Good quality with moderate requirements.'
       },
-      'llama-3.2-1b': {
+      llama321b: {
         name: 'Llama 3.2 1B (High Quality)',
         description: 'Official Meta model. Excellent quality in compact size.'
       },
-      'qwen2-1.5b': {
+      qwen215b: {
         name: 'Qwen2.5 1.5B (Recommended)',
         description: 'Balanced model from Alibaba. Excellent quality/performance ratio.'
       },
-      'llama-3.2-3b': {
+      llama323b: {
         name: 'Llama 3.2 3B (Max Quality)',
         description: 'Large Meta model. Max quality, requires WebGPU and good memory.'
       },
-      'phi-3.5-mini': {
+      phi35mini: {
         name: 'Phi 3.5 Mini (Advanced)',
         description: 'Microsoft Research model. High reasoning capacity, requires WebGPU.'
       },
-      'qwen2-0.5b-embed': {
+      lfm2audio15b: {
+        name: 'LFM2 Audio (Native Voice)',
+        description: 'Specialized model for real-time audio and voice processing.'
+      },
+      qwen205bembed: {
         name: 'Qwen2 0.5B (CPU / Safe)',
         description: 'Classic and safe option. Always works on CPU.'
       },
-      'snowflake-arctic-embed-m-gpu': {
+      snowflakeArcticEmbedMGpu: {
         name: 'Arctic Embed M (GPU / Ultra Fast)',
         description: 'Professional embedding model. Requires WebGPU. Very high precision.'
       },
-      'snowflake-arctic-embed-s-gpu': {
+      snowflakeArcticEmbedSGpu: {
         name: 'Arctic Embed S (GPU / Instant)',
         description: 'Lightweight Arctic version. Instant on WebGPU.'
       },
@@ -877,6 +906,17 @@ export const translations = {
       description: 'To ensure model downloads are not interrupted and work offline, install this application on your home screen.',
       note: 'Installed apps receive more system resources and prevent the browser from deleting downloaded models.',
       install: 'Install Application'
+    },
+    apps: {
+      title: 'Apps',
+      insuite: 'InSuite Tools',
+      inlinkedName: 'InLinked',
+      inlinkedDesc: 'LinkedIn Formatter',
+      inqrName: 'InQR',
+      inqrDesc: 'QR & Barcode Generator',
+      sendToInLinked: 'Send to InLinked',
+      sendToInQR: 'Send to InQR',
+      extension: 'Extension'
     }
   }
 };

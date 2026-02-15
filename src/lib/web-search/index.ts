@@ -72,6 +72,7 @@ export { WebSearchError, isValidWebUrl, normalizeUrl, extractDomain } from './ty
 // Import here to have it in scope
 import { ExtensionSearchProvider, createExtensionSearchProvider } from './extension-search-provider';
 import { WebSearchService } from './web-search';
+import { WikipediaSearchProvider, DuckDuckGoSearchProvider } from './search-providers';
 
 /**
  * Initialize web search with extension support
@@ -79,8 +80,11 @@ import { WebSearchService } from './web-search';
 export async function initializeWebSearch(): Promise<WebSearchService> {
   console.log('[WebSearch] Initializing with extension support...');
 
-  // Create providers array
-  const providers: SearchProvider[] = [];
+  // Create providers array with default ones first
+  const providers: SearchProvider[] = [
+    new WikipediaSearchProvider(),
+    new DuckDuckGoSearchProvider()
+  ];
 
   try {
     // Create extension provider (uses extensionBridge singleton)
@@ -103,11 +107,6 @@ export async function initializeWebSearch(): Promise<WebSearchService> {
     }
   } catch (error) {
     console.warn('[WebSearch] ❌ Failed to initialize extension provider:', error);
-  }
-
-  // If no extension available, throw error
-  if (providers.length === 0) {
-    throw new Error('Browser extension not available. Web search requires the Edge.AI browser extension. Please install and configure it from the browser-extension folder.');
   }
 
   return new WebSearchService(providers);

@@ -122,14 +122,35 @@ export async function updateConversationTitle(
  * Generate title from first user message
  */
 export function generateTitle(firstMessage: string): string {
-  const maxLength = 50;
-  const cleaned = firstMessage.trim();
+  const maxLength = 40;
+  const cleaned = firstMessage.trim().split('\n')[0];
 
   if (cleaned.length <= maxLength) {
     return cleaned;
   }
 
   return cleaned.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * Advanced title generation using the AI engine
+ */
+export async function aiGenerateTitle(firstMessage: string): Promise<string> {
+  try {
+    const { default: EngineManager } = await import('@/lib/ai/engine-manager');
+    const chatEngine = await EngineManager.getChatEngine();
+    
+    const prompt = `Generate a very short, concise title (max 5 words) for a conversation that starts with this message: "${firstMessage.substring(0, 100)}". Respond ONLY with the title, no quotes or punctuation.`;
+    
+    const title = await chatEngine.generateText([
+      { role: 'user', content: prompt }
+    ], { max_tokens: 20 });
+
+    return title.trim().replace(/^["']|["']$/g, '') || generateTitle(firstMessage);
+  } catch (error) {
+    console.warn('Failed to generate AI title, falling back to basic title:', error);
+    return generateTitle(firstMessage);
+  }
 }
 
 /**

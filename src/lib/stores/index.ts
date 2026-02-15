@@ -110,6 +110,7 @@ export const modelsReady = computed(() => {
 
 export const conversationsSignal = signal<Conversation[]>([]);
 export const activeConversationIdSignal = signal<string | null>(null);
+export const generatingTitleIdSignal = signal<string | null>(null);
 
 export const conversationsStore = {
   get all() {
@@ -271,6 +272,7 @@ export const canvasStore = {
   },
 
   open(content?: string) {
+    extensionsStore.close();
     canvasSignal.value = {
       isOpen: true,
       content: content !== undefined ? content : canvasSignal.value.content
@@ -296,6 +298,60 @@ export const canvasStore = {
     canvasSignal.value = {
       ...canvasSignal.value,
       content
+    };
+  }
+};
+
+// ============================================================================
+// Extensions Store (Right Sidebar)
+// ============================================================================
+
+interface ExtensionsState {
+  isOpen: boolean;
+  activeExtension: 'inlinked' | 'inqr' | null;
+  url: string | null;
+}
+
+export const extensionsSignal = signal<ExtensionsState>({
+  isOpen: false,
+  activeExtension: null,
+  url: null
+});
+
+export const extensionsStore = {
+  get isOpen() {
+    return extensionsSignal.value.isOpen;
+  },
+
+  get activeExtension() {
+    return extensionsSignal.value.activeExtension;
+  },
+
+  get url() {
+    return extensionsSignal.value.url;
+  },
+
+  open(extension: 'inlinked' | 'inqr', url: string) {
+    extensionsSignal.value = {
+      isOpen: true,
+      activeExtension: extension,
+      url
+    };
+    // Close canvas if it's open to avoid overlapping
+    canvasStore.close();
+  },
+
+  close() {
+    extensionsSignal.value = {
+      ...extensionsSignal.value,
+      isOpen: false
+    };
+  },
+
+  toggle() {
+    extensionsSignal.value = {
+      ...extensionsSignal.value,
+      isOpen: !extensionsSignal.value.isOpen
     };
   }
 };

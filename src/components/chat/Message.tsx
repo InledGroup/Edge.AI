@@ -1,6 +1,6 @@
 // Message Component - Individual chat message
 
-import { User, Bot, FileText, Copy, FileEdit, Volume2, VolumeX } from 'lucide-preact';
+import { User, Bot, FileText, Copy, FileEdit, Volume2, VolumeX, Linkedin, QrCode } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import type { Message as MessageType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,8 @@ import type { WebSource } from './WebSources';
 import { Button } from '../ui/Button';
 import { speechService, voiceState } from '@/lib/voice/speech-service';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
+import { extensionsStore } from '@/lib/stores';
+import { generateInLinkedUrl, generateInQRUrl, isUrl } from '@/lib/insuite-utils';
 
 export interface MessageProps {
   message: MessageType;
@@ -51,6 +53,18 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
     } else {
       speechService.speak(message.content);
     }
+  }
+
+  function handleInLinked() {
+    const url = generateInLinkedUrl(message.content);
+    extensionsStore.open('inlinked', url);
+  }
+
+  function handleInQR() {
+    const content = message.content.trim();
+    const type = isUrl(content) ? 'text' : 'text'; // Simplified for now
+    const url = generateInQRUrl({ type, value: content });
+    extensionsStore.open('inqr', url);
   }
 
   return (
@@ -138,7 +152,7 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
 
         {/* Action buttons for assistant messages */}
         {!isUser && (
-          <div className="flex items-center gap-2 px-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex flex-wrap items-center gap-2 px-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button
               variant="ghost"
               size="sm"
@@ -166,6 +180,31 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
             >
               <FileEdit size={14} className="mr-1" />
               {i18nStore.t('message.openCanvas')}
+            </Button>
+
+            {/* Extension Buttons */}
+            <div className="h-4 w-[1px] bg-[var(--color-border)] mx-1" />
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleInLinked}
+              className="h-7 px-2 text-xs hover:text-[#0077b5]"
+              title={i18nStore.t('apps.sendToInLinked')}
+            >
+              <img src="https://hosted.inled.es/INLINKED.png" className="w-3.5 h-3.5 mr-1" />
+              InLinked
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleInQR}
+              className="h-7 px-2 text-xs hover:text-[var(--color-primary)]"
+              title={i18nStore.t('apps.sendToInQR')}
+            >
+              <img src="https://hosted.inled.es/inqr.png" className="w-3.5 h-3.5 mr-1" />
+              InQR
             </Button>
           </div>
         )}

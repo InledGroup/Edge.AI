@@ -6,6 +6,7 @@ import { ChatInterface } from './chat/ChatInterface';
 import { DocumentViewer } from './DocumentViewer';
 import { DocumentUpload } from './DocumentUpload';
 import { DocumentCanvas } from './DocumentCanvas';
+import { ExtensionsPanel } from './ExtensionsPanel';
 import { FirstRunWizard } from './FirstRunWizard';
 import { ModelLoadingIndicator } from './ModelLoadingIndicator';
 import { ExtensionStatus } from './ExtensionStatus';
@@ -13,7 +14,7 @@ import LiveMode from './chat/LiveMode';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
 import { i18nStore } from '@/lib/stores/i18n';
-import { canvasSignal, canvasStore } from '@/lib/stores';
+import { canvasSignal, canvasStore, extensionsSignal } from '@/lib/stores';
 import { checkIfMobile } from '@/lib/ai/device-profile';
 import { AlertTriangle, X } from 'lucide-preact';
 
@@ -96,6 +97,7 @@ export function AppLayout() {
   };
 
   const canvasOpen = canvasSignal.value.isOpen;
+  const extensionsOpen = extensionsSignal.value.isOpen;
 
   return (
     <>
@@ -123,6 +125,9 @@ export function AppLayout() {
                />
             </div>
           )}
+
+          {/* Right Sidebar (Extensions) */}
+          {extensionsOpen && <ExtensionsPanel />}
         </main>
       </div>
 
