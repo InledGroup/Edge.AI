@@ -80,8 +80,17 @@ class MCPManager {
 
       if (server.transport === 'http') {
         // SSEClientTransport is generally more compatible with existing MCP servers
-        // like the one for Notion which might not support StreamableHTTP yet.
-        transport = new SSEClientTransport(new URL(server.url), {
+        // We attempt to pass the token in the URL if it exists in headers, 
+        // as browser EventSource does not support custom headers.
+        const url = new URL(server.url);
+        if (server.headers && server.headers['Authorization']) {
+          const auth = server.headers['Authorization'];
+          if (auth.startsWith('Bearer ')) {
+            url.searchParams.set('token', auth.substring(7));
+          }
+        }
+
+        transport = new SSEClientTransport(url, {
           requestInit: {
             headers: {
               ...(server.headers || {})

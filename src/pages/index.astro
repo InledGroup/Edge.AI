@@ -26,6 +26,41 @@ import '@/styles/global.css';
     {!pwaInfo && <link rel="manifest" href="/manifest.json" />}
     <script>
         import '../pwa.ts';
+        import { Buffer } from 'buffer';
+        
+        // Node.js Polyfills for browser compatibility
+        if (typeof window !== 'undefined') {
+            // @ts-ignore
+            window.global = window;
+            
+            // @ts-ignore
+            if (!window.process) {
+                // @ts-ignore
+                window.process = { 
+                    env: {}, 
+                    version: 'v20.0.0', 
+                    platform: 'browser',
+                    browser: true,
+                    nextTick: (fn: Function) => setTimeout(fn, 0),
+                    cwd: () => '/'
+                };
+            } else {
+                // @ts-ignore
+                window.process.nextTick = (fn: Function) => setTimeout(fn, 0);
+                // @ts-ignore
+                if (!window.process.cwd) window.process.cwd = () => '/';
+            }
+            
+            // Buffer polyfill
+            // @ts-ignore
+            window.Buffer = Buffer;
+
+            // Crypto polyfill
+            if (!window.crypto.webcrypto) {
+                // @ts-ignore
+                window.crypto.webcrypto = window.crypto;
+            }
+        }
     </script>
 </head>
 <body>

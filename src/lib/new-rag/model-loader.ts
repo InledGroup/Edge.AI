@@ -1,8 +1,14 @@
 import { pipeline, env } from '@huggingface/transformers';
+import { DEFAULT_CONFIG } from './config';
 
-// Configuration: Prefer local cache, allow fetching if missing.
+// Configuration: Explicitly allow remote models and configure paths
 env.allowLocalModels = false; 
+env.allowRemoteModels = true;
 env.useBrowserCache = true;
+
+// Ensure we use the correct Hugging Face host for model fetching
+env.remoteHost = 'https://huggingface.co/';
+env.remotePathTemplate = '{model}/resolve/{revision}/';
 
 export class RAGModelLoader {
   private static instance: RAGModelLoader;
@@ -17,8 +23,9 @@ export class RAGModelLoader {
 
   async getClassifier(onProgress?: (progress: number, status: string) => void) {
     if (!this.cache.has('classifier')) {
-      console.log('Loading Classifier: bert-base-multilingual-cased...');
-      this.cache.set('classifier', await pipeline('feature-extraction', 'Xenova/bert-base-multilingual-cased', {
+      const modelId = DEFAULT_CONFIG.models.classifier;
+      console.log(`Loading Classifier: ${modelId}...`);
+      this.cache.set('classifier', await pipeline('feature-extraction', modelId, {
         progress_callback: (p: any) => {
           if (onProgress && p.status === 'progress') onProgress(p.progress, p.file);
         }
@@ -29,8 +36,9 @@ export class RAGModelLoader {
 
   async getEmbedder(onProgress?: (progress: number, status: string) => void) {
     if (!this.cache.has('embedder')) {
-      console.log('Loading Embedder: bge-m3...');
-      this.cache.set('embedder', await pipeline('feature-extraction', 'Xenova/bge-m3', {
+      const modelId = DEFAULT_CONFIG.models.embedding;
+      console.log(`Loading Embedder: ${modelId}...`);
+      this.cache.set('embedder', await pipeline('feature-extraction', modelId, {
         progress_callback: (p: any) => {
           if (onProgress && p.status === 'progress') onProgress(p.progress, p.file);
         }
@@ -41,8 +49,9 @@ export class RAGModelLoader {
 
   async getReranker(onProgress?: (progress: number, status: string) => void) {
     if (!this.cache.has('reranker')) {
-      console.log('Loading Reranker: monoT5-base-msmarco...');
-      this.cache.set('reranker', await pipeline('text2text-generation', 'Xenova/monot5-base-msmarco', {
+      const modelId = DEFAULT_CONFIG.models.reranker;
+      console.log(`Loading Reranker: ${modelId}...`);
+      this.cache.set('reranker', await pipeline('text2text-generation', modelId, {
         progress_callback: (p: any) => {
           if (onProgress && p.status === 'progress') onProgress(p.progress, p.file);
         }
@@ -53,8 +62,9 @@ export class RAGModelLoader {
 
   async getGenerator(onProgress?: (progress: number, status: string) => void) {
     if (!this.cache.has('generator')) {
-      console.log('Loading Generator: flan-t5-large...');
-      this.cache.set('generator', await pipeline('text2text-generation', 'Xenova/flan-t5-large', {
+      const modelId = DEFAULT_CONFIG.models.generator;
+      console.log(`Loading Generator: ${modelId}...`);
+      this.cache.set('generator', await pipeline('text2text-generation', modelId, {
         progress_callback: (p: any) => {
           if (onProgress && p.status === 'progress') onProgress(p.progress, p.file);
         }

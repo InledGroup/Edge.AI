@@ -10,16 +10,15 @@ export const DEFAULT_CONFIG: RAGConfig = {
   },
   models: {
     // LLM-Embedder / BGE-M3 (High performance dense embedding)
-    // We use BGE-M3 as the closest reliable implementation of LLM-Embedder in the Xenova registry.
-    embedding: 'Xenova/bge-m3', 
+    embedding: 'onnx-community/bge-m3', 
     // Sparse vector generation is handled by custom logic (TF-IDF Hashing)
     sparse: 'custom-hashing-vectorizer', 
     // monoT5 for Reranking
-    reranker: 'Xenova/monot5-base-msmarco', 
+    reranker: 'onnx-community/monot5-base-msmarco', 
     // BERT for Classification (Feature Extraction + Prototype)
-    classifier: 'Xenova/bert-base-multilingual-cased',
+    classifier: 'onnx-community/bert-base-multilingual-cased',
     // Flan-T5 Large for Generation (HyDE & Recomp)
-    generator: 'Xenova/flan-t5-large', 
+    generator: 'onnx-community/flan-t5-large', 
   },
   chunking: {
     smallChunkSize: 175,

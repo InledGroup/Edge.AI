@@ -252,6 +252,22 @@ export const translations = {
         name: 'Arctic Embed S (GPU / Instantáneo)',
         description: 'Versión ligera de Arctic. Instantáneo en WebGPU.'
       },
+      bgem3: {
+        name: 'BGE-M3 (Dense Embedding)',
+        description: 'Modelo de alto rendimiento para búsqueda semántica multilingüe.'
+      },
+      monot5base: {
+        name: 'monoT5 (Reranker)',
+        description: 'Modelo especializado en re-ordenar resultados por relevancia.'
+      },
+      bertmultilingual: {
+        name: 'BERT Multilingual (Classifier)',
+        description: 'Clasificador de intención para decidir si usar RAG o Chat.'
+      },
+      flant5large: {
+        name: 'Flan-T5 Large (HyDE/Generator)',
+        description: 'Generador de hipótesis y compresión de contexto avanzado.'
+      },
     },
     wizard: {
       welcome: 'Bienvenido a Edge.AI',
@@ -734,6 +750,22 @@ export const translations = {
       snowflakeArcticEmbedSGpu: {
         name: 'Arctic Embed S (GPU / Instant)',
         description: 'Lightweight Arctic version. Instant on WebGPU.'
+      },
+      bgem3: {
+        name: 'BGE-M3 (Dense Embedding)',
+        description: 'High-performance model for multilingual semantic search.'
+      },
+      monot5base: {
+        name: 'monoT5 (Reranker)',
+        description: 'Specialized model for re-ranking search results by relevance.'
+      },
+      bertmultilingual: {
+        name: 'BERT Multilingual (Classifier)',
+        description: 'Intent classifier to decide between RAG and Direct Chat.'
+      },
+      flant5large: {
+        name: 'Flan-T5 Large (HyDE/Generator)',
+        description: 'Advanced hypothesis generator and context compression model.'
       },
     },
     wizard: {

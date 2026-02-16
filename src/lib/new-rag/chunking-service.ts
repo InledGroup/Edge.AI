@@ -7,7 +7,7 @@ export class ChunkingService {
 
   /**
    * Small-to-Big Chunking Logic (Robust Implementation)
-   * 1. Split into sentences.
+   * 1. Split into sentences using NLP tokenizer.
    * 2. Group sentences into small chunks (approx 175 tokens).
    * 3. For each small chunk, expand window to form parent chunk (approx 512 tokens).
    */
@@ -74,6 +74,9 @@ export class ChunkingService {
             parentText = sent + ' ' + parentText;
             currentParentTokens += tokens;
             left--;
+          } else {
+            // Optimization: Stop expanding this direction if we can't fit the sentence
+            left = -1; 
           }
         }
         
@@ -85,13 +88,12 @@ export class ChunkingService {
             parentText = parentText + ' ' + sent;
             currentParentTokens += tokens;
             right++;
+          } else {
+            right = sentences.length;
           }
         }
 
-        // Break if we can't expand either side without exceeding limit (or handled by checks)
         if (left < 0 && right >= sentences.length) break;
-        // Optimization: if both checks failed to add, we stop
-         // (implicit in the checks above, but let's be safe)
       }
 
       return {

@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import preact from '@astrojs/preact';
 import tailwind from '@astrojs/tailwind';
 import AstroPWA from '@vite-pwa/astro';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -97,6 +98,16 @@ export default defineConfig({
     })
   ],
   vite: {
+    plugins: [
+      nodePolyfills({
+        include: ['buffer', 'events', 'process', 'util', 'stream', 'crypto', 'path', 'fs', 'os'],
+        globals: {
+          Buffer: true,
+          global: true,
+          process: true,
+        },
+      }),
+    ],
     server: {
       https: httpsConfig,
     },
