@@ -85,7 +85,7 @@ export interface EdgeAIDB extends DBSchema {
 }
 
 const DB_NAME = 'edge-ai-db';
-const DB_VERSION = 3;
+const DB_VERSION = 6;
 
 let dbInstance: IDBPDatabase<EdgeAIDB> | null = null;
 

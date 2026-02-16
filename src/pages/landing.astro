@@ -1,1054 +1,396 @@
 ---
-// Edge.AI - Marketing Landing Page
 import "@/styles/global.css";
-import {
-    Shield,
-    Zap,
-    Coins,
-    Lock,
-    Rocket,
-    BookOpen,
-    HardDrive,
-    Layout,
-    ShieldCheck,
-    ChevronRight,
-    ChevronDown,
-    Globe,
-    Star,
-    Check,
-    X,
-    Minus,
+import { 
+  Shield, Zap, Lock, Rocket, BookOpen, Globe, Star, Check, 
+  Cpu, MessageSquare, Mic, HardDrive, Share2, Briefcase, 
+  User, ShieldCheck, ChevronRight, BarChart3, Database,
+  FileSearch, Activity, Crosshair, Award
 } from "lucide-preact";
 ---
 
 <!doctype html>
-<html lang="es" data-theme="dark">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Edge.AI - IA 100% Local y Privada</title>
-        <meta name="description" content="Plataforma de IA conversacional 100% local - Sin backend, sin cuentas, sin envío de datos" />
-        <link rel="icon" type="image/png" href="/icon-192.png" />
-        <link rel="shortcut icon" href="/icon-192.png" />
-        <meta name="theme-color" content="#0f172a" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Edge.AI" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <style>
-            /* Smooth scroll behavior */
-            html {
-                scroll-behavior: smooth;
-            }
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edge.AI | Private & Professional AI Infrastructure</title>
+    <style>
+        :root {
+            --accent-personal: var(--color-primary);
+            --accent-business: #3b82f6; 
+        }
+        .glass {
+            background: rgba(47, 47, 47, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--color-border);
+        }
+        .gradient-text-personal {
+            background: linear-gradient(90deg, var(--color-primary), #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gradient-text-business {
+            background: linear-gradient(90deg, #3b82f6, var(--color-primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .grid-bg {
+            background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.03) 1px, transparent 0);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body class="bg-[var(--color-bg)] text-[var(--color-text)] font-sans selection:bg-[var(--color-primary)]/30">
 
-            /* Custom animations */
-            @keyframes float {
-                0%,
-                100% {
-                    transform: translateY(0px);
-                }
-                50% {
-                    transform: translateY(-20px);
-                }
-            }
+    <!-- Language Switcher (Fixed) -->
+    <div class="fixed top-6 right-6 z-[110]">
+        <button
+            id="langSwitcher"
+            class="px-4 py-2 glass hover:bg-[var(--color-primary)]/10 text-[var(--color-text)] font-semibold rounded-xl transition-all duration-300 border border-[var(--color-border)] flex items-center gap-2"
+        >
+            <Globe size={18} />
+            <span id="langLabel">English</span>
+        </button>
+    </div>
 
-            @keyframes gradient-shift {
-                0%,
-                100% {
-                    background-position: 0% 50%;
-                }
-                50% {
-                    background-position: 100% 50%;
-                }
-            }
-
-            @keyframes fade-in-up {
-                from {
-                    opacity: 0;
-                    transform: translateY(30px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
-
-            .animate-float {
-                animation: float 6s ease-in-out infinite;
-            }
-
-            .animate-gradient {
-                background-size: 200% 200%;
-                animation: gradient-shift 8s ease infinite;
-            }
-
-            .fade-in-up {
-                animation: fade-in-up 0.8s ease-out forwards;
-            }
-
-            /* Stagger delays for cards */
-            .card-1 {
-                animation-delay: 0.1s;
-            }
-            .card-2 {
-                animation-delay: 0.2s;
-            }
-            .card-3 {
-                animation-delay: 0.3s;
-            }
-            .card-4 {
-                animation-delay: 0.4s;
-            }
-            .card-5 {
-                animation-delay: 0.5s;
-            }
-            .card-6 {
-                animation-delay: 0.6s;
-            }
-
-            /* Gradient text */
-            .gradient-text {
-                background: linear-gradient(
-                    90deg,
-                    var(--color-primary),
-                    #20b813,
-                    var(--color-primary)
-                );
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-            }
-
-            /* Glass morphism effect */
-            .glass {
-                background: rgba(20, 20, 20, 0.6);
-                backdrop-filter: blur(12px);
-                -webkit-backdrop-filter: blur(12px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            }
-
-            /* Grid pattern background */
-            .grid-pattern {
-                background-image:
-                    linear-gradient(
-                        rgba(40, 229, 24, 0.03) 1px,
-                        transparent 1px
-                    ),
-                    linear-gradient(
-                        90deg,
-                        rgba(40, 229, 24, 0.03) 1px,
-                        transparent 1px
-                    );
-                background-size: 50px 50px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="min-h-screen bg-[var(--color-bg)] grid-pattern">
-            <!-- Product Hunt Announcement -->
-    
-
-            <!-- Language Switcher -->
-            <div class="fixed top-6 right-6 z-[70]">
-                <button
-                    id="langSwitcher"
-                    class="px-4 py-2 glass hover:bg-[var(--color-primary)]/10 text-[var(--color-text)] font-semibold rounded-xl transition-all duration-300 border border-white/10 flex items-center gap-2"
-                >
-                    <Globe size={18} />
-                    <span id="langLabel">English</span>
-                </button>
-            </div>
-
-            <!-- Hero Section -->
-            <section class="relative overflow-hidden">
-                <!-- Animated Background Effects -->
-                <div
-                    class="absolute inset-0 pointer-events-none overflow-hidden"
-                >
-                    <div
-                        class="absolute top-0 left-1/4 w-[600px] h-[600px] bg-[var(--color-primary)] opacity-15 blur-[150px] rounded-full animate-float"
-                    >
-                    </div>
-                    <div
-                        class="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-[#20b813] opacity-10 blur-[120px] rounded-full"
-                        style="animation: float 8s ease-in-out infinite;"
-                    >
-                    </div>
-                    <div
-                        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--color-primary)] opacity-5 blur-[200px] rounded-full"
-                    >
-                    </div>
+    <!-- Entry Selector (Overlay) -->
+    <div id="entry-selector" class="fixed inset-0 z-[100] bg-[var(--color-bg)] flex items-center justify-center p-4">
+        <div class="max-w-6xl w-full grid md:grid-cols-2 gap-8">
+            <!-- Personal Side -->
+            <button onclick="selectView('personal')" class="group p-8 rounded-3xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-primary)] transition-all text-left shadow-2xl">
+                <div class="w-16 h-16 rounded-2xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] mb-6 group-hover:scale-110 transition-transform">
+                    <User size={40} />
                 </div>
-
-                <div
-                    class="container mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32 relative"
-                >
-                    <div class="max-w-5xl mx-auto">
-                        <!-- Logo Badge -->
-                        <div
-                            class="flex justify-center mb-10 opacity-0 fade-in-up"
-                        >
-                            <div class="relative group">
-                                <img
-                                    src="/inledai.png"
-                                    alt="Logo"
-                                    class="w-24 rounded-3xl animate-gradient flex items-center justify-center font-bold text-5xl text-black transform hover:scale-110 transition-transform duration-300"
-                                />
-                            </div>
-                        </div>
-
-                        <!-- Main Heading -->
-                        <div class="text-center space-y-6 mb-12">
-                            <h1
-                                class="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-extrabold leading-none tracking-tight opacity-0 fade-in-up"
-                                style="animation-delay: 0.1s;"
-                            >
-                                <span
-                                    class="block mb-3 gradient-text animate-gradient"
-                                    data-i18n="landing.heroTitle1"
-                                >
-                                    IA
-                                </span>
-                                <span class="block text-[var(--color-text)]" data-i18n="landing.heroTitle2">
-                                    que no sale de tu ordenador
-                                </span>
-                            </h1>
-
-                            <p
-                                class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)] max-w-3xl mx-auto leading-relaxed px-4 opacity-0 fade-in-up"
-                                style="animation-delay: 0.2s;"
-                            >
-                                <span data-i18n="landing.heroSubtitle">
-                                Chatea con modelos de IA que se ejecutan en tu
-                                ordenador, buscan en internet y leen tus
-                                documentos sin subirlos a la nube.
-                                </span>
-                                <br />
-                                <span data-i18n="landing.heroNote">Hasta puedes
-                                desactivar la Wifi una vez descargado el modelo</span>
-                                <span
-                                    class="block mt-2 text-[var(--color-primary)] font-bold"
-                                    data-i18n="landing.heroBadges"
-                                >
-                                    Privado · Local · Ilimitado
-                                </span>
-                            </p>
-                        </div>
-
-                        <!-- CTA Buttons -->
-                        <div
-                            class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 px-4 opacity-0 fade-in-up"
-                            style="animation-delay: 0.3s;"
-                        >
-                            <a
-                                href="/"
-                                class="group relative px-10 py-5 bg-gradient-to-r from-[var(--color-primary)] to-[#20b813] text-black font-bold rounded-2xl text-lg sm:text-xl transition-all duration-300 hover:shadow-2xl hover:shadow-[var(--color-primary)]/60 hover:scale-105 w-full sm:w-auto overflow-hidden"
-                            >
-                                <span
-                                    class="relative z-10 flex items-center justify-center gap-2"
-                                >
-                                    <span data-i18n="landing.tryNow">Probar Ahora</span>
-                                    <ChevronRight
-                                        size={20}
-                                        className="group-hover:translate-x-1 transition-transform"
-                                    />
-                                </span>
-                                <div
-                                    class="absolute inset-0 bg-gradient-to-r from-[#20b813] to-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                                >
-                                </div>
-                            </a>
-
-                            <a
-                                href="#features"
-                                class="group px-10 py-5 glass hover:bg-[var(--color-primary)]/5 text-[var(--color-text)] font-bold rounded-2xl text-lg sm:text-xl transition-all duration-300 hover:border-[var(--color-primary)]/50 w-full sm:w-auto"
-                            >
-                                <span
-                                    class="flex items-center justify-center gap-2"
-                                >
-                                    <span data-i18n="landing.viewFeatures">Ver Características</span>
-                                    <ChevronDown
-                                        size={20}
-                                        className="group-hover:translate-y-1 transition-transform"
-                                    />
-                                </span>
-                            </a>
-                        </div>
-
-        
-
-                        <!-- Trust Indicators -->
-                        <div
-                            class="flex flex-wrap justify-center gap-8 text-sm sm:text-base text-[var(--color-text-secondary)] opacity-0 fade-in-up"
-                            style="animation-delay: 0.4s;"
-                        >
-                            <div
-                                class="flex items-center gap-3 px-4 py-2 glass rounded-full"
-                            >
-                                <Shield
-                                    size={20}
-                                    className="text-[var(--color-primary)]"
-                                />
-                                <span class="font-medium" data-i18n="landing.noServers">Sin servidores</span>
-                            </div>
-                            <div
-                                class="flex items-center gap-3 px-4 py-2 glass rounded-full"
-                            >
-                                <Zap
-                                    size={20}
-                                    className="text-[var(--color-primary)]"
-                                />
-                                <span class="font-medium" data-i18n="landing.noRegistration">Sin registro</span>
-                            </div>
-                            <div
-                                class="flex items-center gap-3 px-4 py-2 glass rounded-full"
-                            >
-                                <Coins
-                                    size={20}
-                                    className="text-[var(--color-primary)]"
-                                />
-                                <span class="font-medium" data-i18n="landing.noCosts">Sin costos</span>
-                            </div>
-                        </div>
-                    </div>
+                <h2 class="text-3xl font-bold mb-4" data-i18n="landing.selector.personal_title">Personal Use</h2>
+                <p class="text-[var(--color-text-secondary)] mb-6 text-lg" data-i18n="landing.selector.personal_desc">Protect your digital privacy. Chat with your files, browse without tracking, and customize your AI without giving away your personal data.</p>
+                <div class="flex items-center text-[var(--color-primary)] font-bold">
+                    <span data-i18n="landing.selector.personal_btn">Enter as Individual</span> <ChevronRight className="ml-2" />
                 </div>
+            </button>
 
-                <!-- Decorative divider -->
-                <div
-                    class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--color-primary)]/50 to-transparent"
-                >
+            <!-- Business Side -->
+            <button onclick="selectView('business')" class="group p-8 rounded-3xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-blue-500 transition-all text-left shadow-2xl">
+                <div class="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 mb-6 group-hover:scale-110 transition-transform">
+                    <Briefcase size={40} />
                 </div>
-            </section>
-
-            <!-- Features Section -->
-            <section id="features" class="relative py-20 sm:py-24 lg:py-32">
-                <!-- Background decoration -->
-                <div
-                    class="absolute inset-0 pointer-events-none overflow-hidden"
-                >
-                    <div
-                        class="absolute top-1/2 right-0 w-[400px] h-[400px] bg-[var(--color-primary)] opacity-5 blur-[120px] rounded-full"
-                    >
-                    </div>
+                <h2 class="text-3xl font-bold mb-4" data-i18n="landing.selector.business_title">Corporate Use</h2>
+                <p class="text-[var(--color-text-secondary)] mb-6 text-lg" data-i18n="landing.selector.business_desc">Data sovereignty for organizations. Local AI for high-security environments, Defense, Healthcare, and Finance.</p>
+                <div class="flex items-center text-blue-500 font-bold">
+                    <span data-i18n="landing.selector.business_btn">Enter as Business</span> <ChevronRight className="ml-2" />
                 </div>
-
-                <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-                    <!-- Section Header -->
-                    <div class="text-center mb-16 lg:mb-20">
-                        <h2
-                            class="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight"
-                        >
-                            <span class="gradient-text animate-gradient" data-i18n="landing.featuresTitle">
-                                Nunca antes desarrollado, novedoso
-                            </span>
-                        </h2>
-                        <p
-                            class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)] max-w-3xl mx-auto px-4"
-                            data-i18n="landing.featuresSubtitle"
-                        >
-                            Todo el poder de la IA sin comprometer tu privacidad
-                        </p>
-                    </div>
-
-                    <!-- Feature Cards Grid -->
-                    <div
-                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-7xl mx-auto"
-                    >
-                        <!-- Feature Card 1 -->
-                        <div
-                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-1"
-                        >
-                            <div class="relative mb-6">
-                                <div
-                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
-                                >
-                                </div>
-                                <div
-                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
-                                >
-                                    <Lock size={32} strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <h3
-                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
-                                data-i18n="landing.feature1Title"
-                            >
-                                Privacidad Total
-                            </h3>
-                            <p
-                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
-                                data-i18n="landing.feature1Desc"
-                            >
-                                Las conversaciones se almacenan en tu navegador usando IndexedDB. No se envían a ningún servidor, se quedan en tu dispositivo.
-                            </p>
-                        </div>
-
-                        <!-- Feature Card 2 -->
-                        <div
-                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-2"
-                        >
-                            <div class="relative mb-6">
-                                <div
-                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
-                                >
-                                </div>
-                                <div
-                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
-                                >
-                                    <Rocket size={32} strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <h3
-                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
-                                data-i18n="landing.feature2Title"
-                            >
-                                Modelos Potentes
-                            </h3>
-                            <p
-                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
-                                data-i18n="landing.feature2Desc"
-                            >
-                                Gracias a potentes algoritmos de detección, Edge AI escoge el modelo de IA que mejor se adapta a las especificaciones de tu dispositivo.
-                            </p>
-                        </div>
-
-                        <!-- Feature Card 3 -->
-                        <div
-                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-3"
-                        >
-                            <div class="relative mb-6">
-                                <div
-                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
-                                >
-                                </div>
-                                <div
-                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
-                                >
-                                    <BookOpen size={32} strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <h3
-                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
-                                data-i18n="landing.feature3Title"
-                            >
-                                Añade documentos sin comprometer la privacidad
-                            </h3>
-                            <p
-                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
-                                data-i18n="landing.feature3Desc"
-                            >
-                                Con novedosos sistemas de tecnología RAG, Edge.AI puede responder a tus preguntas sobre documentos que tú le añadas que nunca saldrán de tu dispositivo.
-                            </p>
-                        </div>
-
-                        <!-- Feature Card 4 -->
-                        <div
-                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-4"
-                        >
-                            <div class="relative mb-6">
-                                <div
-                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
-                                >
-                                </div>
-                                <div
-                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
-                                >
-                                    <Zap size={32} strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <h3
-                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
-                                data-i18n="landing.feature4Title"
-                            >
-                                Rápido y Eficiente
-                            </h3>
-                            <p
-                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
-                                data-i18n="landing.feature4Desc"
-                            >
-                                Optimizado con WebGPU y WebAssembly para máximo
-                                rendimiento. Funciona offline una vez descargado
-                                el modelo.
-                            </p>
-                        </div>
-
-                        <!-- Feature Card 5 -->
-                        <div
-                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-5"
-                        >
-                            <div class="relative mb-6">
-                                <div
-                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
-                                >
-                                </div>
-                                <div
-                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
-                                >
-                                    <Globe size={32} strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <h3
-                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
-                                data-i18n="landing.feature5Title"
-                            >
-                                Búsqueda en internet
-                            </h3>
-                            <p
-                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
-                                data-i18n="landing.feature5Desc"
-                            >
-                                Si necesitas que Edge.AI busque en internet: lo tienes. <br>
-                                Búsqueda en Wikipedia y DuckDuckGo, privada, sin relacionarte con la búsqueda. <br>
-                                La búsqueda se realiza en tu dispositivo, no pasa por nuestros servidores
-                            </p>
-                        </div>
-
-                        <!-- Feature Card 6 -->
-                        <div
-                            class="group p-8 glass hover:bg-[var(--color-primary)]/5 rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-primary)]/20 hover:-translate-y-2 opacity-0 fade-in-up card-6"
-                        >
-                            <div class="relative mb-6">
-                                <div
-                                    class="absolute inset-0 bg-[var(--color-primary)] opacity-20 blur-xl rounded-2xl group-hover:opacity-40 transition-opacity"
-                                >
-                                </div>
-                                <div
-                                    class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/20 to-transparent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-[var(--color-primary)]"
-                                >
-                                    <Layout size={32} strokeWidth={1.5} />
-                                </div>
-                            </div>
-                            <h3
-                                class="text-2xl font-bold mb-4 text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
-                                data-i18n="landing.feature6Title"
-                            >
-                                Interfaz Moderna
-                            </h3>
-                            <p
-                                class="text-[var(--color-text-secondary)] leading-relaxed text-base"
-                                data-i18n="landing.feature6Desc"
-                            >
-                                Diseño limpio e intuitivo con modo oscuro.
-                                Experiencia de usuario fluida y profesional.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Decorative divider -->
-                <div
-                    class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--color-primary)]/50 to-transparent"
-                >
-                </div>
-            </section>
-
-            <!-- Comparison Section -->
-            <section id="comparison" class="relative py-20 sm:py-24 lg:py-32 bg-[var(--color-bg)]/50">
-                <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-                    <!-- Section Header -->
-                    <div class="text-center mb-16">
-                        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6">
-                            <span class="gradient-text animate-gradient" data-i18n="landing.comparison.title">
-                                Comparativa
-                            </span>
-                        </h2>
-                        <p class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)]" data-i18n="landing.comparison.subtitle">
-                            Cómo nos comparamos con otros
-                        </p>
-                    </div>
-
-                    <!-- Comparison Table -->
-                    <div class="overflow-x-auto pb-4">
-                        <div class="min-w-[800px] glass rounded-3xl p-8 border border-[var(--color-primary)]/20">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr>
-                                        <th class="p-4 text-[var(--color-text-secondary)] font-medium text-lg w-1/5"></th>
-                                        <th class="p-4 text-[var(--color-primary)] font-bold text-xl w-1/5 text-center bg-[var(--color-primary)]/10 rounded-t-2xl border-t border-x border-[var(--color-primary)]/20" data-i18n="landing.comparison.col_edgeai">Edge AI</th>
-                                        <th class="p-4 text-[var(--color-text)] font-semibold text-lg w-1/5 text-center" data-i18n="landing.comparison.col_chatgpt">ChatGPT</th>
-                                        <th class="p-4 text-[var(--color-text)] font-semibold text-lg w-1/5 text-center" data-i18n="landing.comparison.col_notebooklm">NotebookLM</th>
-                                        <th class="p-4 text-[var(--color-text)] font-semibold text-lg w-1/5 text-center" data-i18n="landing.comparison.col_liquid">Liquid AI</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="text-[var(--color-text)]">
-                                    <!-- Row 1: Data Collection -->
-                                    <tr class="border-b border-white/5">
-                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_data_collection">Recopilación de datos</td>
-                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
-                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
-                                                <X size={20} /> <span data-i18n="landing.comparison.value_no">No</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-red-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-red-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-red-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <!-- Row 2: Model Training -->
-                                    <tr class="border-b border-white/5">
-                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_model_training">Entrenamiento de modelos</td>
-                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
-                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
-                                                <X size={20} /> <span data-i18n="landing.comparison.value_no">No</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-red-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-red-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-yellow-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_cloud">Nube</span>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <!-- Row 3: Web Search -->
-                                    <tr class="border-b border-white/5">
-                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_web_search">Búsqueda en internet</td>
-                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
-                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <!-- Row 4: Upload Documents -->
-                                    <tr class="border-b border-white/5">
-                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_upload_docs">Subir documentos</td>
-                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
-                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_local">Local</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-yellow-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_cloud">Nube</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-yellow-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_cloud">Nube</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-yellow-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_cloud">Nube</span>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <!-- Row 5: GDPR -->
-                                    <tr class="border-b border-white/5">
-                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_gdpr">RGPD</td>
-                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-[var(--color-primary)]/10">
-                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-yellow-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_mixed">Híbrido</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-yellow-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_mixed">Híbrido</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-yellow-400">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Minus size={20} /> <span data-i18n="landing.comparison.value_mixed">Híbrido</span>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <!-- Row 6: Voice Assistant -->
-                                    <tr>
-                                        <td class="p-4 font-medium" data-i18n="landing.comparison.row_voice_assistant">Asistente de voz</td>
-                                        <td class="p-4 text-center bg-[var(--color-primary)]/5 border-x border-b border-[var(--color-primary)]/10 rounded-b-2xl">
-                                            <span class="inline-flex items-center gap-2 text-[var(--color-primary)] font-bold">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
-                                            <span class="inline-flex items-center gap-2">
-                                                <X size={20} /> <span data-i18n="landing.comparison.value_no">No</span>
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-center text-[var(--color-text-secondary)]">
-                                            <span class="inline-flex items-center gap-2">
-                                                <Check size={20} /> <span data-i18n="landing.comparison.value_yes">Sí</span>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Reviews Section -->
-            <section class="relative py-20 sm:py-24 lg:py-32">
-                <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-                    <!-- Section Header -->
-                    <div class="text-center mb-16">
-                        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6">
-                            <span class="gradient-text animate-gradient" data-i18n="landing.reviews.title">
-                                Lo que dicen nuestros usuarios
-                            </span>
-                        </h2>
-                        <p class="text-lg sm:text-xl lg:text-2xl text-[var(--color-text-secondary)]" data-i18n="landing.reviews.subtitle">
-                            Únete a la comunidad de privacidad
-                        </p>
-                    </div>
-
-                    <!-- Reviews Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-7xl mx-auto">
-                        <!-- Review 1 -->
-                        <div class="p-8 glass rounded-3xl border border-white/10 hover:border-[var(--color-primary)]/30 transition-all duration-300">
-                            <div class="flex gap-1 text-yellow-400 mb-4">
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                            </div>
-                            <p class="text-lg text-[var(--color-text)] mb-6 leading-relaxed italic" data-i18n="landing.reviews.review1_text">
-                                "Increíble poder usar modelos LLM directamente en mi navegador sin enviar datos a nadie."
-                            </p>
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-blue-500 flex items-center justify-center text-white font-bold text-xl">
-                                    C
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-[var(--color-text)]" data-i18n="landing.reviews.review1_author">Carlos M.</h4>
-                                    <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.reviews.review1_role">Desarrollador</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Review 2 -->
-                        <div class="p-8 glass rounded-3xl border border-white/10 hover:border-[var(--color-primary)]/30 transition-all duration-300">
-                            <div class="flex gap-1 text-yellow-400 mb-4">
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                            </div>
-                            <p class="text-lg text-[var(--color-text)] mb-6 leading-relaxed italic" data-i18n="landing.reviews.review2_text">
-                                "La función de búsqueda web privada es justo lo que necesitaba. Rápido y seguro."
-                            </p>
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xl">
-                                    S
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-[var(--color-text)]" data-i18n="landing.reviews.review2_author">Sarah L.</h4>
-                                    <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.reviews.review2_role">Investigadora</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Review 3 -->
-                        <div class="p-8 glass rounded-3xl border border-white/10 hover:border-[var(--color-primary)]/30 transition-all duration-300">
-                            <div class="flex gap-1 text-yellow-400 mb-4">
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                                <Star size={18} fill="currentColor" />
-                            </div>
-                            <p class="text-lg text-[var(--color-text)] mb-6 leading-relaxed italic" data-i18n="landing.reviews.review3_text">
-                                "Poder analizar mis PDFs confidenciales sin subirlos a la nube no tiene precio."
-                            </p>
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white font-bold text-xl">
-                                    D
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-[var(--color-text)]" data-i18n="landing.reviews.review3_author">David R.</h4>
-                                    <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.reviews.review3_role">Analista Legal</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Hero CTA Section -->
-            <section class="py-20 md:py-32 relative overflow-hidden">
-                <!-- Background Effects -->
-                <div class="absolute inset-0 pointer-events-none">
-                    <div
-                        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[var(--color-primary)] opacity-5 blur-[150px] rounded-full"
-                    >
-                    </div>
-                </div>
-
-                <div class="container mx-auto px-6 relative">
-                    <div class="max-w-4xl mx-auto text-center">
-                        <!-- CTA Content -->
-                        <h2
-                            class="text-4xl md:text-6xl font-bold mb-6 leading-tight"
-                        >
-                            <span class="text-[var(--color-text)]" data-i18n="landing.ctaTitle1">
-                                Empieza hoy con Edge.AI
-                            </span>
-                            <br />
-                            <span
-                                class="bg-gradient-to-r from-[var(--color-primary)] via-[#20b813] to-[var(--color-primary)] bg-clip-text text-transparent"
-                                data-i18n="landing.ctaTitle2"
-                            >
-                                Solo con un clic
-                            </span>
-                        </h2>
-
-                        <p
-                            class="text-xl md:text-2xl text-[var(--color-text-secondary)] mb-12 max-w-2xl mx-auto leading-relaxed"
-                        >
-                            <span data-i18n="landing.ctaSubtitle">
-                            No necesitas registrarte, no hay planes de pago, no
-                            hay límites.
-                            </span>
-                            <span class="text-[var(--color-primary)]" data-i18n="landing.ctaHighlight"
-                                >Simplemente empieza a usar IA de forma privada.</span
-                            >
-                        </p>
-
-                        <!-- CTA Buttons -->
-                        <div
-                            class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12"
-                        >
-                            <a
-                                href="/"
-                                class="group relative px-10 py-5 bg-gradient-to-r from-[var(--color-primary)] to-[#20b813] text-black font-bold rounded-xl text-xl transition-all duration-300 hover:shadow-2xl hover:shadow-[var(--color-primary)]/50 hover:scale-105 w-full sm:w-auto"
-                            >
-                                <span class="relative z-10" data-i18n="landing.startFree"
-                                    >Comenzar Gratis</span
-                                >
-                                <div
-                                    class="absolute inset-0 bg-gradient-to-r from-[#20b813] to-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl"
-                                >
-                                </div>
-                            </a>
-                        </div>
-
-                        <!-- Benefits List -->
-                        <div
-                            class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16"
-                        >
-                            <div class="flex flex-col items-center gap-3">
-                                <div
-                                    class="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)]"
-                                >
-                                    <Zap size={32} strokeWidth={1.5} />
-                                </div>
-                                <h3
-                                    class="font-semibold text-lg text-[var(--color-text)]"
-                                    data-i18n="landing.benefit1Title"
-                                >
-                                    Listo en Segundos
-                                </h3>
-                                <p
-                                    class="text-sm text-[var(--color-text-secondary)]"
-                                    data-i18n="landing.benefit1Desc"
-                                >
-                                    Solo abre el navegador, descarga los modelos y chatea
-                                </p>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-3">
-                                <div
-                                    class="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)]"
-                                >
-                                    <ShieldCheck size={32} strokeWidth={1.5} />
-                                </div>
-                                <h3
-                                    class="font-semibold text-lg text-[var(--color-text)]"
-                                    data-i18n="landing.benefit2Title"
-                                >
-                                    100% Privado
-                                </h3>
-                                <p
-                                    class="text-sm text-[var(--color-text-secondary)]"
-                                    data-i18n="landing.benefit2Desc"
-                                >
-                                    Tus datos nunca salen de tu dispositivo
-                                </p>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-3">
-                                <div
-                                    class="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)]"
-                                >
-                                    <Coins size={32} strokeWidth={1.5} />
-                                </div>
-                                <h3
-                                    class="font-semibold text-lg text-[var(--color-text)]"
-                                    data-i18n="landing.benefit3Title"
-                                >
-                                    Siempre Gratis
-                                </h3>
-                                <p
-                                    class="text-sm text-[var(--color-text-secondary)]"
-                                    data-i18n="landing.benefit3Desc"
-                                >
-                                    Sin tarifas ocultas ni suscripciones
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Footer -->
-            <footer
-                class="border-t border-[var(--color-border)] bg-[var(--color-bg)]/50 backdrop-blur-sm"
-            >
-                <div class="container mx-auto px-6 py-8">
-                    <div class="flex flex-col items-center gap-4 text-center">
-                        <!-- Logo -->
-                        <div class="flex items-center gap-3">
-                            <div class="relative">
-                                <div
-                                    class="absolute inset-0 bg-[var(--color-primary)] blur-xl opacity-50 rounded-full"
-                                >
-                                </div>
-                                <div>
-                                    <img src="/inledai.png" alt="Edge.AI Logo" class="w-16  rounded-full">
-                                </div>
-                            </div>
-                            <div>
-                                <h3
-                                    class="text-xl font-bold bg-gradient-to-r from-[var(--color-primary)] via-[#20b813] to-[var(--color-primary)] bg-clip-text text-transparent"
-                                >
-                                    Edge.AI
-                                </h3>
-                            </div>
-                        </div>
-
-                        <p
-                            class="text-sm text-[var(--color-text-secondary)] max-w-md"
-                            data-i18n="landing.footerTagline"
-                        >
-                            ¿Desde cuando la IA es igual a preocupaciones?
-                        </p>
-
-                        <div
-                            class="flex flex-wrap justify-center gap-4 text-xs text-[var(--color-text-tertiary)]"
-                        >
-                            <span
-                                >Usamos <span
-                                    class="text-[var(--color-primary)]"
-                                    >WebLLM</span
-                                ></span
-                            >
-                            <span>·</span>
-                            <span
-                                ><span class="text-[var(--color-primary)]"
-                                    >Wllama</span
-                                ></span
-                            >
-                        </div>
-
-                        <div
-                            class="pt-4 border-t border-[var(--color-border)] w-full"
-                        >
-                            <p
-                                class="text-xs text-[var(--color-text-tertiary)]"
-                                data-i18n="landing.footerLicense"
-                            >
-                                Licenciado bajo GNU General Public License v3.0 | Inled Group
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </footer>
+            </button>
         </div>
+    </div>
 
-        <!-- Language script -->
-        <script>
-            import { i18nStore } from '@/lib/stores/i18n';
+    <div id="main-content" class="hidden">
+        <!-- Navigation -->
+        <nav class="fixed top-0 w-full z-50 glass border-b border-[var(--color-border)]">
+            <div class="container mx-auto px-6 h-20 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <img src="/inledai.png" class="w-10 h-10 rounded-xl" alt="Edge.AI">
+                    <span class="text-xl font-bold tracking-tight">Edge<span class="text-[var(--color-primary)]">.AI</span></span>
+                    <span id="view-badge" class="ml-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border"></span>
+                </div>
+                <div class="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--color-text-secondary)]">
+                    <a href="#features" class="hover:text-[var(--color-text)] transition-colors" data-i18n="landing.nav.features">Features</a>
+                    <a id="nav-apps-link" href="#apps" class="hover:text-[var(--color-text)] transition-colors hidden" data-i18n="landing.nav.use_cases">Use Cases</a>
+                    <a href="#security" class="hover:text-[var(--color-text)] transition-colors" data-i18n="landing.nav.compliance">Compliance</a>
+                    <button onclick="location.reload()" class="px-4 py-2 rounded-xl bg-[var(--color-bg-tertiary)] text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-all border border-[var(--color-border)]" data-i18n="landing.nav.switch">Switch Profile</button>
+                </div>
+                <a href="/" class="px-6 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-black font-bold rounded-xl transition-all shadow-lg shadow-[var(--color-primary)]/20" data-i18n="landing.nav.open_app">Open App</a>
+            </div>
+        </nav>
 
-            // Function to update landing page text
-            function updateLandingLanguage() {
-                const elements = document.querySelectorAll('[data-i18n]');
-                elements.forEach(el => {
-                    const key = el.getAttribute('data-i18n');
-                    if (key) {
-                        el.innerHTML = i18nStore.t(key);
-                    }
-                });
+        <!-- Dynamic Hero -->
+        <header class="relative pt-48 pb-20 overflow-hidden grid-bg">
+            <div id="hero-glow" class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] opacity-20 blur-[120px] rounded-full pointer-events-none"></div>
 
-                // Update switcher label
-                const langLabel = document.getElementById('langLabel');
-                if (langLabel) {
-                    langLabel.textContent = i18nStore.current === 'es' ? 'English' : 'Español';
+            <div class="container mx-auto px-6 relative z-10 text-center md:text-left">
+                <div class="max-w-4xl">
+                    <h1 id="hero-title" class="text-5xl md:text-8xl font-black mb-8 leading-[0.9] tracking-tighter"></h1>
+                    <p id="hero-subtitle" class="text-xl md:text-2xl text-[var(--color-text-secondary)] mb-10 leading-relaxed max-w-2xl mx-auto md:mx-0"></p>
+                    <div class="flex flex-wrap gap-4 justify-center md:justify-start">
+                        <a href="/" class="px-10 py-5 bg-[var(--color-text)] text-[var(--color-bg)] font-black rounded-2xl text-xl hover:scale-105 transition-all shadow-xl" data-i18n="landing.hero.cta">Launch Application</a>
+                        <div class="flex items-center gap-4 px-6 py-4 glass rounded-2xl border-[var(--color-border)]">
+                            <ShieldCheck className="text-[var(--color-primary)]" />
+                            <span class="text-sm font-semibold" data-i18n="landing.hero.badge">100% Local · Air-Gapped AI</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Core Features -->
+        <section id="features" class="py-24 border-t border-[var(--color-border)]">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl font-black mb-4" data-i18n="landing.features.title">Hardened Architecture</h2>
+                    <p class="text-[var(--color-text-secondary)]" data-i18n="landing.features.subtitle">The power of generative AI without exposing a single bit to the network.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="p-8 rounded-3xl glass hover:border-[var(--color-primary)]/30 transition-all group">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] mb-6"><BookOpen /></div>
+                        <h3 class="text-2xl font-bold mb-4" data-i18n="landing.features.rag_title">100% Local RAG</h3>
+                        <p class="text-[var(--color-text-secondary)]" data-i18n="landing.features.rag_desc">Indexing and querying of confidential documents. Your files never leave the volatile memory of your hardware.</p>
+                    </div>
+
+                    <div class="p-8 rounded-3xl glass hover:border-[var(--color-primary)]/30 transition-all group">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] mb-6"><Share2 /></div>
+                        <h3 class="text-2xl font-bold mb-4" data-i18n="landing.features.mcp_title">MCP Protocol</h3>
+                        <p class="text-[var(--color-text-secondary)]" data-i18n="landing.features.mcp_desc">Secure connection with SQL databases, internal repositories, or third-party tools via Model Context Protocol.</p>
+                    </div>
+
+                    <div class="p-8 rounded-3xl glass hover:border-[var(--color-primary)]/30 transition-all group">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] mb-6"><Mic /></div>
+                        <h3 class="text-2xl font-bold mb-4" data-i18n="landing.features.voice_title">Encrypted Voice</h3>
+                        <p class="text-[var(--color-text-secondary)]" data-i18n="landing.features.voice_desc">Voice interaction processed entirely locally. No cloud processing for maximum meeting confidentiality.</p>
+                    </div>
+
+                    <div class="p-8 rounded-3xl glass hover:border-[var(--color-primary)]/30 transition-all group">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] mb-6"><Database /></div>
+                        <h3 class="text-2xl font-bold mb-4" data-i18n="landing.features.memory_title">Sovereign Memory</h3>
+                        <p class="text-[var(--color-text-secondary)]" data-i18n="landing.features.memory_desc">History and context stored exclusively in your browser. Full control over what the AI remembers.</p>
+                    </div>
+
+                    <div class="p-8 rounded-3xl glass hover:border-[var(--color-primary)]/30 transition-all group lg:col-span-2">
+                        <div class="flex flex-col md:flex-row gap-8 items-center h-full">
+                            <div class="flex-1">
+                                <div class="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] mb-6"><Cpu /></div>
+                                <h3 class="text-2xl font-bold mb-4" data-i18n="landing.features.insuite_title">InSuite Ecosystem</h3>
+                                <p class="text-[var(--color-text-secondary)]" data-i18n="landing.features.insuite_desc">Boost daily productivity with InLinked and InQR. AI-powered tools directly connected to the local intelligence.</p>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="w-24 h-24 rounded-2xl bg-white p-4 shadow-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                                    <img src="https://hosted.inled.es/INLINKED.png" alt="InLinked" class="w-full h-full object-contain" />
+                                </div>
+                                <div class="w-24 h-24 rounded-2xl bg-white p-4 shadow-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                                    <img src="https://hosted.inled.es/inqr.png" alt="InQR" class="w-full h-full object-contain" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Business Applications -->
+        <section id="apps" class="py-24 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hidden">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl font-black mb-4" data-i18n="landing.apps.title">Strategic Verticals</h2>
+                    <p class="text-[var(--color-text-secondary)]" data-i18n="landing.apps.subtitle">Solutions designed for environments where privacy errors are not an option.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="p-6 rounded-2xl glass border-l-4 border-l-blue-500">
+                        <Activity className="text-blue-500 mb-4" />
+                        <h4 class="font-bold text-lg mb-2" data-i18n="landing.apps.health_title">Health & Pharma</h4>
+                        <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.apps.health_desc">Analysis of clinical records and patient data without risk of leaking sensitive information.</p>
+                    </div>
+                    <div class="p-6 rounded-2xl glass border-l-4 border-l-[var(--color-primary)]">
+                        <Crosshair className="text-[var(--color-primary)] mb-4" />
+                        <h4 class="font-bold text-lg mb-2" data-i18n="landing.apps.defense_title">Defense & Military</h4>
+                        <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.apps.defense_desc">Operational AI in disconnected (Air-Gapped) environments for tactical analysis and critical logistics.</p>
+                    </div>
+                    <div class="p-6 rounded-2xl glass border-l-4 border-l-blue-500">
+                        <FileSearch className="text-blue-500 mb-4" />
+                        <h4 class="font-bold text-lg mb-2" data-i18n="landing.apps.legal_title">Legal & Compliance</h4>
+                        <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.apps.legal_desc">Massive contract review and internal auditing while maintaining absolute professional secrecy.</p>
+                    </div>
+                    <div class="p-6 rounded-2xl glass border-l-4 border-l-[var(--color-primary)]">
+                        <BarChart3 className="text-[var(--color-primary)] mb-4" />
+                        <h4 class="font-bold text-lg mb-2" data-i18n="landing.apps.finance_title">Finance</h4>
+                        <p class="text-sm text-[var(--color-text-secondary)]" data-i18n="landing.apps.finance_desc">Processing financial reports and investment strategies without exposing market intelligence.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Compliance -->
+        <section id="security" class="py-24 border-t border-[var(--color-border)]">
+            <div class="container mx-auto px-6">
+                <div class="max-w-4xl mx-auto glass p-12 rounded-[40px] border-[var(--color-primary)]/20 relative overflow-hidden text-center">
+                    <div class="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)]/5 to-transparent"></div>
+                    <Award size={48} className="mx-auto text-[var(--color-primary)] mb-6 relative z-10" />
+                    <h2 class="text-3xl font-black mb-2 relative z-10" data-i18n="landing.security.title">Verifiable Privacy by Architecture</h2>
+                    <p class="text-[10px] text-[var(--color-primary)] font-bold uppercase tracking-widest mb-8 relative z-10 opacity-80" data-i18n="landing.security.warning">Technical Compliance · Not formally certified</p>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 relative z-10">
+                        <div class="space-y-2">
+                            <div class="text-[var(--color-primary)] font-black text-2xl">GDPR</div>
+                            <div class="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-tighter" data-i18n="landing.security.gdpr">Privacy by Design</div>
+                        </div>
+                        <div class="space-y-2 border-l border-white/5">
+                            <div class="text-[var(--color-primary)] font-black text-2xl">HIPAA</div>
+                            <div class="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-tighter" data-i18n="landing.security.hipaa">Local Medical Security</div>
+                        </div>
+                        <div class="space-y-2 border-l border-white/5">
+                            <div class="text-[var(--color-primary)] font-black text-2xl">ISO 27001</div>
+                            <div class="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-tighter" data-i18n="landing.security.iso">Hardened Architecture</div>
+                        </div>
+                        <div class="space-y-2 border-l border-white/5">
+                            <div class="text-[var(--color-primary)] font-black text-2xl">SOC 2</div>
+                            <div class="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-tighter" data-i18n="landing.security.soc">Technical Secrecy</div>
+                        </div>
+                    </div>
+                    
+                    <p class="mt-12 text-sm text-[var(--color-text-secondary)] max-w-2xl mx-auto italic" data-i18n="landing.security.disclaimer">
+                        "Edge.AI is not a third-party certified entity. However, its 100% local architecture eliminates the attack surface and external data processing, allowing your organization to meet the strictest security standards natively. We invite you to audit our open-source code."
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sovereignty Section -->
+        <section id="business-exclusive" class="hidden py-24 glass border-y border-[var(--color-border)]">
+            <div class="container mx-auto px-6">
+                <div class="grid md:grid-cols-2 gap-16 items-center">
+                    <div>
+                        <h2 class="text-5xl font-black mb-8 tracking-tighter" data-i18n="landing.sovereignty.title">Enterprise Data Sovereignty</h2>
+                        <div class="space-y-8">
+                            <div class="flex gap-4">
+                                <div class="p-2 h-fit rounded-lg bg-[var(--color-primary)]/20 text-[var(--color-primary)]"><Shield /></div>
+                                <div>
+                                    <h4 class="font-bold text-xl mb-2" data-i18n="landing.sovereignty.secrecy_title">Industrial Secrecy</h4>
+                                    <p class="text-[var(--color-text-secondary)]" data-i18n="landing.sovereignty.secrecy_desc">Prevent intellectual property leaks. No training data or queries ever leave your infrastructure.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="p-2 h-fit rounded-lg bg-blue-500/20 text-blue-500"><BarChart3 /></div>
+                                <div>
+                                    <h4 class="font-bold text-xl mb-2" data-i18n="landing.sovereignty.nodes_title">Multi-Node Deployment</h4>
+                                    <p class="text-[var(--color-text-secondary)]" data-i18n="landing.sovereignty.nodes_desc">Connect local instances with private inference servers for high-performance teams.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-blue-500/20 blur-[100px] rounded-full"></div>
+                        <div class="relative p-12 glass rounded-3xl border-blue-500/30 text-center">
+                            <Database size={80} className="mx-auto text-blue-500 mb-6" />
+                            <h3 class="text-2xl font-bold mb-4" data-i18n="landing.sovereignty.compliance_title">Direct Compliance</h3>
+                            <p class="text-[var(--color-text-secondary)]" data-i18n="landing.sovereignty.compliance_desc">By not processing data on third-party servers, compliance with GDPR, HIPAA, or internal audits is intrinsic.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="py-12 border-t border-[var(--color-border)] mt-20">
+            <div class="container mx-auto px-6 text-center">
+                <div class="flex items-center justify-center gap-3 mb-6">
+                    <img src="/inledai.png" class="w-8 h-8 rounded-lg" alt="Logo">
+                    <span class="font-bold text-[var(--color-text)]">Edge.AI</span>
+                </div>
+                <p class="text-[var(--color-text-secondary)] text-sm mb-4 italic" data-i18n="landing.footer.tagline">Since when should technology compromise your privacy?</p>
+                <div class="text-xs text-[var(--color-text-tertiary)]">
+                    © 2026 Inled Group · GPL v3 License · 100% Local Intelligence
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        import { i18nStore } from '@/lib/stores/i18n';
+
+        const content = {
+            personal: {
+                titleKey: "landing.hero.personal_title",
+                subtitleKey: "landing.hero.personal_subtitle",
+                badgeKey: "landing.hero.personal_badge",
+                badgeClass: "text-[var(--color-primary)] border-[var(--color-primary)]/30",
+                glowColor: "var(--color-primary)"
+            },
+            business: {
+                titleKey: "landing.hero.business_title",
+                subtitleKey: "landing.hero.business_subtitle",
+                badgeKey: "landing.hero.business_badge",
+                badgeClass: "text-blue-500 border-blue-500/30",
+                glowColor: "#3b82f6"
+            }
+        };
+
+        let currentView = null;
+
+        function updateTexts() {
+            const elements = document.querySelectorAll('[data-i18n]');
+            elements.forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (key) {
+                    el.innerHTML = i18nStore.t(key);
                 }
+            });
+
+            // Update Dynamic Hero if selected
+            if (currentView) {
+                const title = document.getElementById('hero-title');
+                const subtitle = document.getElementById('hero-subtitle');
+                const badge = document.getElementById('view-badge');
+                
+                title.innerHTML = i18nStore.t(content[currentView].titleKey);
+                subtitle.textContent = i18nStore.t(content[currentView].subtitleKey);
+                badge.textContent = i18nStore.t(content[currentView].badgeKey);
             }
 
-            // Init language
-            async function init() {
-                await i18nStore.init();
-                updateLandingLanguage();
+            // Update Switcher
+            const langLabel = document.getElementById('langLabel');
+            if (langLabel) {
+                langLabel.textContent = i18nStore.current === 'es' ? 'English' : 'Español';
+            }
+        }
+
+        window.selectView = function(view) {
+            currentView = view;
+            const entry = document.getElementById('entry-selector');
+            const main = document.getElementById('main-content');
+            const badge = document.getElementById('view-badge');
+            const bizSect = document.getElementById('business-exclusive');
+            const appsSect = document.getElementById('apps');
+            const navAppsLink = document.getElementById('nav-apps-link');
+            const glow = document.getElementById('hero-glow');
+
+            updateTexts();
+            
+            badge.className = `ml-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${content[view].badgeClass}`;
+            glow.style.backgroundColor = content[view].glowColor;
+
+            if (view === 'business') {
+                bizSect.classList.remove('hidden');
+                appsSect.classList.remove('hidden');
+                navAppsLink.classList.remove('hidden');
+            } else {
+                bizSect.classList.add('hidden');
+                appsSect.classList.add('hidden');
+                navAppsLink.classList.add('hidden');
             }
 
-            // Handle switcher click
-            const langSwitcher = document.getElementById('langSwitcher');
-            if (langSwitcher) {
-                langSwitcher.addEventListener('click', async () => {
-                    const nextLang = i18nStore.current === 'es' ? 'en' : 'es';
-                    await i18nStore.setLanguage(nextLang);
-                    updateLandingLanguage();
-                });
-            }
+            entry.style.opacity = '0';
+            entry.style.transition = 'opacity 0.5s ease';
+            
+            setTimeout(() => {
+                entry.classList.add('hidden');
+                main.classList.remove('hidden');
+                window.scrollTo(0, 0);
+            }, 500);
+        }
 
-            // Initialize on load
-            if (typeof window !== 'undefined') {
-                init();
-            }
-        </script>
-        <script>
-            import '../pwa.ts';
-        </script>
-    </body>
+        // Handle switcher click
+        const langSwitcher = document.getElementById('langSwitcher');
+        if (langSwitcher) {
+            langSwitcher.addEventListener('click', async () => {
+                const nextLang = i18nStore.current === 'es' ? 'en' : 'es';
+                await i18nStore.setLanguage(nextLang);
+                updateTexts();
+            });
+        }
+
+        // Initialize on load
+        if (typeof window !== 'undefined') {
+            i18nStore.init().then(() => {
+                updateTexts();
+            });
+        }
+    </script>
+</body>
 </html>
