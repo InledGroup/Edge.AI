@@ -7,6 +7,8 @@ export interface ChunkMetadata {
   totalChunks: number;
   prevContext?: string; // Last sentence of previous chunk
   nextContext?: string; // First sentence of next chunk
+  expandedContext?: string; // Previous paragraph + Current + Next paragraph
+  headerContext?: string; // Current section heading
 }
 
 /**
@@ -151,6 +153,12 @@ export function semanticChunkText(
   const chunks: SemanticChunk[] = [];
   let currentChunk: string[] = [];
   let currentSize = 0;
+  
+  // Context tracking
+  const chunkParagraphs: number[][] = []; 
+  let currentChunkIndices: number[] = [];
+  let currentHeading: string | undefined = undefined;
+  const paragraphHeadings: (string | undefined)[] = []; // Map paragraph index to its active heading
 
   for (let i = 0; i < paragraphs.length; i++) {
     const paragraph = paragraphs[i];
@@ -158,14 +166,25 @@ export function semanticChunkText(
 
     // Detect type
     const type = detectParagraphType(paragraph);
+    
+    // Update current heading if this paragraph looks like one
+    if (type === 'heading' || paragraph.startsWith('#')) {
+      // Clean markdown heading syntax
+      currentHeading = paragraph.replace(/^#+\s*/, '').trim();
+    }
+    
+    // Store heading for this paragraph
+    paragraphHeadings[i] = currentHeading;
 
     // If paragraph alone is too big, split it by sentences
     if (paragraphSize > targetSize * 1.5) {
       // Flush current chunk if not empty
       if (currentChunk.length > 0) {
-        chunks.push(createChunk(currentChunk, chunks.length));
+        chunks.push(createChunk(currentChunk, chunks.length, currentHeading));
+        chunkParagraphs.push([...currentChunkIndices]);
         currentChunk = [];
         currentSize = 0;
+        currentChunkIndices = [];
       }
 
       // Split large paragraph by sentences
@@ -175,8 +194,8 @@ export function semanticChunkText(
 
       for (const sentence of sentences) {
         if (sentenceSize + sentence.length > targetSize && sentenceChunk.length > 0) {
-          chunks.push(createChunk(sentenceChunk, chunks.length));
-          // Keep last sentence for context
+          chunks.push(createChunk(sentenceChunk, chunks.length, currentHeading));
+          chunkParagraphs.push([i]); 
           sentenceChunk = [sentenceChunk[sentenceChunk.length - 1], sentence];
           sentenceSize = sentenceChunk[0].length + sentence.length;
         } else {
@@ -186,7 +205,8 @@ export function semanticChunkText(
       }
 
       if (sentenceChunk.length > 0) {
-        chunks.push(createChunk(sentenceChunk, chunks.length));
+        chunks.push(createChunk(sentenceChunk, chunks.length, currentHeading));
+        chunkParagraphs.push([i]);
       }
 
       continue;
@@ -194,43 +214,87 @@ export function semanticChunkText(
 
     // If adding this paragraph exceeds target size, create chunk
     if (currentSize + paragraphSize > targetSize && currentChunk.length > 0) {
-      chunks.push(createChunk(currentChunk, chunks.length));
+      // Use heading of the first paragraph in the chunk or the current one
+      // (Usually chunks should share a heading, but if boundary crosses, use the one that started it)
+      const chunkHeading = paragraphHeadings[currentChunkIndices[0]] || currentHeading;
+      
+      chunks.push(createChunk(currentChunk, chunks.length, chunkHeading));
+      chunkParagraphs.push([...currentChunkIndices]);
 
       // Start new chunk with overlap (last paragraph)
       if (currentChunk.length > 0) {
         currentChunk = [currentChunk[currentChunk.length - 1], paragraph];
         currentSize = currentChunk[0].length + paragraphSize;
+        currentChunkIndices = [i - 1, i]; 
       } else {
         currentChunk = [paragraph];
         currentSize = paragraphSize;
+        currentChunkIndices = [i];
       }
     } else {
       currentChunk.push(paragraph);
       currentSize += paragraphSize;
+      currentChunkIndices.push(i);
     }
   }
 
   // Add remaining chunk
   if (currentChunk.length > 0) {
-    chunks.push(createChunk(currentChunk, chunks.length));
+    const chunkHeading = paragraphHeadings[currentChunkIndices[0]] || currentHeading;
+    chunks.push(createChunk(currentChunk, chunks.length, chunkHeading));
+    chunkParagraphs.push([...currentChunkIndices]);
   }
 
   // Add total chunks metadata and context
-  return chunks.map((chunk, i) => ({
-    ...chunk,
-    metadata: {
-      ...chunk.metadata,
-      totalChunks: chunks.length,
-      prevContext: i > 0 ? getLastSentence(chunks[i - 1].content) : undefined,
-      nextContext: i < chunks.length - 1 ? getFirstSentence(chunks[i + 1].content) : undefined,
-    },
-  }));
+  return chunks.map((chunk, i) => {
+    // Construct expanded context
+    const indices = chunkParagraphs[i];
+    let expandedContext = chunk.content;
+    const header = chunk.metadata.headerContext;
+
+    if (indices && indices.length > 0) {
+      const startIdx = indices[0];
+      const endIdx = indices[indices.length - 1];
+
+      // Get previous paragraph
+      if (startIdx > 0) {
+        const prevPara = paragraphs[startIdx - 1];
+        if (!chunk.content.includes(prevPara)) {
+             expandedContext = `...${prevPara}\n\n${expandedContext}`;
+        }
+      }
+
+      // Get next paragraph
+      if (endIdx < paragraphs.length - 1) {
+        const nextPara = paragraphs[endIdx + 1];
+        if (!chunk.content.includes(nextPara)) {
+            expandedContext = `${expandedContext}\n\n${nextPara}...`;
+        }
+      }
+    }
+    
+    // Prepend Header Context to expanded context for better semantics
+    if (header) {
+      expandedContext = `[Sección: ${header}]\n${expandedContext}`;
+    }
+
+    return {
+      ...chunk,
+      metadata: {
+        ...chunk.metadata,
+        totalChunks: chunks.length,
+        prevContext: i > 0 ? getLastSentence(chunks[i - 1].content) : undefined,
+        nextContext: i < chunks.length - 1 ? getFirstSentence(chunks[i + 1].content) : undefined,
+        expandedContext
+      },
+    };
+  });
 }
 
 /**
  * Create chunk from paragraphs
  */
-function createChunk(paragraphs: string[], index: number): SemanticChunk {
+function createChunk(paragraphs: string[], index: number, headerContext?: string): SemanticChunk {
   const content = paragraphs.join('\n\n');
   const type = detectParagraphType(content);
 
@@ -239,7 +303,8 @@ function createChunk(paragraphs: string[], index: number): SemanticChunk {
     metadata: {
       type,
       index,
-      totalChunks: 0, // Will be set later
+      totalChunks: 0, 
+      headerContext
     },
   };
 }

@@ -31,6 +31,8 @@ import {
   saveDefaultEmbeddingModel,
   saveDeviceProfile
 } from '@/lib/ai/model-settings';
+import { setUseAdvancedRAG } from '@/lib/db/settings';
+import { RAGModelLoader } from '@/lib/new-rag/model-loader';
 import { WebLLMEngine } from '@/lib/ai/webllm-engine';
 import { WllamaEngine } from '@/lib/ai/wllama-engine';
 import EngineManager from '@/lib/ai/engine-manager';
@@ -48,6 +50,12 @@ interface LoadingProgress {
   chat: { progress: number; message: string } | null;
   embedding: { progress: number; message: string } | null;
   tool: { progress: number; message: string } | null;
+  advancedRAG: { 
+    classifier: { progress: number; message: string } | null;
+    reranker: { progress: number; message: string } | null;
+    generator: { progress: number; message: string } | null;
+    bgeM3: { progress: number; message: string } | null;
+  };
 }
 
 export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
@@ -57,10 +65,17 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
   const [embeddingScores, setEmbeddingScores] = useState<ModelScore[]>([]);
   const [selectedChatModel, setSelectedChatModel] = useState<ModelMetadata | null>(null);
   const [selectedEmbeddingModel, setSelectedEmbeddingModel] = useState<ModelMetadata | null>(null);
+  const [enableAdvancedRAG, setEnableAdvancedRAG] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress>({
     chat: null,
     embedding: null,
-    tool: null
+    tool: null,
+    advancedRAG: {
+      classifier: null,
+      reranker: null,
+      generator: null,
+      bgeM3: null
+    }
   });
   const [error, setError] = useState<string | null>(null);
   const [chatModelFilter, setChatModelFilter] = useState<'all' | 'gpu' | 'cpu'>('all');
@@ -129,6 +144,14 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       await loadChatModel(selectedChatModel);
       await loadEmbeddingModel(selectedEmbeddingModel);
       
+      // Load Advanced RAG models if enabled
+      if (enableAdvancedRAG) {
+        await loadAdvancedRAGModels();
+        await setUseAdvancedRAG(true);
+      } else {
+        await setUseAdvancedRAG(false);
+      }
+
       // Save defaults
       saveDefaultChatModel(selectedChatModel.id);
       saveDefaultEmbeddingModel(selectedEmbeddingModel.id);
@@ -154,6 +177,42 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
       console.error('Failed to load specialized tool model:', err);
       // Tool model is recommended but not strictly required for core chat
     }
+  }
+
+  async function loadAdvancedRAGModels() {
+    const loader = RAGModelLoader.getInstance();
+    
+    // Load BGE-M3
+    await loader.getEmbedder((progress, status) => {
+      setLoadingProgress(prev => ({
+        ...prev,
+        advancedRAG: { ...prev.advancedRAG, bgeM3: { progress, message: status } }
+      }));
+    });
+
+    // Load Classifier
+    await loader.getClassifier((progress, status) => {
+      setLoadingProgress(prev => ({
+        ...prev,
+        advancedRAG: { ...prev.advancedRAG, classifier: { progress, message: status } }
+      }));
+    });
+
+    // Load Reranker
+    await loader.getReranker((progress, status) => {
+      setLoadingProgress(prev => ({
+        ...prev,
+        advancedRAG: { ...prev.advancedRAG, reranker: { progress, message: status } }
+      }));
+    });
+
+    // Load Generator
+    await loader.getGenerator((progress, status) => {
+      setLoadingProgress(prev => ({
+        ...prev,
+        advancedRAG: { ...prev.advancedRAG, generator: { progress, message: status } }
+      }));
+    });
   }
 
   async function loadChatModel(model: ModelMetadata) {
@@ -597,6 +656,28 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
               </div>
             </div>
 
+            {/* Advanced RAG Option */}
+            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={enableAdvancedRAG}
+                  onChange={(e) => setEnableAdvancedRAG((e.target as HTMLInputElement).checked)}
+                />
+                <div>
+                  <div className="font-semibold flex items-center gap-2">
+                    <Zap size={16} className="text-amber-500" />
+                    RAG Avanzado (Máximo Rendimiento - Fudan University)
+                  </div>
+                  <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                    Activa la arquitectura de búsqueda híbrida, re-ranking con monoT5 y compresión de contexto. 
+                    Requiere descargar ~5GB adicionales de modelos de alto rendimiento. Recomendado para PCs potentes.
+                  </p>
+                </div>
+              </label>
+            </div>
+
             {/* Error */}
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-500">
@@ -677,6 +758,48 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
                   size="md"
                   variant="primary"
                 />
+              </div>
+            )}
+
+            {/* Advanced RAG Progress */}
+            {enableAdvancedRAG && (
+              <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
+                <div className="text-sm font-bold flex items-center gap-2 text-amber-500">
+                  <Zap size={16} />
+                  Componentes RAG Avanzado (Fudan)
+                </div>
+                
+                {loadingProgress.advancedRAG.bgeM3 && (
+                  <ProgressBar
+                    progress={loadingProgress.advancedRAG.bgeM3.progress}
+                    label={`Embedding: ${loadingProgress.advancedRAG.bgeM3.message}`}
+                    size="sm"
+                  />
+                )}
+                
+                {loadingProgress.advancedRAG.classifier && (
+                  <ProgressBar
+                    progress={loadingProgress.advancedRAG.classifier.progress}
+                    label={`Clasificador: ${loadingProgress.advancedRAG.classifier.message}`}
+                    size="sm"
+                  />
+                )}
+
+                {loadingProgress.advancedRAG.reranker && (
+                  <ProgressBar
+                    progress={loadingProgress.advancedRAG.reranker.progress}
+                    label={`Reranker: ${loadingProgress.advancedRAG.reranker.message}`}
+                    size="sm"
+                  />
+                )}
+
+                {loadingProgress.advancedRAG.generator && (
+                  <ProgressBar
+                    progress={loadingProgress.advancedRAG.generator.progress}
+                    label={`Generador: ${loadingProgress.advancedRAG.generator.message}`}
+                    size="sm"
+                  />
+                )}
               </div>
             )}
           </div>

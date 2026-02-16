@@ -1,17 +1,17 @@
 // ChatInput Component - Message input with auto-resize
 
 import { useState, useRef, useEffect } from 'preact/hooks';
-import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle, AudioWaveform, MoreHorizontal, Server } from 'lucide-preact';
+import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle, AudioWaveform, MoreHorizontal, Server, AppWindow } from 'lucide-preact';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
-import { uiStore, uiSignal } from '@/lib/stores';
+import { uiStore, uiSignal, extensionsStore, extensionsSignal } from '@/lib/stores';
 import { speechService, voiceState, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { getEnabledMCPServers } from '@/lib/db/mcp';
 import type { MCPServer } from '@/types';
 
 export interface ChatInputProps {
-  onSend: (message: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[]) => void;
+  onSend: (message: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[], activeTool?: { type: 'app' | 'mcp', id: string, name: string } | null) => void;
   disabled?: boolean;
   loading?: boolean;
   placeholder?: string;
@@ -34,17 +34,25 @@ export function ChatInput({
   const [mode, setMode] = useState<'web' | 'local' | 'smart' | 'conversation'>('conversation');
   const [showMenu, setShowMenu] = useState(false);
   const [mcpServers, setMcpServers] = useState<MCPServer[]>([]);
-  const [showMCPAutocomplete, setShowMCPAutocomplete] = useState(false);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Subscribe to language changes
+  // Subscribe to signals
   const lang = languageSignal.value;
   const vState = voiceState.value;
   const vMode = isVoiceModeEnabled.value;
   const showLiveMode = uiSignal.value.showLiveMode;
+  const activeTool = extensionsSignal.value.activeTool;
+  const customApps = extensionsSignal.value.customApps;
+  
+  // Incluimos apps nativas
+  const builtInApps = [
+    { id: 'inlinked', name: 'InLinked', iconUrl: 'https://hosted.inled.es/INLINKED.png' },
+    { id: 'inqr', name: 'InQR', iconUrl: 'https://hosted.inled.es/inqr.png' }
+  ];
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -65,16 +73,16 @@ export function ChatInput({
       textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
     }
 
-    // MCP Autocomplete Logic
-    if (message.startsWith('/') && !message.includes(' ')) {
+    // Autocomplete Logic
+    if (message.startsWith('/') && !message.includes(' ') && !activeTool) {
       if (mcpServers.length === 0) {
         getEnabledMCPServers().then(setMcpServers);
       }
-      setShowMCPAutocomplete(true);
+      setShowAutocomplete(true);
     } else {
-      setShowMCPAutocomplete(false);
+      setShowAutocomplete(false);
     }
-  }, [message]);
+  }, [message, activeTool]);
 
   // Handle voice results
   useEffect(() => {
@@ -88,7 +96,7 @@ export function ChatInput({
         // Accedemos directamente a la señal para evitar cierres obsoletos (stale closures)
         if (isVoiceModeEnabled.value) {
           // Si es modo conversación, enviar automáticamente
-          onSend(text, mode, selectedImage ? [selectedImage] : undefined);
+          onSend(text, mode, selectedImage ? [selectedImage] : undefined, activeTool);
           setSelectedImage(null);
         } else {
           // Si es solo dictado, añadir al input
@@ -96,12 +104,12 @@ export function ChatInput({
         }
       });
     }
-  }, [vState, mode, onSend, selectedImage, showLiveMode]);
+  }, [vState, mode, onSend, selectedImage, showLiveMode, activeTool]);
 
   function handleSubmit(e: Event) {
     e.preventDefault();
     if ((message.trim() || selectedImage) && !disabled && !loading) {
-      onSend(message.trim(), mode, selectedImage ? [selectedImage] : undefined);
+      onSend(message.trim(), mode, selectedImage ? [selectedImage] : undefined, activeTool);
       setMessage('');
       setSelectedImage(null);
     }
@@ -143,6 +151,11 @@ export function ChatInput({
       e.preventDefault();
       handleSubmit(e);
     }
+    
+    // Remove active tool on Backspace if message is empty
+    if (e.key === 'Backspace' && message === '' && activeTool) {
+      extensionsStore.setActiveTool(null);
+    }
   }
 
   function toggleDictation() {
@@ -156,30 +169,77 @@ export function ChatInput({
   const mcpMatches = mcpServers.filter(s => 
     ('/' + s.name).toLowerCase().startsWith(message.toLowerCase())
   );
+  
+  const allApps = [...builtInApps, ...customApps];
+  const appMatches = allApps.filter(app => 
+    ('/' + app.name).toLowerCase().startsWith(message.toLowerCase())
+  );
 
   return (
     <form onSubmit={handleSubmit} className="relative">
-      {/* MCP Autocomplete Popup */}
-      {showMCPAutocomplete && mcpMatches.length > 0 && (
+      {/* Autocomplete Popup */}
+      {showAutocomplete && (mcpMatches.length > 0 || appMatches.length > 0) && (
         <div className="absolute bottom-full left-0 mb-2 w-64 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <div className="px-3 py-2 text-xs font-medium text-[var(--color-text-secondary)] bg-[var(--color-bg-tertiary)]/50 border-b border-[var(--color-border)]">
-            MCP Servers
-          </div>
-          {mcpMatches.map(server => (
-            <button
-              key={server.id}
-              type="button"
-              onClick={() => {
-                setMessage('/' + server.name + ' ');
-                setShowMCPAutocomplete(false);
-                textareaRef.current?.focus();
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors text-left"
-            >
-              <Server size={14} className="text-[var(--color-primary)]" />
-              <span>{server.name}</span>
-            </button>
-          ))}
+          {mcpMatches.length > 0 && (
+            <>
+              <div className="px-3 py-2 text-xs font-medium text-[var(--color-text-secondary)] bg-[var(--color-bg-tertiary)]/50 border-b border-[var(--color-border)]">
+                MCP Servers
+              </div>
+              {mcpMatches.map(server => (
+                <button
+                  key={server.id}
+                  type="button"
+                  onClick={() => {
+                    setMessage('');
+                    extensionsStore.setActiveTool({
+                      type: 'mcp',
+                      id: server.id,
+                      name: server.name
+                    });
+                    setShowAutocomplete(false);
+                    setTimeout(() => textareaRef.current?.focus(), 10);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors text-left"
+                >
+                  <Server size={14} className="text-[var(--color-primary)]" />
+                  <span>{server.name}</span>
+                </button>
+              ))}
+            </>
+          )}
+          
+          {appMatches.length > 0 && (
+            <>
+              <div className="px-3 py-2 text-xs font-medium text-[var(--color-text-secondary)] bg-[var(--color-bg-tertiary)]/50 border-b border-[var(--color-border)] border-t first:border-t-0">
+                Apps
+              </div>
+              {appMatches.map(app => (
+                <button
+                  key={(app as any).id}
+                  type="button"
+                  onClick={() => {
+                    setMessage('');
+                    extensionsStore.setActiveTool({
+                      type: 'app',
+                      id: (app as any).id,
+                      name: (app as any).name,
+                      icon: (app as any).iconUrl
+                    });
+                    setShowAutocomplete(false);
+                    setTimeout(() => textareaRef.current?.focus(), 10);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors text-left"
+                >
+                  {(app as any).iconUrl ? (
+                    <img src={(app as any).iconUrl} className="w-3.5 h-3.5 object-contain" />
+                  ) : (
+                    <AppWindow size={14} className="text-[var(--color-primary)]" />
+                  )}
+                  <span>{(app as any).name}</span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
       )}
 
@@ -383,13 +443,34 @@ export function ChatInput({
           )}
         </div>
 
+        {/* Selected Tool Pill (Apps or MCPs) */}
+        {activeTool && (
+          <div className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-full text-xs font-semibold text-[var(--color-text)] animate-in zoom-in-95 duration-200 shadow-sm">
+            {activeTool.type === 'mcp' ? (
+              <Server size={12} className="text-[var(--color-primary)]" />
+            ) : activeTool.icon ? (
+              <img src={activeTool.icon} className="w-3.5 h-3.5 object-contain" />
+            ) : (
+              <AppWindow size={12} className="text-[var(--color-primary)]" />
+            )}
+            <span>{activeTool.name}</span>
+            <button
+              type="button"
+              onClick={() => extensionsStore.setActiveTool(null)}
+              className="ml-1 p-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition-colors"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           value={message}
           onInput={(e) => setMessage((e.target as HTMLTextAreaElement).value)}
           onKeyDown={handleKeyDown}
           disabled={disabled || loading}
-          placeholder={vState === 'listening' ? i18nStore.t('chat.listening') : placeholder}
+          placeholder={vState === 'listening' ? i18nStore.t('chat.listening') : activeTool ? `Usar ${activeTool.name}...` : placeholder}
           rows={1}
           className={cn(
             'flex-1 bg-transparent text-[var(--color-text)]',

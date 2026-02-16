@@ -53,6 +53,26 @@ const STEP_INFO: Record<WebSearchStep, { icon: any; color: string }> = {
     icon: Sparkles,
     color: 'text-amber-500'
   },
+  searching: {
+    icon: Search,
+    color: 'text-blue-500'
+  },
+  classification: {
+    icon: Cpu,
+    color: 'text-purple-500'
+  },
+  hyde: {
+    icon: Sparkles,
+    color: 'text-indigo-500'
+  },
+  reranking: {
+    icon: FileText,
+    color: 'text-cyan-500'
+  },
+  compression: {
+    icon: FileText,
+    color: 'text-teal-500'
+  },
   completed: {
     icon: Sparkles,
     color: 'text-green-600'

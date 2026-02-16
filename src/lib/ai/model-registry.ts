@@ -348,6 +348,78 @@ export const MODEL_REGISTRY: ModelMetadata[] = [
     requiresWebGPU: true,
     contextSize: 512,
     tags: ['embedding', 'gpu', 'fast']
+  },
+
+  // ========================================================================
+  // ADVANCED RAG MODELS (Fudan High-Perf)
+  // ========================================================================
+  {
+    id: 'bge-m3',
+    name: 'BGE-M3',
+    displayName: 'BGE-M3 (Dense Embedding)',
+    description: 'Modelo de embedding denso de alto rendimiento para búsqueda semántica.',
+    type: 'embedding',
+    engine: 'transformers',
+    hfModelId: 'Xenova/bge-m3',
+    sizeGB: 1.1,
+    speed: 'fast',
+    quality: 'excellent',
+    minMemoryGB: 2,
+    preferredMemoryGB: 4,
+    requiresWebGPU: false,
+    contextSize: 8192,
+    tags: ['advanced-rag', 'embedding', 'transformers']
+  },
+  {
+    id: 'monot5-base',
+    name: 'monoT5-base-msmarco',
+    displayName: 'monoT5 (Reranker)',
+    description: 'Modelo especializado en reordenar documentos por relevancia.',
+    type: 'chat', // Using chat as a proxy for specialized processing
+    engine: 'transformers',
+    hfModelId: 'Xenova/monot5-base-msmarco',
+    sizeGB: 0.9,
+    speed: 'medium',
+    quality: 'excellent',
+    minMemoryGB: 2,
+    preferredMemoryGB: 4,
+    requiresWebGPU: false,
+    contextSize: 512,
+    tags: ['advanced-rag', 'reranker', 'transformers']
+  },
+  {
+    id: 'bert-multilingual',
+    name: 'bert-base-multilingual-cased',
+    displayName: 'BERT Multilingual (Classifier)',
+    description: 'Modelo para clasificación de consultas y detección de intención.',
+    type: 'chat',
+    engine: 'transformers',
+    hfModelId: 'Xenova/bert-base-multilingual-cased',
+    sizeGB: 0.7,
+    speed: 'fast',
+    quality: 'excellent',
+    minMemoryGB: 1,
+    preferredMemoryGB: 2,
+    requiresWebGPU: false,
+    contextSize: 512,
+    tags: ['advanced-rag', 'classifier', 'transformers']
+  },
+  {
+    id: 'flan-t5-large',
+    name: 'flan-t5-large',
+    displayName: 'Flan-T5 Large (HyDE/Generator)',
+    description: 'Modelo instructivo para generación de documentos hipotéticos y compresión.',
+    type: 'chat',
+    engine: 'transformers',
+    hfModelId: 'Xenova/flan-t5-large',
+    sizeGB: 3.1,
+    speed: 'medium',
+    quality: 'excellent',
+    minMemoryGB: 4,
+    preferredMemoryGB: 8,
+    requiresWebGPU: false,
+    contextSize: 2048,
+    tags: ['advanced-rag', 'generator', 'transformers']
   }
 ];
 

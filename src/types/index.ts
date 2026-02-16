@@ -145,6 +145,7 @@ export interface Settings {
   // Live Mode settings
   liveModeAudioType?: 'system' | 'model'; // Use system TTS or model-generated audio
   liveModeSttType?: 'system' | 'model'; // Use system STT or model-based STT
+  useAdvancedRAG?: boolean; // Use Fudan High-Perf RAG pipeline
 }
 
 /**
@@ -242,5 +243,19 @@ export interface MCPServer {
   enabled: boolean;
   status: 'connected' | 'disconnected' | 'error';
   errorMessage?: string;
+  createdAt: number;
+}
+
+/**
+ * Custom Integration Application
+ */
+export interface CustomApp {
+  id: string;
+  name: string;
+  url: string; // The URL to open the app (e.g. https://insuite.inled.es/inlinked/)
+  baseUrlToIntercept: string; // The URL base that should trigger this app (e.g. https://linkedin.com)
+  exampleUrl: string; // e.g. https://insuite.inled.es/inlinked/?t={{text}}
+  instructions: string; // Markdown instructions/syntax
+  iconUrl?: string; // Optional icon URL
   createdAt: number;
 }

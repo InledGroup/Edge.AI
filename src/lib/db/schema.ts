@@ -9,7 +9,8 @@ import type {
   Chunk,
   StoredEmbedding,
   Conversation,
-  Settings
+  Settings,
+  CustomApp
 } from '../../types';
 
 /**
@@ -78,6 +79,13 @@ export interface EdgeAIDB extends DBSchema {
       'by-status': string;
     };
   };
+  custom_apps: {
+    key: string;
+    value: CustomApp;
+    indexes: {
+      'by-created': number;
+    };
+  };
   settings: {
     key: string;
     value: any;
@@ -85,7 +93,7 @@ export interface EdgeAIDB extends DBSchema {
 }
 
 const DB_NAME = 'edge-ai-db';
-const DB_VERSION = 6;
+const DB_VERSION = 8;
 
 let dbInstance: IDBPDatabase<EdgeAIDB> | null = null;
 
@@ -152,6 +160,14 @@ export async function getDB(): Promise<IDBPDatabase<EdgeAIDB>> {
           keyPath: 'id'
         });
         mcpStore.createIndex('by-status', 'status');
+      }
+
+      // Custom Apps store
+      if (!db.objectStoreNames.contains('custom_apps')) {
+        const customAppsStore = db.createObjectStore('custom_apps', {
+          keyPath: 'id'
+        });
+        customAppsStore.createIndex('by-created', 'createdAt');
       }
 
       // Settings store (key-value)
@@ -232,14 +248,16 @@ export async function getDBStats() {
 export async function exportDatabase() {
   const db = await getDB();
 
-  const [documents, chunks, embeddings, conversations, memories, settings] =
+  const [documents, chunks, embeddings, conversations, memories, settings, mcp_servers, custom_apps] =
     await Promise.all([
       db.getAll('documents'),
       db.getAll('chunks'),
       db.getAll('embeddings'),
       db.getAll('conversations'),
       db.getAll('memories'),
-      getAllSettings()
+      getAllSettings(),
+      db.getAll('mcp_servers'),
+      db.getAll('custom_apps')
     ]);
 
   return {
@@ -250,7 +268,9 @@ export async function exportDatabase() {
     embeddings,
     conversations,
     memories,
-    settings
+    settings,
+    mcp_servers,
+    custom_apps
   };
 }
 
@@ -260,7 +280,7 @@ export async function exportDatabase() {
 export async function importDatabase(data: any): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(
-    ['documents', 'chunks', 'embeddings', 'conversations', 'memories', 'mcp_servers', 'settings'],
+    ['documents', 'chunks', 'embeddings', 'conversations', 'memories', 'mcp_servers', 'custom_apps', 'settings'],
     'readwrite'
   );
 
@@ -293,6 +313,11 @@ export async function importDatabase(data: any): Promise<void> {
     // Import MCP servers
     for (const server of data.mcp_servers || []) {
       await tx.objectStore('mcp_servers').put(server);
+    }
+
+    // Import custom apps
+    for (const app of data.custom_apps || []) {
+      await tx.objectStore('custom_apps').put(app);
     }
 
     // Import settings

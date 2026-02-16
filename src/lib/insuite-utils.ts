@@ -75,39 +75,96 @@ export function cleanUrl(url: string): string {
 /**
  * Analyzes assistant response to trigger extensions
  */
-export function processExtensionIntent(content: string): boolean {
+export function processExtensionIntent(content: string, activeToolId?: string | null): boolean {
   const text = content.trim();
   
-  // 1. PRIORIDAD: Si la IA ya generó una URL de InSuite, usarla TAL CUAL
-  const insuiteMatch = text.match(/https:\/\/insuite\.inled\.es\/(inlinked|inqr|inqr\/|inlinked\/)[^\s\)\[\]\>]+/);
-  if (insuiteMatch) {
-    const fullUrl = cleanUrl(insuiteMatch[0]);
-    let typePart = insuiteMatch[1].replace('/', '');
+  // 1. Detección de URLs de InSuite (InLinked / InQR)
+  const insuiteMatches = [...text.matchAll(/https:\/\/insuite\.inled\.es\/(inlinked|inqr|inqr\/|inlinked\/)[^\s\)\[\]\>]+/g)];
+  
+  if (insuiteMatches.length > 0) {
+    // Si hay un activeToolId, priorizar la URL que coincida con ese ID
+    let bestMatch = insuiteMatches[0];
+    if (activeToolId) {
+      const toolMatch = insuiteMatches.find(m => m[1].includes(activeToolId));
+      if (toolMatch) bestMatch = toolMatch;
+    }
+
+    const fullUrl = cleanUrl(bestMatch[0]);
+    let typePart = bestMatch[1].replace('/', '');
     const type = typePart === 'inlinked' ? 'inlinked' : 'inqr';
-    extensionsStore.open(type, fullUrl);
+    extensionsStore.open(type as any, fullUrl);
     return true;
+  }
+
+  // 2. Custom Apps detection (by intercepting their base URLs)
+  const customApps = extensionsStore.customApps;
+  for (const app of customApps) {
+    if (app.baseUrlToIntercept) {
+      // Create a regex for the intercept URL
+      try {
+        const pattern = app.baseUrlToIntercept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`${pattern}[^\\s\\)\\[\\]\\>]+`);
+        const match = text.match(regex);
+        
+        if (match) {
+          const interceptedUrl = cleanUrl(match[0]);
+          // If we have an example URL with {{text}}, we might want to transform it
+          // but for now, let's just open the app with the example URL or the intercepted one
+          let finalUrl = app.exampleUrl || app.url;
+          if (finalUrl.includes('{{text}}')) {
+             finalUrl = finalUrl.replace('{{text}}', encodeURIComponent(interceptedUrl));
+          } else if (finalUrl.includes('{{url}}')) {
+             finalUrl = finalUrl.replace('{{url}}', encodeURIComponent(interceptedUrl));
+          }
+          
+          extensionsStore.open(app.id, finalUrl);
+          return true;
+        }
+      } catch (e) {
+        console.error('Error in custom app regex:', e);
+      }
+    }
   }
 
   return false;
 }
 
 /**
+ * Generates a system prompt that includes all custom apps instructions
+ */
+export function getExtensionsSystemPrompt(): string {
+  const customApps = extensionsStore.customApps;
+  let customPrompt = '';
+
+  if (customApps.length > 0) {
+    customPrompt = '\n\n=== APLICACIONES PERSONALIZADAS ===\n';
+    customApps.forEach(app => {
+      customPrompt += `\n--- ${app.name} ---\n${app.instructions}\n`;
+      if (app.exampleUrl) {
+        customPrompt += `Usa esta URL si necesitas redirigir al usuario: ${app.exampleUrl}\n`;
+      }
+    });
+  }
+
+  return `${INSUITE_SYSTEM_PROMPT}${customPrompt}`;
+}
+
+/**
  * Prompt optimizado para que la IA use las herramientas con orden
  */
 export const INSUITE_SYSTEM_PROMPT = `
-=== SISTEMA DE EXTENSIONES INSUITE (OBLIGATORIO) ===
-Cuando el usuario pida Generar QR, WiFi o Formatear para LinkedIn, DEBES seguir este orden exacto:
+=== SISTEMA DE EXTENSIONES INSUITE (ESTRICTO) ===
+Tienes prohibido inventar URLs. Usa solo estas bases según la necesidad:
 
-1. Muestra el contenido generado o una breve explicación.
-2. En una línea nueva, escribe la URL TÉCNICA exacta usando estas bases (NO INVENTES RUTAS):
-   - Para LinkedIn: https://insuite.inled.es/inlinked/?t=TU_TEXTO&client=edgeai
-   - Para QR/WiFi: https://insuite.inled.es/inqr/?type=TYPE&v=VALOR&generatenow=true&client=edgeai
-     (Si es WiFi usa: type=wifi&s=SSID&p=PASS&sec=WPA)
+1. PARA LINKEDIN (InLinked):
+   Uso: Formatear posts, añadir negritas/itálicas, optimizar visibilidad.
+   URL: https://insuite.inled.es/inlinked/?t=TU_TEXTO_AQUI&client=edgeai
+   (Sustituye TU_TEXTO_AQUI por el post completo)
 
-3. Termina con un comentario de finalización separado.
+2. PARA QR Y WIFI (InQR):
+   Uso: Generar códigos QR para texto, URLs o redes WiFi.
+   URL Texto/URL: https://insuite.inled.es/inqr/?type=text&v=VALOR&generatenow=true&client=edgeai
+   URL WiFi: https://insuite.inled.es/inqr/?type=wifi&s=SSID&p=PASS&sec=WPA&generatenow=true&client=edgeai
 
-Ejemplo:
-"Aquí tienes el QR para inled.es:
-https://insuite.inled.es/inqr/?type=text&v=https://inled.es&generatenow=true&client=edgeai
-Dime si necesitas algo más."
+REGLA DE ORO: Si el usuario seleccionó una app específica (ej. InLinked), NO menciones ni generes URLs de otras apps (como InQR).
 `;

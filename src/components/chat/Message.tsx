@@ -1,6 +1,6 @@
 // Message Component - Individual chat message
 
-import { User, Bot, FileText, Copy, FileEdit, Volume2, VolumeX, Linkedin, QrCode } from 'lucide-preact';
+import { User, Bot, FileText, Copy, FileEdit, Volume2, VolumeX, Linkedin, QrCode, Globe, AppWindow } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import type { Message as MessageType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,7 @@ import type { WebSource } from './WebSources';
 import { Button } from '../ui/Button';
 import { speechService, voiceState } from '@/lib/voice/speech-service';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
-import { extensionsStore } from '@/lib/stores';
+import { extensionsStore, extensionsSignal } from '@/lib/stores';
 import { generateInLinkedUrl, generateInQRUrl, isUrl } from '@/lib/insuite-utils';
 
 export interface MessageProps {
@@ -23,6 +23,18 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
   const [copied, setCopied] = useState(false);
   const vState = voiceState.value;
   const lang = languageSignal.value;
+
+  // Detectar si hay un appId o mcpServerId en los metadatos (para mensajes de usuario)
+  const appId = message.metadata?.appId;
+  const mcpId = message.metadata?.mcpServerId;
+  
+  const builtInApps = [
+    { id: 'inlinked', name: 'InLinked', iconUrl: 'https://hosted.inled.es/INLINKED.png' },
+    { id: 'inqr', name: 'InQR', iconUrl: 'https://hosted.inled.es/inqr.png' }
+  ];
+
+  const app = appId ? (extensionsSignal.value.customApps.find(a => a.id === appId) || builtInApps.find(a => a.id === appId)) : null;
+  const mcpName = mcpId ? 'MCP' : null; // Podríamos buscar el nombre real si fuera necesario
 
   // Detectar si hay fuentes web (metadata con webSources)
   const webSources = (message as any).metadata?.webSources as WebSource[] | undefined;
@@ -67,6 +79,16 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
     extensionsStore.open('inqr', url);
   }
 
+  function handleCustomAppClick(appId: string, exampleUrl: string) {
+    let url = exampleUrl;
+    if (url.includes('{{text}}')) {
+      url = url.replace('{{text}}', encodeURIComponent(message.content));
+    } else if (url.includes('{{url}}') && isUrl(message.content)) {
+      url = url.replace('{{url}}', encodeURIComponent(message.content));
+    }
+    extensionsStore.open(appId, url);
+  }
+
   return (
     <div
       className={cn(
@@ -106,7 +128,25 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
           )}
         >
           {isUser ? (
-            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            <div className="flex flex-col gap-2">
+              {app && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-black/10 rounded-full text-[10px] font-bold w-fit">
+                  {app.iconUrl ? (
+                    <img src={app.iconUrl} className="w-3 h-3 object-contain" />
+                  ) : (
+                    <AppWindow size={10} />
+                  )}
+                  <span>{app.name}</span>
+                </div>
+              )}
+              {mcpId && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-black/10 rounded-full text-[10px] font-bold w-fit">
+                  <Server size={10} />
+                  <span>MCP</span>
+                </div>
+              )}
+              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            </div>
           ) : (
             <MarkdownRenderer content={message.content} className="leading-relaxed" />
           )}
@@ -206,6 +246,25 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
               <img src="https://hosted.inled.es/inqr.png" className="w-3.5 h-3.5 mr-1" />
               InQR
             </Button>
+
+            {/* Custom Apps Buttons */}
+            {extensionsStore.customApps.map(app => (
+              <Button
+                key={app.id}
+                variant="ghost"
+                size="sm"
+                onClick={() => handleCustomAppClick(app.id, app.exampleUrl || app.url)}
+                className="h-7 px-2 text-xs"
+                title={app.name}
+              >
+                {app.iconUrl ? (
+                  <img src={app.iconUrl} className="w-3.5 h-3.5 mr-1" />
+                ) : (
+                  <Globe size={14} className="mr-1" />
+                )}
+                {app.name}
+              </Button>
+            ))}
           </div>
         )}
       </div>

@@ -5,7 +5,7 @@ import { FileText, Trash2, UploadCloud } from 'lucide-preact';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { ProgressBar } from './ui/ProgressBar';
-import { documentsStore, processingStore, modelsReady, modelsStore } from '@/lib/stores';
+import { documentsStore, processingStore, processingSignal, modelsReady, modelsStore } from '@/lib/stores';
 import { parseDocument, validateFile } from '@/lib/parsers';
 import { createDocument } from '@/lib/db/documents';
 import { processDocument } from '@/lib/rag/rag-pipeline';
@@ -87,21 +87,21 @@ export function DocumentUpload() {
       }
 
       // Parse document
-      processingStore.set({
+      processingSignal.value = {
         documentId: 'temp',
         stage: 'parsing',
         progress: 0,
         message: i18nStore.t('documents.processingParsing')
-      });
+      };
 
       const parsed = await parseDocument(file, {
         onProgress: (progress, message) => {
-          processingStore.set({
+          processingSignal.value = {
             documentId: 'temp',
             stage: 'parsing',
             progress,
             message
-          });
+          };
         }
       });
 
@@ -125,7 +125,7 @@ export function DocumentUpload() {
     } catch (error) {
       console.error('❌ Failed to process file:', error);
       alert(`Error: ${error}`);
-      processingStore.clear();
+      processingSignal.value = null;
     }
   }
 
@@ -145,14 +145,14 @@ export function DocumentUpload() {
         embeddingEngine,
         settings.chunkSize,
         (status) => {
-          processingStore.set(status);
+          processingSignal.value = status;
           documentsStore.update(documentId, {
             status: status.stage === 'complete' ? 'ready' : 'processing'
           });
         }
       );
 
-      processingStore.clear();
+      processingSignal.value = null;
       console.log(`✅ Document ${documentId} processed with RAG`);
 
     } catch (error) {
@@ -161,7 +161,7 @@ export function DocumentUpload() {
         status: 'error',
         errorMessage: error instanceof Error ? error.message : 'Unknown error'
       });
-      processingStore.clear();
+      processingSignal.value = null;
     }
   }
 
@@ -259,12 +259,12 @@ export function DocumentUpload() {
       </div>
 
       {/* Processing Status */}
-      {processingStore.current && (
+      {processingSignal.value && (
         <div className="bg-[var(--color-bg-secondary)] rounded-lg p-4">
           <ProgressBar
-            progress={processingStore.current.progress}
-            label={processingStore.current.message}
-            variant={processingStore.current.stage === 'error' ? 'error' : 'default'}
+            progress={processingSignal.value.progress}
+            label={processingSignal.value.message}
+            variant={processingSignal.value.stage === 'error' ? 'error' : 'default'}
           />
         </div>
       )}

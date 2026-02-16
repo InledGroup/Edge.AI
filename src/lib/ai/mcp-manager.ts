@@ -79,15 +79,14 @@ class MCPManager {
       const provider = new BrowserOAuthProvider(server);
 
       if (server.transport === 'http') {
-        // Use StreamableHTTPClientTransport as it is the recommended modern transport for HTTP-based MCP
-        transport = new StreamableHTTPClientTransport(new URL(server.url), {
+        // SSEClientTransport is generally more compatible with existing MCP servers
+        // like the one for Notion which might not support StreamableHTTP yet.
+        transport = new SSEClientTransport(new URL(server.url), {
           requestInit: {
             headers: {
-              'Accept': 'application/json, text/event-stream',
               ...(server.headers || {})
             }
-          },
-          authProvider: provider
+          }
         });
       } else {
         transport = new WebSocketClientTransport(new URL(server.url));

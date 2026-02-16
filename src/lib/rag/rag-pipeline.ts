@@ -51,10 +51,12 @@ export async function processDocument(
       texts,
       4, // Max 4 concurrent
       (progress, status) => {
+        const calculatedProgress = 30 + (progress * 0.6); // 30-90%
+        console.log(`📊 [RAG Pipeline] Progress: ${calculatedProgress.toFixed(1)}% - ${status}`);
         onProgress?.({
           documentId,
           stage: 'embedding',
-          progress: 30 + (progress * 0.6), // 30-90%
+          progress: calculatedProgress,
           message: status
         });
       }
@@ -163,13 +165,14 @@ export async function queryWithRAG(
   // Step 2: Hybrid search with BM25 + semantic
   const chunks = await searchSimilarChunks(
     queryEmbedding,
-    topK,
+    topK + 3, // Fetch more candidates initially
     documentIds,
     searchQuery, // Use original query for BM25
     {
       semanticWeight: 0.85, // Higher weight for our new better embedding model
       lexicalWeight: 0.15,
-      useReranking: true
+      useReranking: true,
+      minRelevance: 0.3 // Require minimum relevance to avoid noise
     }
   );
 
@@ -202,20 +205,25 @@ export async function generateRAGAnswer(
   // Build structured messages
   const messages: { role: string; content: string }[] = [];
 
-  // 1. System Prompt with Context
-  let systemContent = `Eres un asistente experto que analiza documentos y responde preguntas de manera precisa y útil.
+  // 1. System Prompt with Context - ENHANCED for better accuracy
+  let systemContent = `Eres un asistente de IA avanzado especializado en analizar documentos y responder preguntas basándote EXCLUSIVAMENTE en el contexto proporcionado. Tu objetivo es ser preciso, honesto y útil.
 
-## CONTEXTO DE DOCUMENTOS:
-${context || 'No hay documentos relevantes disponibles.'}
+## CONTEXTO DE DOCUMENTOS (Ventana Ampliada):
+${context || 'No se encontraron documentos relevantes para esta consulta.'}
 
-## INSTRUCCIONES:
-Analiza el contexto proporcionado y responde la pregunta del usuario.
-- Básate PRINCIPALMENTE en el contexto proporcionado
-- Cita las fuentes usando formato [Doc N] cuando menciones información específica
-- Sé claro, completo pero conciso
-- Si el contexto no tiene relación con la pregunta, indícalo pero intenta responder con tu conocimiento general si es posible, aclarando que no proviene de los documentos.
+## INSTRUCCIONES CRÍTICAS (NO ALUCINAR):
+1. **Regla de Oro:** Si la respuesta NO está explícitamente en el texto de arriba, DEBES decir: "Lo siento, los documentos proporcionados no contienen información sobre [tema de la pregunta]".
+   - 🚫 NO inventes definiciones.
+   - 🚫 NO asumas que una organización es "sin fines de lucro" o "tecnológica" si no lo dice.
+   - 🚫 NO uses tu conocimiento general para llenar vacíos de información específica.
 
-IMPORTANTE: Proporciona solo la respuesta final.`;
+2. **Citas Precisas:** Cada afirmación debe estar respaldada. Usa [Doc N] al final de cada frase clave.
+
+3. **Manejo de Ambigüedad:** Si el contexto menciona el término pero no lo define (ej. aparece en un título pero falta el texto descriptivo), indícalo: "El documento menciona 'Inled Group' pero no proporciona una definición explícita."
+
+4. **Respuesta Directa:** Responde concisamente. Si la respuesta es una lista, usa viñetas.
+
+Analiza el contexto con cuidado. A menudo la respuesta está en el texto circundante (Contexto anterior/posterior).`;
 
   if (additionalContext) {
     systemContent += `\n\n${additionalContext}`;
@@ -279,6 +287,10 @@ export async function completeRAGFlow(
   quality?: ReturnType<typeof assessRAGQuality>;
   faithfulness?: number;
 }> {
+  // Auto-enable query rewriting for short queries
+  const isShortQuery = query.split(/\s+/).length < 8;
+  const shouldRewrite = options?.useQueryRewriting !== false && (options?.useQueryRewriting || isShortQuery);
+
   // Step 1: Retrieve relevant chunks with enhanced options
   const ragResult = await queryWithRAG(
     query,
@@ -288,7 +300,7 @@ export async function completeRAGFlow(
     chatEngine,
     {
       useQueryExpansion: options?.useQueryExpansion,
-      useQueryRewriting: options?.useQueryRewriting
+      useQueryRewriting: shouldRewrite
     }
   );
 

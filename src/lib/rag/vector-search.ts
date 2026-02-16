@@ -52,6 +52,7 @@ export interface HybridSearchConfig {
   semanticWeight?: number; // 0-1, default 0.7
   lexicalWeight?: number;  // 0-1, default 0.3
   useReranking?: boolean;  // default true
+  minRelevance?: number;   // Minimum relevance score (0-1)
 }
 
 /**
@@ -138,8 +139,19 @@ export async function searchSimilarChunks(
   }
 
   // === HYBRID SCORING ===
-  const semanticWeight = config?.semanticWeight ?? 0.7;
-  const lexicalWeight = config?.lexicalWeight ?? 0.3;
+  let semanticWeight = config?.semanticWeight ?? 0.7;
+  let lexicalWeight = config?.lexicalWeight ?? 0.3;
+  let minRelevance = config?.minRelevance;
+
+  // Dynamic weight adjustment for specific entity queries
+  // If query is short (< 6 words) and has capitalized words (potential entities), boost lexical search
+  if (query && query.split(/\s+/).length < 6 && /[A-ZÁÉÍÓÚÑ]/.test(query)) {
+    console.log('⚡ [Hybrid Search] Detected specific entity query. Boosting lexical search.');
+    semanticWeight = 0.5;
+    lexicalWeight = 0.5;
+    // Relax min relevance slightly for entity searches as embeddings might be less precise
+    if (minRelevance) minRelevance = Math.max(0.1, minRelevance - 0.1); 
+  }
 
   retrievedChunks.forEach(rc => {
     const semanticScore = semanticScores.get(rc.chunk.id) || 0;
@@ -153,11 +165,18 @@ export async function searchSimilarChunks(
   retrievedChunks.sort((a, b) => b.score - a.score);
 
   // Take top K before reranking
-  let topResults = retrievedChunks.slice(0, topK * 2); // Get 2x for reranking
+  let topResults = retrievedChunks.slice(0, topK * 3); // Get 3x for reranking to have more candidates
 
   // === RERANKING ===
   if (config?.useReranking !== false && query) {
     topResults = rerankResults(topResults, query);
+  }
+
+  // Filter by minimum relevance if provided
+  if (minRelevance) {
+    const minScore = minRelevance;
+    topResults = topResults.filter(r => r.score >= minScore);
+    console.log(`🧹 Filtered ${retrievedChunks.length - topResults.length} chunks below threshold ${minScore}`);
   }
 
   // Final top K
@@ -175,7 +194,7 @@ export async function searchSimilarChunks(
 
 /**
  * Create context from retrieved chunks for RAG
- * Now includes previous/next context for better coherence
+ * Now includes expanded context for better coherence
  */
 export function createRAGContext(chunks: RetrievedChunk[]): string {
   if (chunks.length === 0) {
@@ -186,19 +205,17 @@ export function createRAGContext(chunks: RetrievedChunk[]): string {
     const docName = rc.document.name;
     const score = (rc.score * 100).toFixed(1);
 
-    // Build enhanced chunk content with context
-    let chunkContent = rc.chunk.content;
+    // Prefer expanded context if available, otherwise fallback to standard content
+    let chunkContent = rc.chunk.metadata?.expandedContext || rc.chunk.content;
 
-    // Add previous context if available
-    if (rc.chunk.metadata?.prevContext) {
-      chunkContent = `[Contexto anterior]: ${rc.chunk.metadata.prevContext}\n\n${chunkContent}`;
-      console.log(`🔗 [RAG] Added prev context to chunk ${index + 1}`);
-    }
-
-    // Add next context if available
-    if (rc.chunk.metadata?.nextContext) {
-      chunkContent = `${chunkContent}\n\n[Continúa]: ${rc.chunk.metadata.nextContext}`;
-      console.log(`🔗 [RAG] Added next context to chunk ${index + 1}`);
+    // If no expanded context but we have simple prev/next contexts, use them
+    if (!rc.chunk.metadata?.expandedContext) {
+      if (rc.chunk.metadata?.prevContext) {
+        chunkContent = `[Contexto anterior]: ${rc.chunk.metadata.prevContext}\n\n${chunkContent}`;
+      }
+      if (rc.chunk.metadata?.nextContext) {
+        chunkContent = `${chunkContent}\n\n[Continúa]: ${rc.chunk.metadata.nextContext}`;
+      }
     }
 
     return `[Documento ${index + 1}: ${docName} (${score}% relevancia)]\n${chunkContent}`;
@@ -216,6 +233,7 @@ export function createRAGContext(chunks: RetrievedChunk[]): string {
  * - Position in document (earlier chunks often more important)
  * - Document recency
  * - Query-chunk overlap
+ * - Proximity match (keywords appearing close together)
  */
 export function rerankResults(
   chunks: RetrievedChunk[],
@@ -225,9 +243,14 @@ export function rerankResults(
 
   // Track document distribution
   const docCounts = new Map<string, number>();
-  const queryTokens = new Set(
-    query.toLowerCase().split(/\s+/).filter(t => t.length > 2)
-  );
+  
+  // Extract significant terms (longer than 2 chars)
+  const queryTerms = query.toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(t => t.length > 2);
+    
+  const queryTokens = new Set(queryTerms);
 
   // Calculate reranking scores
   const reranked = chunks.map((chunk, index) => {
@@ -262,10 +285,12 @@ export function rerankResults(
       }
     }
 
+    const chunkContentLower = (chunk.chunk.metadata?.expandedContext || chunk.chunk.content).toLowerCase();
+
     // === QUERY TOKEN OVERLAP ===
     // Bonus for chunks that contain many query terms
     const chunkTokens = new Set(
-      chunk.chunk.content.toLowerCase().split(/\s+/)
+      chunkContentLower.split(/\s+/)
     );
     let overlapCount = 0;
     queryTokens.forEach(token => {
@@ -274,14 +299,31 @@ export function rerankResults(
 
     if (queryTokens.size > 0) {
       const overlapRatio = overlapCount / queryTokens.size;
-      rerankScore *= (1 + overlapRatio * 0.15); // Up to 15% bonus
+      rerankScore *= (1 + overlapRatio * 0.4); // Increased to 40% bonus for high overlap
+    }
+
+    // === EXACT PHRASE MATCH ===
+    // Significant bonus if the chunk contains the exact query phrase
+    if (chunkContentLower.includes(query.toLowerCase())) {
+        rerankScore *= 1.5; // 50% bonus for exact phrase match
+    } else {
+        // === PARTIAL PHRASE / PROXIMITY ===
+        // If exact match fails, check if significant subsets of the query appear
+        // e.g. "Inled Group" in "qué es Inled Group"
+        for (let i = 0; i < queryTerms.length - 1; i++) {
+            const bigram = `${queryTerms[i]} ${queryTerms[i+1]}`;
+            if (chunkContentLower.includes(bigram)) {
+                rerankScore *= 1.2; // 20% bonus for bigram match
+                break; // Apply once
+            }
+        }
     }
 
     // === CHUNK QUALITY ===
     // Longer chunks with context are often better
-    const hasContext = chunk.chunk.metadata?.prevContext || chunk.chunk.metadata?.nextContext;
+    const hasContext = chunk.chunk.metadata?.expandedContext || chunk.chunk.metadata?.prevContext;
     if (hasContext) {
-      rerankScore *= 1.05; // 5% bonus for contextual chunks
+      rerankScore *= 1.1; // 10% bonus for contextual chunks
     }
 
     return {

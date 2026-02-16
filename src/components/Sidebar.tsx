@@ -18,7 +18,8 @@ import {
   LayoutGrid,
   Linkedin,
   QrCode,
-  Sparkles
+  Sparkles,
+  AppWindow
 } from 'lucide-preact';
 import { conversationsStore, documentsStore, uiStore, extensionsStore, generatingTitleIdSignal } from '@/lib/stores';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
@@ -33,6 +34,7 @@ import type { Conversation } from '@/types';
 import { ModelConfigMenu } from './ModelConfigMenu';
 import { MemoryManager } from './MemoryManager';
 import { MCPSettings } from './mcp/MCPSettings';
+import { CustomAppsSettings } from './CustomAppsSettings';
 
 interface SidebarProps {
   onDocumentClick?: (documentId: string) => void;
@@ -45,6 +47,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
   const [activeTab, setActiveTab] = useState<'conversations' | 'documents' | 'extensions'>('conversations');
   const [showMemoryManager, setShowMemoryManager] = useState(false);
   const [showMCPSettings, setShowMCPSettings] = useState(false);
+  const [showCustomAppsSettings, setShowCustomAppsSettings] = useState(false);
 
   // Subscribe to language changes and conversations for re-rendering
   const lang = languageSignal.value;
@@ -133,6 +136,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
     <>
       {showMemoryManager && <MemoryManager onClose={() => setShowMemoryManager(false)} />}
       {showMCPSettings && <MCPSettings onClose={() => setShowMCPSettings(false)} />}
+      {showCustomAppsSettings && <CustomAppsSettings onClose={() => setShowCustomAppsSettings(false)} />}
       
       {/* Mobile toggle button */}
       <button
@@ -290,10 +294,20 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
           ) : (
             /* Extensions List */
             <div className="space-y-4">
-              <div className="px-2 py-1 text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider">
-                {i18nStore.t('apps.insuite')}
+              <div className="flex items-center justify-between px-2 py-1">
+                <div className="text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                  {i18nStore.t('apps.title')}
+                </div>
+                <button 
+                  onClick={() => setShowCustomAppsSettings(true)}
+                  className="p-1 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
+                  title={i18nStore.t('customApps.title')}
+                >
+                  <Plus size={14} />
+                </button>
               </div>
               <div className="space-y-1">
+                {/* Built-in InLinked */}
                 <div
                   onClick={handleOpenInLinked}
                   className="group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer hover:bg-[var(--color-bg-tertiary)]/50 transition-all border border-transparent hover:border-[var(--color-border)]"
@@ -308,6 +322,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                   <ChevronRight size={14} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100" />
                 </div>
 
+                {/* Built-in InQR */}
                 <div
                   onClick={handleOpenInQR}
                   className="group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer hover:bg-[var(--color-bg-tertiary)]/50 transition-all border border-transparent hover:border-[var(--color-border)]"
@@ -321,6 +336,28 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                   </div>
                   <ChevronRight size={14} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100" />
                 </div>
+
+                {/* Custom Apps */}
+                {extensionsStore.customApps.map((app) => (
+                  <div
+                    key={app.id}
+                    onClick={() => extensionsStore.open(app.id, app.url)}
+                    className="group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer hover:bg-[var(--color-bg-tertiary)]/50 transition-all border border-transparent hover:border-[var(--color-border)]"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-white p-1.5 shadow-sm flex-shrink-0 border border-gray-100 flex items-center justify-center">
+                      {app.iconUrl ? (
+                        <img src={app.iconUrl} alt={app.name} className="w-full h-full object-contain" />
+                      ) : (
+                        <Globe size={20} className="text-[var(--color-text-secondary)]" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{app.name}</p>
+                      <p className="text-xs text-[var(--color-text-tertiary)] truncate">{app.url}</p>
+                    </div>
+                    <ChevronRight size={14} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100" />
+                  </div>
+                ))}
               </div>
             </div>
           )}

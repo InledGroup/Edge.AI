@@ -24,7 +24,22 @@ const DEFAULT_SETTINGS: Settings = {
   useSpecializedToolModel: false, // Disabled by default - use only as fallback
   liveModeAudioType: 'system', // Use system TTS by default
   liveModeSttType: 'system', // Use system STT by default
+  useAdvancedRAG: false, // Disabled by default
 };
+
+/**
+ * Get advanced RAG setting
+ */
+export async function getUseAdvancedRAG(): Promise<boolean> {
+  return await getSetting('useAdvancedRAG') ?? false;
+}
+
+/**
+ * Set advanced RAG setting
+ */
+export async function setUseAdvancedRAG(value: boolean): Promise<void> {
+  await setSetting('useAdvancedRAG', value);
+}
 
 /**
  * Get a setting value

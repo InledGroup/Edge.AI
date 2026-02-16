@@ -11,16 +11,18 @@ import { conversationsStore, modelsReady, hasReadyDocuments, canvasStore, canvas
 import { i18nStore } from '@/lib/stores/i18n';
 import type { Message as MessageType } from '@/types';
 import { completeRAGFlow } from '@/lib/rag/rag-pipeline';
+import { AdvancedRAGPipeline } from '@/lib/new-rag';
 import EngineManager from '@/lib/ai/engine-manager';
 import { WebLLMEngine } from '@/lib/ai/webllm-engine';
 import { addMessage, getOrCreateConversation, getConversation, generateTitle, updateConversationTitle, aiGenerateTitle } from '@/lib/db/conversations';
-import { getRAGSettings, getWebSearchSettings, getSetting } from '@/lib/db/settings';
+import { getRAGSettings, getWebSearchSettings, getSetting, getUseAdvancedRAG } from '@/lib/db/settings';
 import { getMemories, addMemory } from '@/lib/db/memories';
 import { WebRAGOrchestrator } from '@/lib/web-search';
 import { generateUUID } from '@/lib/utils';
 import { speechService, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { mcpManager } from '@/lib/ai/mcp-manager';
-import { processExtensionIntent, INSUITE_SYSTEM_PROMPT } from '@/lib/insuite-utils';
+import { processExtensionIntent, getExtensionsSystemPrompt } from '@/lib/insuite-utils';
+import { extensionsStore, extensionsSignal } from '@/lib/stores';
 
 // Helper functions moved out of component
 const isDocumentGenerationRequest = (message: string): boolean => {
@@ -32,6 +34,23 @@ const isDocumentGenerationRequest = (message: string): boolean => {
 const markdownToHTML = (md: string) => {
   return md.replace(/^# (.*$)/gim, '<h1>$1</h1>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
 };
+
+const builtInApps = [
+  { 
+    id: 'inlinked', 
+    name: 'InLinked', 
+    iconUrl: 'https://hosted.inled.es/INLINKED.png', 
+    instructions: 'Eres un experto en LinkedIn. Formatea el texto del usuario para maximizar el engagement. Usa negritas y listas. Al final, genera OBLIGATORIAMENTE la URL: https://insuite.inled.es/inlinked/?t=TU_TEXTO&client=edgeai',
+    exampleUrl: 'https://insuite.inled.es/inlinked/?t={{text}}&client=edgeai'
+  },
+  { 
+    id: 'inqr', 
+    name: 'InQR', 
+    iconUrl: 'https://hosted.inled.es/inqr.png', 
+    instructions: 'Genera códigos QR. Si es texto o URL usa: https://insuite.inled.es/inqr/?type=text&v=VALOR&generatenow=true&client=edgeai. Si es WiFi usa: https://insuite.inled.es/inqr/?type=wifi&s=SSID&p=PASS&sec=WPA&generatenow=true&client=edgeai',
+    exampleUrl: 'https://insuite.inled.es/inqr/?type=text&v={{text}}&generatenow=true&client=edgeai'
+  }
+];
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<MessageType[]>([]);
@@ -97,20 +116,29 @@ export function ChatInterface() {
     canvasStore.open(markdownToHTML(content));
   };
 
-  async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[]) {
+  async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[], activeTool?: { type: 'app' | 'mcp', id: string, name: string } | null) {
     if (!isModelsReady) { alert(i18nStore.t('chat.loadModelsFirst')); return; }
 
     const originalContent = content; 
     let assistantPrompt = content;   
     let effectiveMode = mode;
 
-    // 1. Detect MCP Trigger (Slash command or Keyword)
+    // Reset active tool in store if it was used
+    if (activeTool) {
+      extensionsStore.setActiveTool(null);
+    }
+
+    // 1. Detect MCP Trigger (Pill or Slash command or Keyword)
     let mcpTools: any[] = [];
     let activeServerName = '';
     const toolNameMap = new Map<string, string>();
 
-    const mcpMatch = content.match(/\/(\w+)/);
-    let serverToUse = mcpMatch ? mcpMatch[1] : null;
+    let serverToUse = (activeTool?.type === 'mcp') ? activeTool.name : null;
+    
+    if (!serverToUse) {
+      const mcpMatch = content.match(/\/(\w+)/);
+      serverToUse = mcpMatch ? mcpMatch[1] : null;
+    }
 
     // Auto-detection by keyword if no slash command
     if (!serverToUse) {
@@ -170,7 +198,17 @@ export function ChatInterface() {
       }
     }
 
-    const userMessage: MessageType = { id: generateUUID(), role: 'user', content: originalContent, images, timestamp: Date.now() };
+    const userMessage: MessageType = { 
+      id: generateUUID(), 
+      role: 'user', 
+      content: originalContent, 
+      images, 
+      timestamp: Date.now(),
+      metadata: activeTool ? { 
+        appId: activeTool.type === 'app' ? activeTool.id : undefined,
+        mcpServerId: activeTool.type === 'mcp' ? activeTool.id : undefined
+      } : undefined
+    };
     setMessages(prev => [...prev, userMessage]);
 
         let conversationId = conversationsStore.activeId;
@@ -282,18 +320,64 @@ export function ChatInterface() {
         assistantMessage = { id: tempId, role: 'assistant', content: res.answer, timestamp: Date.now() } as any;
         setWebSearchProgress(null); // Clear progress when done
       } else if (effectiveMode === 'local') {
-        const embeddingEngine = await EngineManager.getEmbeddingEngine();
-        const settings = await getRAGSettings();
-        let streamedText = '';
-        const { answer, ragResult } = await completeRAGFlow(assistantPrompt, embeddingEngine, chatEngine, settings.topK, undefined, messages.slice(-5).map(m => ({ role: m.role, content: m.content })), (c) => {
-          streamedText += c;
-          setCurrentResponse(streamedText);
-          processAudioChunk(c);
-        }, { additionalContext: canvasContext + memoryContext });
-        assistantMessage = { id: generateUUID(), role: 'assistant', content: answer, timestamp: Date.now(), sources: ragResult.chunks };
+        const useAdvanced = await getUseAdvancedRAG();
+        
+        if (useAdvanced) {
+          // Use the new Advanced RAG Pipeline (Fudan High-Perf)
+          const pipeline = AdvancedRAGPipeline.getInstance();
+          const ragResult = await pipeline.execute(assistantPrompt, (step, progress, message) => {
+            setWebSearchProgress({ step: step as any, progress, message });
+          });
+
+          if (ragResult.mode === 'rag' && ragResult.context) {
+            // Generate answer with the retrieved context
+            const history = [...messages.slice(-5), userMessage].map(m => ({ role: m.role, content: m.content }));
+            const prompt = `Contexto relevante:\n${ragResult.context}\n\nPregunta: ${assistantPrompt}`;
+            const chatMsgs = [{ role: 'system', content: `Eres un asistente experto. Responde basándote en el contexto proporcionado.${memoryContext}` }, ...history, { role: 'user', content: prompt }];
+            
+            let answer = '';
+            await chatEngine.generateText(chatMsgs as any, { 
+              onStream: (c) => { 
+                answer += c;
+                setCurrentResponse(answer);
+                processAudioChunk(c);
+              } 
+            });
+            assistantMessage = { id: generateUUID(), role: 'assistant', content: answer, timestamp: Date.now(), sources: ragResult.sources as any };
+          } else {
+            // Direct chat if classification said so or no context found
+            const history = [...messages.slice(-5), userMessage].map(m => ({ role: m.role, content: m.content }));
+            const chatMsgs = [{ role: 'system', content: `Eres un asistente inteligente local.${memoryContext}` }, ...history];
+            let answer = '';
+            await chatEngine.generateText(chatMsgs as any, { onStream: (c) => { answer += c; setCurrentResponse(answer); processAudioChunk(c); } });
+            assistantMessage = { id: generateUUID(), role: 'assistant', content: answer, timestamp: Date.now() };
+          }
+          setWebSearchProgress(null);
+        } else {
+          // Legacy RAG Flow
+          const embeddingEngine = await EngineManager.getEmbeddingEngine();
+          const settings = await getRAGSettings();
+          let streamedText = '';
+          const { answer, ragResult } = await completeRAGFlow(assistantPrompt, embeddingEngine, chatEngine, settings.topK, undefined, messages.slice(-5).map(m => ({ role: m.role, content: m.content })), (c) => {
+            streamedText += c;
+            setCurrentResponse(streamedText);
+            processAudioChunk(c);
+          }, { additionalContext: canvasContext + memoryContext });
+          assistantMessage = { id: generateUUID(), role: 'assistant', content: answer, timestamp: Date.now(), sources: ragResult.chunks };
+        }
       } else {
         const history = [...messages.slice(-10), userMessage].map(m => ({ role: m.role, content: m.content }));
-        const systemPrompt = `Eres un asistente inteligente local. ${canvasContext}${memoryContext}\n${INSUITE_SYSTEM_PROMPT}`;
+        
+        let customAppPrompt = '';
+        if (activeTool && activeTool.type === 'app') {
+          const app = extensionsSignal.value.customApps.find(a => a.id === activeTool.id) || 
+                      builtInApps.find(a => a.id === activeTool.id);
+          if (app) {
+            customAppPrompt = `\n\n=== PRIORIDAD CRÍTICA: APP SELECCIONADA: ${app.name} ===\nInstrucciones específicas: ${app.instructions}\nSolo genera la URL técnica para esta app. IGNORA cualquier otra herramienta.\nURL de ejemplo: ${app.exampleUrl || (app as any).url}`;
+          }
+        }
+        
+        const systemPrompt = `Eres un asistente inteligente local. ${canvasContext}${memoryContext}\n${getExtensionsSystemPrompt()}${customAppPrompt}`;
         const chatMsgs = [{ role: 'system', content: systemPrompt }, ...history];
         
         let answer = '';
@@ -434,7 +518,7 @@ export function ChatInterface() {
         // 2. Then, after a small delay, process extension intent (which might close canvas)
         // This ensures the user "sees" the output as requested
         setTimeout(() => {
-          processExtensionIntent(assistantMessage.content);
+          processExtensionIntent(assistantMessage!.content, activeTool?.id);
         }, 500);
       }
     } catch (error: any) {

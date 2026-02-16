@@ -21,14 +21,14 @@ export interface BM25Score {
 }
 
 /**
- * Tokeniza texto en palabras
+ * Tokeniza texto en palabras - Soporte Unicode completo (acentos, ñ, etc.)
  */
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/[^\w\s]/g, ' ') // Eliminar puntuación
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Mantener letras y números Unicode
     .split(/\s+/)
-    .filter(token => token.length > 2); // Filtrar palabras muy cortas
+    .filter(token => token.length > 1); // Filtrar palabras de 1 letra (y, o, a)
 }
 
 /**

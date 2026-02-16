@@ -407,6 +407,11 @@ export type WebSearchStep =
   | 'embedding'
   | 'vector_search'
   | 'answer_generation'
+  | 'searching'
+  | 'classification'
+  | 'hyde'
+  | 'reranking'
+  | 'compression'
   | 'completed'
   | 'error';
 

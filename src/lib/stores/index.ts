@@ -2,7 +2,7 @@
 // Single source of truth for the entire application
 
 import { signal, computed } from '@preact/signals';
-import type { Document, Conversation, ModelConfig, ProcessingStatus } from '@/types';
+import type { Document, Conversation, ModelConfig, ProcessingStatus, CustomApp } from '@/types';
 
 // ============================================================================
 // Documents Store
@@ -308,14 +308,23 @@ export const canvasStore = {
 
 interface ExtensionsState {
   isOpen: boolean;
-  activeExtension: 'inlinked' | 'inqr' | null;
+  activeExtension: 'inlinked' | 'inqr' | string | null;
   url: string | null;
+  customApps: CustomApp[];
+  activeTool: {
+    type: 'app' | 'mcp';
+    id: string;
+    name: string;
+    icon?: string;
+  } | null;
 }
 
 export const extensionsSignal = signal<ExtensionsState>({
   isOpen: false,
   activeExtension: null,
-  url: null
+  url: null,
+  customApps: [],
+  activeTool: null
 });
 
 export const extensionsStore = {
@@ -331,8 +340,24 @@ export const extensionsStore = {
     return extensionsSignal.value.url;
   },
 
-  open(extension: 'inlinked' | 'inqr', url: string) {
+  get customApps() {
+    return extensionsSignal.value.customApps;
+  },
+
+  get activeTool() {
+    return extensionsSignal.value.activeTool;
+  },
+
+  setActiveTool(tool: { type: 'app' | 'mcp', id: string, name: string, icon?: string } | null) {
     extensionsSignal.value = {
+      ...extensionsSignal.value,
+      activeTool: tool
+    };
+  },
+
+  open(extension: 'inlinked' | 'inqr' | string, url: string) {
+    extensionsSignal.value = {
+      ...extensionsSignal.value,
       isOpen: true,
       activeExtension: extension,
       url
@@ -353,6 +378,36 @@ export const extensionsStore = {
       ...extensionsSignal.value,
       isOpen: !extensionsSignal.value.isOpen
     };
+  },
+
+  setCustomApps(apps: CustomApp[]) {
+    extensionsSignal.value = {
+      ...extensionsSignal.value,
+      customApps: apps
+    };
+  },
+
+  addCustomApp(app: CustomApp) {
+    extensionsSignal.value = {
+      ...extensionsSignal.value,
+      customApps: [...extensionsSignal.value.customApps, app]
+    };
+  },
+
+  removeCustomApp(id: string) {
+    extensionsSignal.value = {
+      ...extensionsSignal.value,
+      customApps: extensionsSignal.value.customApps.filter(a => a.id !== id)
+    };
+  },
+
+  updateCustomApp(id: string, updates: Partial<CustomApp>) {
+    extensionsSignal.value = {
+      ...extensionsSignal.value,
+      customApps: extensionsSignal.value.customApps.map(a =>
+        a.id === id ? { ...a, ...updates } : a
+      )
+    };
   }
 };
 
@@ -366,18 +421,35 @@ export const extensionsStore = {
  */
 export async function initializeStores() {
   try {
+    console.log('🔄 Initializing stores...');
+    
     // Import DB functions (dynamic to avoid SSR issues)
     const { getAllDocuments } = await import('@/lib/db/documents');
     const { getConversationsSorted } = await import('@/lib/db/conversations');
     const { getSetting } = await import('@/lib/db/settings');
+    const { getAllCustomApps } = await import('@/lib/db/custom-apps');
     const { i18nStore } = await import('@/lib/stores/i18n');
     const { mcpManager } = await import('@/lib/ai/mcp-manager');
+    const { getDB } = await import('@/lib/db/schema');
+
+    // Force DB initialization first
+    const db = await getDB();
+    console.log('📦 Database ready, version:', db.version, 'stores:', [...db.objectStoreNames]);
 
     // Initialize language
     await i18nStore.init();
 
     // Initialize MCP Manager
     await mcpManager.initialize();
+
+    // Load custom apps
+    try {
+      const customApps = await getAllCustomApps();
+      extensionsStore.setCustomApps(customApps || []);
+    } catch (e) {
+      console.error('⚠️ Failed to load custom apps:', e);
+      extensionsStore.setCustomApps([]);
+    }
 
     // Load documents
     const documents = await getAllDocuments();

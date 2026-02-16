@@ -3,10 +3,10 @@
  * Allows users to reconfigure models after initial setup
  */
 
-import { useState, useRef } from 'preact/hooks';
+import { useState, useRef, useEffect } from 'preact/hooks';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { Settings, RefreshCw, Trash2, Download, Info, Upload, Database } from 'lucide-preact';
+import { Settings, RefreshCw, Trash2, Download, Info, Upload, Database, Zap } from 'lucide-preact';
 import { modelsStore, modelsReady, conversationsStore } from '@/lib/stores';
 import {
   getDefaultModelIds,
@@ -21,6 +21,7 @@ import {
   importConversations, 
   getConversationsSorted 
 } from '@/lib/db/conversations';
+import { getUseAdvancedRAG, setUseAdvancedRAG } from '@/lib/db/settings';
 
 interface ModelConfigMenuProps {
   onOpenWizard: () => void;
@@ -29,7 +30,19 @@ interface ModelConfigMenuProps {
 export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [useAdvancedRAG, setUseAdvancedRAGState] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Load settings on mount
+  useEffect(() => {
+    getUseAdvancedRAG().then(setUseAdvancedRAGState);
+  }, []);
+
+  async function handleToggleAdvancedRAG() {
+    const newValue = !useAdvancedRAG;
+    setUseAdvancedRAGState(newValue);
+    await setUseAdvancedRAG(newValue);
+  }
   
   // Subscribe to language changes
   const lang = languageSignal.value;
@@ -206,6 +219,31 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
                     <span className={EngineManager.isToolEngineReady() ? 'text-[var(--color-success)]' : 'text-[var(--color-text-tertiary)]'}>
                       {EngineManager.isToolEngineReady() ? 'LFM2 Tool (Emergencia)' : i18nStore.t('models.notLoaded')}
                     </span>
+                  </div>
+                </div>
+
+                {/* Advanced RAG Toggle */}
+                <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap size={16} className={useAdvancedRAG ? "text-amber-500" : "text-[var(--color-text-tertiary)]"} />
+                      <div>
+                        <div className="text-sm font-medium">RAG Avanzado (Fudan)</div>
+                        <div className="text-[10px] text-[var(--color-text-tertiary)]">Máximo rendimiento y precisión</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleToggleAdvancedRAG}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        useAdvancedRAG ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-bg-tertiary)]'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          useAdvancedRAG ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
 

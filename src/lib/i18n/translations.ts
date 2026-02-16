@@ -177,6 +177,10 @@ export const translations = {
       vector_search: 'Buscando relevancia',
       answer_generation: 'Generando respuesta',
       searching: 'Ejecutando herramienta',
+      classification: 'Clasificando consulta',
+      hyde: 'Generando HyDE (Hipótesis)',
+      reranking: 'Re-ordenando (monoT5)',
+      compression: 'Comprimiendo contexto',
       completed: 'Completado',
       error: 'Error'
     },
@@ -455,6 +459,27 @@ export const translations = {
       sendToInLinked: 'Enviar a InLinked',
       sendToInQR: 'Enviar a InQR',
       extension: 'Extensión'
+    },
+    customApps: {
+      title: 'Aplicaciones Personalizadas',
+      subtitle: 'Configura integraciones a medida con herramientas externas',
+      addApp: 'Añadir nueva aplicación',
+      editApp: 'Editar aplicación',
+      name: 'Nombre de la integración',
+      url: 'URL de la aplicación',
+      baseUrlToIntercept: 'URL base a interceptar (opcional)',
+      exampleUrl: 'URL de ejemplo con variables',
+      instructions: 'Instrucciones y sintaxis (Markdown)',
+      noApps: 'No hay aplicaciones personalizadas configuradas',
+      tipVariables: 'Usa {{text}} para insertar el contenido del mensaje en la URL.',
+      placeholderName: 'ej. InLinked',
+      placeholderUrl: 'https://insuite.inled.es/inlinked/',
+      placeholderIntercept: 'https://linkedin.com',
+      placeholderExample: 'https://insuite.inled.es/inlinked/?t={{text}}',
+      placeholderInstructions: '# Instrucciones\nSintaxis: ...',
+      cancel: 'Cancelar',
+      save: 'Guardar aplicación',
+      update: 'Actualizar aplicación'
     }
   },
   en: {
@@ -635,6 +660,10 @@ export const translations = {
       vector_search: 'Searching relevance',
       answer_generation: 'Generating answer',
       searching: 'Executing tool',
+      classification: 'Classifying query',
+      hyde: 'Generating HyDE (Hypothesis)',
+      reranking: 'Re-ranking (monoT5)',
+      compression: 'Compressing context',
       completed: 'Completed',
       error: 'Error'
     },
@@ -913,6 +942,27 @@ export const translations = {
       sendToInLinked: 'Send to InLinked',
       sendToInQR: 'Send to InQR',
       extension: 'Extension'
+    },
+    customApps: {
+      title: 'Custom Applications',
+      subtitle: 'Configure custom integrations with external tools',
+      addApp: 'Add new application',
+      editApp: 'Edit application',
+      name: 'Integration Name',
+      url: 'Application URL',
+      baseUrlToIntercept: 'Base URL to intercept (optional)',
+      exampleUrl: 'Example URL with variables',
+      instructions: 'Instructions and syntax (Markdown)',
+      noApps: 'No custom applications configured',
+      tipVariables: 'Use {{text}} to insert message content into the URL.',
+      placeholderName: 'e.g. InLinked',
+      placeholderUrl: 'https://insuite.inled.es/inlinked/',
+      placeholderIntercept: 'https://linkedin.com',
+      placeholderExample: 'https://insuite.inled.es/inlinked/?t={{text}}',
+      placeholderInstructions: '# Instructions\nSyntax: ...',
+      cancel: 'Cancel',
+      save: 'Save application',
+      update: 'Update application'
     }
   }
 };
