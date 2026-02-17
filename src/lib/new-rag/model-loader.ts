@@ -1,14 +1,21 @@
 import { pipeline, env } from '@huggingface/transformers';
 import { DEFAULT_CONFIG } from './config';
 
-// Configuration: Explicitly allow remote models and configure paths
+/**
+ * Configure transformers.js environment
+ */
 env.allowLocalModels = false; 
 env.allowRemoteModels = true;
 env.useBrowserCache = true;
 
-// Ensure we use the correct Hugging Face host for model fetching
-env.remoteHost = 'https://huggingface.co/';
-env.remotePathTemplate = '{model}/resolve/{revision}/';
+// Force anonymous requests to bypass any local browser sessions that might be causing 401 errors
+const FETCH_OPTIONS = {
+  credentials: 'omit' as const,
+  mode: 'cors' as const,
+};
+
+// @ts-ignore
+env.fetch_options = FETCH_OPTIONS;
 
 export class RAGModelLoader {
   private static instance: RAGModelLoader;
@@ -28,7 +35,9 @@ export class RAGModelLoader {
       this.cache.set('classifier', await pipeline('feature-extraction', modelId, {
         progress_callback: (p: any) => {
           if (onProgress && p.status === 'progress') onProgress(p.progress, p.file);
-        }
+        },
+        // @ts-ignore
+        fetch_options: FETCH_OPTIONS
       }));
     }
     return this.cache.get('classifier');
@@ -41,7 +50,9 @@ export class RAGModelLoader {
       this.cache.set('embedder', await pipeline('feature-extraction', modelId, {
         progress_callback: (p: any) => {
           if (onProgress && p.status === 'progress') onProgress(p.progress, p.file);
-        }
+        },
+        // @ts-ignore
+        fetch_options: FETCH_OPTIONS
       }));
     }
     return this.cache.get('embedder');
@@ -51,10 +62,16 @@ export class RAGModelLoader {
     if (!this.cache.has('reranker')) {
       const modelId = DEFAULT_CONFIG.models.reranker;
       console.log(`Loading Reranker: ${modelId}...`);
-      this.cache.set('reranker', await pipeline('text2text-generation', modelId, {
+      
+      // Check if it's a T5 model (requires text2text-generation)
+      const task = modelId.includes('t5') ? 'text2text-generation' : 'text-classification';
+      
+      this.cache.set('reranker', await pipeline(task as any, modelId, {
         progress_callback: (p: any) => {
           if (onProgress && p.status === 'progress') onProgress(p.progress, p.file);
-        }
+        },
+        // @ts-ignore
+        fetch_options: FETCH_OPTIONS
       }));
     }
     return this.cache.get('reranker');
@@ -67,7 +84,9 @@ export class RAGModelLoader {
       this.cache.set('generator', await pipeline('text2text-generation', modelId, {
         progress_callback: (p: any) => {
           if (onProgress && p.status === 'progress') onProgress(p.progress, p.file);
-        }
+        },
+        // @ts-ignore
+        fetch_options: FETCH_OPTIONS
       }));
     }
     return this.cache.get('generator');

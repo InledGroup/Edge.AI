@@ -55,13 +55,15 @@ interface ModelsState {
   embedding: ModelConfig | null;
   chatLoading: boolean;
   embeddingLoading: boolean;
+  advancedRAGLoading: boolean;
 }
 
 export const modelsSignal = signal<ModelsState>({
   chat: null,
   embedding: null,
   chatLoading: false,
-  embeddingLoading: false
+  embeddingLoading: false,
+  advancedRAGLoading: false
 });
 
 export const modelsStore = {
@@ -81,6 +83,10 @@ export const modelsStore = {
     return modelsSignal.value.embeddingLoading;
   },
 
+  get advancedRAGLoading() {
+    return modelsSignal.value.advancedRAGLoading;
+  },
+
   setChatModel(model: ModelConfig | null) {
     modelsSignal.value = { ...modelsSignal.value, chat: model };
   },
@@ -95,6 +101,10 @@ export const modelsStore = {
 
   setEmbeddingLoading(loading: boolean) {
     modelsSignal.value = { ...modelsSignal.value, embeddingLoading: loading };
+  },
+
+  setAdvancedRAGLoading(loading: boolean) {
+    modelsSignal.value = { ...modelsSignal.value, advancedRAGLoading: loading };
   }
 };
 
@@ -463,6 +473,37 @@ export async function initializeStores() {
     const theme = await getSetting('theme');
     if (theme) {
       uiStore.setTheme(theme);
+    }
+
+    // Load Advanced RAG if enabled
+    const { getUseAdvancedRAG } = await import('@/lib/db/settings');
+    const useAdvanced = await getUseAdvancedRAG();
+    if (useAdvanced) {
+      const { AdvancedRAGPipeline } = await import('@/lib/new-rag');
+      const { modelsStore } = await import('@/lib/stores');
+      
+      console.log('🚀 Pre-loading Advanced RAG models...');
+      modelsStore.setAdvancedRAGLoading(true);
+      
+      try {
+        const pipeline = AdvancedRAGPipeline.getInstance();
+        // Trigger model loading (this uses the singleton which will cache the pipelines)
+        // We call a dummy method or just the loader internally
+        const { RAGModelLoader } = await import('@/lib/new-rag/model-loader');
+        const loader = RAGModelLoader.getInstance();
+        
+        await Promise.all([
+          loader.getClassifier(),
+          loader.getEmbedder(),
+          loader.getReranker(),
+          loader.getGenerator()
+        ]);
+        console.log('✅ Advanced RAG models loaded');
+      } catch (e) {
+        console.error('❌ Failed to pre-load Advanced RAG models:', e);
+      } finally {
+        modelsStore.setAdvancedRAGLoading(false);
+      }
     }
 
     console.log('✅ Stores initialized');

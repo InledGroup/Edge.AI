@@ -23,6 +23,7 @@ import { speechService, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { mcpManager } from '@/lib/ai/mcp-manager';
 import { processExtensionIntent, getExtensionsSystemPrompt } from '@/lib/insuite-utils';
 import { extensionsStore, extensionsSignal } from '@/lib/stores';
+import { getWorkerPool } from '@/lib/workers';
 
 // Helper functions moved out of component
 const isDocumentGenerationRequest = (message: string): boolean => {
@@ -209,98 +210,80 @@ export function ChatInterface() {
         mcpServerId: activeTool.type === 'mcp' ? activeTool.id : undefined
       } : undefined
     };
+    
+    // Add user message to state and DB
     setMessages(prev => [...prev, userMessage]);
-
-        let conversationId = conversationsStore.activeId;
-
-        let isFirstMessage = false;
-
     
+    let conversationId = conversationsStore.activeId;
+    let isFirstMessage = false;
 
-        if (!conversationId) {
+    if (!conversationId) {
+      const conv = await getOrCreateConversation();
+      conversationId = conv.id;
+      isFirstMessage = true;
+      conversationsStore.add(conv);
+    } else {
+      const activeConv = conversationsStore.active;
+      if (!activeConv || !activeConv.messages || activeConv.messages.length === 0) {
+        isFirstMessage = true;
+      }
+    }
 
-          const conv = await getOrCreateConversation();
+    await addMessage(conversationId, userMessage);
 
-          conversationId = conv.id;
-
-          isFirstMessage = true;
-
-          conversationsStore.add(conv);
-
-        } else {
-
-          // Check if the current active conversation has no messages yet
-
-          const activeConv = conversationsStore.active;
-
-          if (!activeConv || !activeConv.messages || activeConv.messages.length === 0) {
-
-            isFirstMessage = true;
-
-          }
-
-        }
-
-    
-
-        await addMessage(conversationId, userMessage);
-
-    
-
-        if (isFirstMessage) {
-
-          // Set a temporary title based on truncation
-
-          const tempTitle = generateTitle(originalContent);
-
-          await updateConversationTitle(conversationId, tempTitle);
-
-          const updatedConv = await getConversation(conversationId);
-
-          if (updatedConv) {
-
-            conversationsStore.update(conversationId, updatedConv);
-
-            conversationsStore.setActive(conversationId);
-
-          }
-
-        } else {
-
-          const updatedConv = await getConversation(conversationId);
-
-          if (updatedConv) conversationsStore.update(conversationId, updatedConv);
-
-        }
+    if (isFirstMessage) {
+      const tempTitle = generateTitle(originalContent);
+      await updateConversationTitle(conversationId, tempTitle);
+      const updatedConv = await getConversation(conversationId);
+      if (updatedConv) {
+        conversationsStore.update(conversationId, updatedConv);
+        conversationsStore.setActive(conversationId);
+      }
+    } else {
+      const updatedConv = await getConversation(conversationId);
+      if (updatedConv) conversationsStore.update(conversationId, updatedConv);
+    }
 
     setIsGenerating(true);
     setCurrentResponse('');
     setWebSearchProgress(null);
     startAudioStreaming();
 
+    // Prepare temporary assistant message for streaming
+    let assistantId = generateUUID();
+    const tempAssistantMsg: MessageType = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      streaming: true
+    };
+    setMessages(prev => [...prev, tempAssistantMsg]);
+
     try {
       const chatEngine = await EngineManager.getChatEngine();
       const chatModelId = modelsStore.chat?.id;
       const memories = await getMemories();
       const memoryContext = memories.length > 0 ? `\n\nRECUERDOS:\n${memories.map(m => `- ${m.content}`).join('\n')}` : '';
+      
       let canvasContext = '';
       if (canvasSignal.value.isOpen && canvasSignal.value.content) {
         canvasContext = `\n=== DOCUMENTO ABIERTO ===\n${canvasSignal.value.content.replace(/<[^>]*>/g, ' ').substring(0, 1000)}\n===`;
       }
 
-      let assistantMessage: MessageType | null = null;
+      let finalContent = '';
+      let finalSources: any[] | undefined = undefined;
 
       if (effectiveMode === 'web') {
         const embeddingEngine = await EngineManager.getEmbeddingEngine();
         const orchestrator = await WebRAGOrchestrator.create(chatEngine, embeddingEngine);
-        const tempId = generateUUID();
-        setMessages(prev => [...prev, { id: tempId, role: 'assistant', content: '', timestamp: Date.now(), streaming: true }]);
         
         const res = await orchestrator.search(originalContent, {
           onToken: (t) => {
-            setCurrentResponse(prev => prev + t);
+            finalContent += t;
+            setCurrentResponse(finalContent);
             processAudioChunk(t);
-            setMessages(prev => prev.map(m => m.id === tempId ? { ...m, content: m.content + t } : m));
+            setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent } : m));
           },
           onProgress: (step, progress, message) => {
             setWebSearchProgress({ step, progress, message });
@@ -317,55 +300,52 @@ export function ChatInterface() {
             });
           }
         });
-        assistantMessage = { id: tempId, role: 'assistant', content: res.answer, timestamp: Date.now() } as any;
-        setWebSearchProgress(null); // Clear progress when done
+        finalContent = res.answer;
       } else if (effectiveMode === 'local') {
         const useAdvanced = await getUseAdvancedRAG();
         
         if (useAdvanced) {
-          // Use the new Advanced RAG Pipeline (Fudan High-Perf)
-          const pipeline = AdvancedRAGPipeline.getInstance();
-          const ragResult = await pipeline.execute(assistantPrompt, (step, progress, message) => {
-            setWebSearchProgress({ step: step as any, progress, message });
+          // Use Advanced RAG Worker (Background Thread) to prevent UI freeze
+          const pool = getWorkerPool();
+          const worker = await pool.getAdvancedRAGWorker();
+          
+          const ragResult = await worker.execute(assistantPrompt, (progress, message) => {
+            setWebSearchProgress({ step: 'searching' as any, progress, message });
           });
 
-          if (ragResult.mode === 'rag' && ragResult.context) {
-            // Generate answer with the retrieved context
-            const history = [...messages.slice(-5), userMessage].map(m => ({ role: m.role, content: m.content }));
-            const prompt = `Contexto relevante:\n${ragResult.context}\n\nPregunta: ${assistantPrompt}`;
-            const chatMsgs = [{ role: 'system', content: `Eres un asistente experto. Responde basándote en el contexto proporcionado.${memoryContext}` }, ...history, { role: 'user', content: prompt }];
+          // A-RAG returns the final answer directly from the agent
+          if (ragResult.answer) {
+            finalContent = ragResult.answer;
+            finalSources = ragResult.sources || [];
             
-            let answer = '';
-            await chatEngine.generateText(chatMsgs as any, { 
-              onStream: (c) => { 
-                answer += c;
-                setCurrentResponse(answer);
-                processAudioChunk(c);
-              } 
-            });
-            assistantMessage = { id: generateUUID(), role: 'assistant', content: answer, timestamp: Date.now(), sources: ragResult.sources as any };
+            // Simular streaming para la UI si la respuesta es estática del worker
+            let displayed = '';
+            const words = finalContent.split(' ');
+            for (const word of words) {
+              displayed += word + ' ';
+              setCurrentResponse(displayed);
+              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: displayed } : m));
+              await new Promise(r => setTimeout(r, 10)); 
+            }
           } else {
-            // Direct chat if classification said so or no context found
-            const history = [...messages.slice(-5), userMessage].map(m => ({ role: m.role, content: m.content }));
-            const chatMsgs = [{ role: 'system', content: `Eres un asistente inteligente local.${memoryContext}` }, ...history];
-            let answer = '';
-            await chatEngine.generateText(chatMsgs as any, { onStream: (c) => { answer += c; setCurrentResponse(answer); processAudioChunk(c); } });
-            assistantMessage = { id: generateUUID(), role: 'assistant', content: answer, timestamp: Date.now() };
+            finalContent = "El agente de investigación no pudo encontrar una respuesta clara.";
           }
           setWebSearchProgress(null);
         } else {
           // Legacy RAG Flow
           const embeddingEngine = await EngineManager.getEmbeddingEngine();
           const settings = await getRAGSettings();
-          let streamedText = '';
           const { answer, ragResult } = await completeRAGFlow(assistantPrompt, embeddingEngine, chatEngine, settings.topK, undefined, messages.slice(-5).map(m => ({ role: m.role, content: m.content })), (c) => {
-            streamedText += c;
-            setCurrentResponse(streamedText);
+            finalContent += c;
+            setCurrentResponse(finalContent);
             processAudioChunk(c);
+            setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent } : m));
           }, { additionalContext: canvasContext + memoryContext });
-          assistantMessage = { id: generateUUID(), role: 'assistant', content: answer, timestamp: Date.now(), sources: ragResult.chunks };
+          finalContent = answer;
+          finalSources = ragResult.chunks;
         }
       } else {
+        // Conversation mode
         const history = [...messages.slice(-10), userMessage].map(m => ({ role: m.role, content: m.content }));
         
         let customAppPrompt = '';
@@ -380,8 +360,6 @@ export function ChatInterface() {
         const systemPrompt = `Eres un asistente inteligente local. ${canvasContext}${memoryContext}\n${getExtensionsSystemPrompt()}${customAppPrompt}`;
         const chatMsgs = [{ role: 'system', content: systemPrompt }, ...history];
         
-        let answer = '';
-        let streamedText = '';
         const isMcpIntent = mcpTools.length > 0 || content.match(/\/(notion|weather|google|search)/i);
 
         if (isMcpIntent && mcpTools.length > 0) {
@@ -390,19 +368,10 @@ export function ChatInterface() {
            
            let toolEngine;
            if (useSpecialized && !canHandleNative) {
-             // If tool engine is not ready, it will download. Show progress.
              if (!EngineManager.isToolEngineReady()) {
-               setWebSearchProgress({ 
-                 step: 'searching', 
-                 progress: 0, 
-                 message: 'Descargando modelo de herramientas LFM2 (Emergencia)...' 
-               });
+               setWebSearchProgress({ step: 'searching', progress: 0, message: 'Descargando modelo de herramientas...' });
                toolEngine = await EngineManager.getToolEngine((progress, msg) => {
-                 setWebSearchProgress({ 
-                   step: 'searching', 
-                   progress, 
-                   message: `Descargando LFM2 Tool: ${msg} (${Math.round(progress)}%)` 
-                 });
+                 setWebSearchProgress({ step: 'searching', progress, message: `Descargando: ${msg} (${Math.round(progress)}%)` });
                });
                setWebSearchProgress(null);
              } else {
@@ -413,36 +382,33 @@ export function ChatInterface() {
            }
            
            let currentMsgs = [...chatMsgs];
-           if (toolEngine !== chatEngine) {
-             currentMsgs[0].content += `\n\nCRITICAL: User is interacting with ${activeServerName}. If you need information, call a function IMMEDIATELY using JSON. Do NOT explain.`;
-           }
-
            let loops = 0;
            let lastResContent = '';
 
            while (loops < 5) {
              let isToolCallDetected = false;
-             let accumulatedText = '';
+             let loopAccumulated = '';
              const res = await toolEngine.chat(currentMsgs, { 
                tools: mcpTools, 
                onStream: (c) => { 
-                 accumulatedText += c;
-                 if (accumulatedText.includes('{') || accumulatedText.includes('###')) { isToolCallDetected = true; setCurrentResponse(''); }
-                 if (!isToolCallDetected) { setCurrentResponse(accumulatedText); processAudioChunk(c); } 
+                 loopAccumulated += c;
+                 if (loopAccumulated.includes('{') || loopAccumulated.includes('###')) { 
+                   isToolCallDetected = true; 
+                   setCurrentResponse(''); 
+                 }
+                 if (!isToolCallDetected) { 
+                   finalContent += c;
+                   setCurrentResponse(finalContent);
+                   processAudioChunk(c);
+                   setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent } : m));
+                 } 
                } 
              });
 
              if (res.tool_calls && res.tool_calls.length > 0) {
                 currentMsgs.push(res);
-                // Persist the assistant's intention to call a tool
-                const toolCallMsg = { 
-                  id: generateUUID(), 
-                  role: 'assistant', 
-                  content: res.content || '', 
-                  timestamp: Date.now(), 
-                  tool_calls: res.tool_calls 
-                };
-                setMessages(prev => [...prev, toolCallMsg as any]);
+                const toolCallMsg = { id: generateUUID(), role: 'assistant', content: res.content || '', timestamp: Date.now(), tool_calls: res.tool_calls };
+                setMessages(prev => [...prev.filter(m => m.id !== assistantId), toolCallMsg as any]);
                 await addMessage(conversationId, toolCallMsg as any);
                 
                 for (const call of res.tool_calls) {
@@ -456,19 +422,21 @@ export function ChatInterface() {
                      result = await mcpManager.callTool(activeServerName, realName, args);
                    } catch (e: any) { result = { error: e.message }; }
                    
-                   const toolMsg = { 
-                     id: generateUUID(), 
-                     role: 'tool', 
-                     content: JSON.stringify(result, null, 2), 
-                     timestamp: Date.now(), 
-                     metadata: { toolName: realName } 
-                   };
-                   
+                   const toolMsg = { id: generateUUID(), role: 'tool', content: JSON.stringify(result, null, 2), timestamp: Date.now(), metadata: { toolName: realName } };
                    currentMsgs.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
                    setMessages(prev => [...prev, toolMsg as any]);
                    await addMessage(conversationId, toolMsg as any);
                 }
+                
+                // Prepare new assistant turn
+                const nextId = generateUUID();
+                setMessages(prev => [...prev, { id: nextId, role: 'assistant', content: '', timestamp: Date.now(), streaming: true }]);
+                
+                // @ts-ignore - Update assistantId for subsequent turns
+                assistantId = nextId; 
+                
                 loops++;
+                finalContent = '';
                 setCurrentResponse('');
              } else {
                 lastResContent = res.content || '';
@@ -476,55 +444,84 @@ export function ChatInterface() {
              }
            }
 
-           // Final summarization turn if needed
            if (loops > 0 && (!lastResContent || lastResContent.length < 5)) {
-              console.log("🏁 Forcing final summarization turn...");
-              answer = await chatEngine.generateText(currentMsgs as any, { onStream: (c) => { streamedText += c; setCurrentResponse(streamedText); processAudioChunk(c); } });
+              await chatEngine.generateText(currentMsgs as any, { onStream: (c) => { 
+                finalContent += c;
+                setCurrentResponse(finalContent); 
+                processAudioChunk(c);
+                // Need to find the latest assistant message to update
+                setMessages(prev => {
+                  const last = prev[prev.length - 1];
+                  if (last.role === 'assistant') return prev.map(m => m.id === last.id ? { ...m, content: last.content + c } : m);
+                  return prev;
+                });
+              } });
            } else {
-              answer = lastResContent;
-              if (!streamedText && !currentResponse) setCurrentResponse(answer);
+              finalContent = lastResContent;
+              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent, streaming: false } : m));
            }
         } else {
-            answer = await chatEngine.generateText(chatMsgs as any, { onStream: (c) => { streamedText += c; setCurrentResponse(streamedText); processAudioChunk(c); } });
+            await chatEngine.generateText(chatMsgs as any, { onStream: (c) => { 
+              finalContent += c;
+              setCurrentResponse(finalContent); 
+              processAudioChunk(c);
+              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent } : m));
+            } });
         }
-        assistantMessage = (answer || streamedText) ? { id: generateUUID(), role: 'assistant', content: answer || streamedText, timestamp: Date.now() } : null;
       }
 
-      if (assistantMessage) {
-        if (effectiveMode !== 'web') setMessages(prev => [...prev, assistantMessage!]);
-        setCurrentResponse('');
-        setWebSearchProgress(null);
-        finishAudioStreaming(assistantMessage.content);
-        await addMessage(conversationId, assistantMessage);
+      // Finalize the message
+      const finalizedAssistantMsg = { 
+        id: assistantId, 
+        role: 'assistant', 
+        content: finalContent, 
+        timestamp: Date.now(),
+        sources: finalSources as any,
+        streaming: false
+      };
 
-        // 0. Generate AI title for new conversations in background
-        if (isFirstMessage) {
-          generatingTitleIdSignal.value = conversationId!;
-          aiGenerateTitle(originalContent).then(async (aiTitle) => {
-            await updateConversationTitle(conversationId!, aiTitle);
-            const updated = await getConversation(conversationId!);
-            if (updated) conversationsStore.update(conversationId!, updated);
-          }).catch(err => console.error("Title generation failed", err))
-            .finally(() => {
-              generatingTitleIdSignal.value = null;
-            });
-        }
+      setMessages(prev => prev.map(m => m.id === assistantId ? finalizedAssistantMsg as any : m));
+      setCurrentResponse('');
+      setWebSearchProgress(null);
+      finishAudioStreaming(finalContent);
+      
+      // Save to DB using the PRE-GENERATED ID
+      await addMessage(conversationId, {
+        id: assistantId,
+        role: 'assistant',
+        content: finalContent,
+        sources: finalSources,
+        metadata: finalizedAssistantMsg.metadata
+      });
 
-        // 1. First, show in canvas if it's a generation request
-        if (isDocumentGenerationRequest(originalContent)) {
-          canvasStore.open(markdownToHTML(assistantMessage.content));
-        }
-        
-        // 2. Then, after a small delay, process extension intent (which might close canvas)
-        // This ensures the user "sees" the output as requested
-        setTimeout(() => {
-          processExtensionIntent(assistantMessage!.content, activeTool?.id);
-        }, 500);
+      // Refresh conversation list/title in background
+      if (isFirstMessage) {
+        generatingTitleIdSignal.value = conversationId!;
+        aiGenerateTitle(originalContent).then(async (aiTitle) => {
+          await updateConversationTitle(conversationId!, aiTitle);
+          const updated = await getConversation(conversationId!);
+          if (updated) conversationsStore.update(conversationId!, updated);
+        }).catch(err => console.error("Title generation failed", err))
+          .finally(() => {
+            generatingTitleIdSignal.value = null;
+          });
+      } else {
+        const updated = await getConversation(conversationId);
+        if (updated) conversationsStore.update(conversationId, updated);
       }
+
+      // Handlers for document generation or extension intent
+      if (isDocumentGenerationRequest(originalContent)) {
+        canvasStore.open(markdownToHTML(finalContent));
+      }
+      setTimeout(() => processExtensionIntent(finalContent, activeTool?.id), 500);
+
     } catch (error: any) {
       console.error(error);
-      setMessages(prev => [...prev, { id: generateUUID(), role: 'assistant', content: 'Error: ' + error.message, timestamp: Date.now() }]);
-    } finally { setIsGenerating(false); }
+      setMessages(prev => [...prev.filter(m => m.id !== assistantId), { id: generateUUID(), role: 'assistant', content: 'Error: ' + error.message, timestamp: Date.now() }]);
+    } finally { 
+      setIsGenerating(false); 
+    }
   }
 
   return (

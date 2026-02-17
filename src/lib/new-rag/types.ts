@@ -1,8 +1,5 @@
 export interface RAGConfig {
-  milvus: {
-    address: string;
-    username?: string;
-    password?: string;
+  localStore: {
     collectionName: string;
     dimension: number;
   };

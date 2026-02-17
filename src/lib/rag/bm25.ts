@@ -9,6 +9,8 @@
  * - Búsquedas donde las palabras exactas importan
  */
 
+import natural from 'natural';
+
 export interface BM25Document {
   id: string;
   content: string;
@@ -21,14 +23,16 @@ export interface BM25Score {
 }
 
 /**
- * Tokeniza texto en palabras - Soporte Unicode completo (acentos, ñ, etc.)
+ * Tokeniza texto en palabras - Soporte Unicode completo y Stemming en Español
  */
 function tokenize(text: string): string[] {
+  const stemmer = natural.PorterStemmerEs;
   return text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Mantener letras y números Unicode
     .split(/\s+/)
-    .filter(token => token.length > 1); // Filtrar palabras de 1 letra (y, o, a)
+    .filter(token => token.length > 1) // Filtrar palabras de 1 letra
+    .map(token => stemmer.stem(token)); // Aplicar Stemming
 }
 
 /**

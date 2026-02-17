@@ -1,6 +1,6 @@
 export * from './types';
 export * from './config';
-export * from './milvus-client';
+export * from './local-vector-db';
 export * from './chunking-service';
 export * from './sparse-vectorizer';
 export * from './model-loader';

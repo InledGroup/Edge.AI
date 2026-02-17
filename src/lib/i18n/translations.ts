@@ -28,6 +28,8 @@ export const translations = {
       auto: 'Automático',
       light: 'Claro',
       dark: 'Oscuro',
+      edit: 'Editar',
+      deleteAll: 'Borrar todo'
     },
     chat: {
       welcome: 'Hola, ¿en qué puedo ayudarte?',
@@ -192,82 +194,25 @@ export const translations = {
       openLink: 'Abrir enlace en nueva pestaña',
     },
     modelRegistry: {
-      phi35vision: {
-        name: 'Phi-3.5 Vision (Multimodal)',
-        description: 'Modelo avanzado de Microsoft con capacidad de visión nativa. Puede ver y analizar imágenes.'
-      },
-      smollm2135m: {
-        name: 'SmolLM2 135M (Ultra Rápido)',
-        description: 'Modelo ultraligero ideal para dispositivos limitados. Respuestas muy rápidas con calidad básica.'
-      },
-      smollm2360m: {
-        name: 'SmolLM2 360M (Rápido)',
-        description: 'Modelo pequeño pero capaz. Buen equilibrio entre velocidad y calidad.'
-      },
-      qwen205b: {
-        name: 'Qwen2.5 0.5B (Rápido)',
-        description: 'Modelo ligero de Alibaba. Excelente para tareas simples con poca latencia.'
-      },
-      lfm212btool: {
-        name: 'LFM2 1.2B Tool (Especializado)',
-        description: 'Modelo optimizado para uso de herramientas y MCP. Alta precisión en funciones.'
-      },
-      lfm2516bq4: {
-        name: 'LFM 2.5 1.6B (Ligero)',
-        description: 'Modelo LiquidAI eficiente. Arquitectura innovadora y rápida (1.1GB).'
-      },
-      tinyllama11b: {
-        name: 'TinyLlama 1.1B (Equilibrado)',
-        description: 'Modelo compacto basado en Llama. Buena calidad con requisitos moderados.'
-      },
-      llama321b: {
-        name: 'Llama 3.2 1B (Alta Calidad)',
-        description: 'Modelo oficial de Meta. Excelente calidad en tamaño compacto.'
-      },
-      qwen215b: {
-        name: 'Qwen2.5 1.5B (Recomendado)',
-        description: 'Modelo equilibrado de Alibaba. Excelente relación calidad/rendimiento.'
-      },
-      llama323b: {
-        name: 'Llama 3.2 3B (Máxima Calidad)',
-        description: 'Modelo grande de Meta. Máxima calidad, requiere WebGPU y buena memoria.'
-      },
-      phi35mini: {
-        name: 'Phi 3.5 Mini (Avanzado)',
-        description: 'Modelo de Microsoft Research. Alta capacidad de razonamiento, requiere WebGPU.'
-      },
-      lfm2audio15b: {
-        name: 'LFM2 Audio (Voz Nativa)',
-        description: 'Modelo especializado en procesamiento de audio y voz en tiempo real.'
-      },
-      qwen205bembed: {
-        name: 'Qwen2 0.5B (CPU / Seguro)',
-        description: 'Opción clásica y segura. Funciona siempre en CPU.'
-      },
-      snowflakeArcticEmbedMGpu: {
-        name: 'Arctic Embed M (GPU / Ultra Rápido)',
-        description: 'Modelo profesional de embeddings. Requiere WebGPU. Muy alta precisión.'
-      },
-      snowflakeArcticEmbedSGpu: {
-        name: 'Arctic Embed S (GPU / Instantáneo)',
-        description: 'Versión ligera de Arctic. Instantáneo en WebGPU.'
-      },
-      bgem3: {
-        name: 'BGE-M3 (Dense Embedding)',
-        description: 'Modelo de alto rendimiento para búsqueda semántica multilingüe.'
-      },
-      monot5base: {
-        name: 'monoT5 (Reranker)',
-        description: 'Modelo especializado en re-ordenar resultados por relevancia.'
-      },
-      bertmultilingual: {
-        name: 'BERT Multilingual (Classifier)',
-        description: 'Clasificador de intención para decidir si usar RAG o Chat.'
-      },
-      flant5large: {
-        name: 'Flan-T5 Large (HyDE/Generator)',
-        description: 'Generador de hipótesis y compresión de contexto avanzado.'
-      },
+      phi35vision: { name: 'Phi-3.5 Vision', description: 'Modelo avanzado con visión nativa.' },
+      smollm2135m: { name: 'SmolLM2 135M', description: 'Modelo ultraligero y muy rápido.' },
+      smollm2360m: { name: 'SmolLM2 360M', description: 'Modelo pequeño pero capaz.' },
+      qwen205b: { name: 'Qwen2.5 0.5B', description: 'Ligero y excelente para tareas simples.' },
+      lfm2audio15b: { name: 'LFM2 Audio', description: 'Especializado en voz en tiempo real.' },
+      lfm2516bq4: { name: 'LFM 2.5 1.6B', description: 'Arquitectura innovadora y rápida.' },
+      tinyllama11b: { name: 'TinyLlama 1.1B', description: 'Equilibrado con requisitos moderados.' },
+      llama321b: { name: 'Llama 3.2 1B', description: 'Alta calidad en tamaño compacto.' },
+      qwen215b: { name: 'Qwen2.5 1.5B', description: 'Recomendado por su equilibrio.' },
+      lfm212btool: { name: 'LFM2 Tool', description: 'Optimizado para herramientas y MCP.' },
+      llama323b: { name: 'Llama 3.2 3B', description: 'Máxima calidad, requiere WebGPU.' },
+      phi35mini: { name: 'Phi 3.5 Mini', description: 'Alta capacidad de razonamiento.' },
+      qwen205bembed: { name: 'Qwen2 0.5B (CPU)', description: 'Embeddings seguros en CPU.' },
+      snowflakearcticembedmgpu: { name: 'Arctic Embed M (GPU)', description: 'Embeddings de alta precisión (GPU).' },
+      snowflakearcticembedsgpu: { name: 'Arctic Embed S (GPU)', description: 'Vectores rápidos en WebGPU.' },
+      bgem3: { name: 'BGE-M3', description: 'Embedding denso de alto rendimiento multilingüe.' },
+      monot5base: { name: 'monoT5 (Reranker)', description: 'Reordena resultados por relevancia.' },
+      bertmultilingual: { name: 'BERT Classifier', description: 'Clasifica la intención de la consulta.' },
+      flant5large: { name: 'Flan-T5 (HyDE)', description: 'Generación de hipótesis y compresión.' },
     },
     wizard: {
       welcome: 'Bienvenido a Edge.AI',
@@ -527,6 +472,8 @@ export const translations = {
       auto: 'Auto',
       light: 'Light',
       dark: 'Dark',
+      edit: 'Edit',
+      deleteAll: 'Delete all'
     },
     chat: {
       welcome: 'Hello, how can I help you?',
@@ -691,82 +638,25 @@ export const translations = {
       openLink: 'Open link in new tab',
     },
     modelRegistry: {
-      phi35vision: {
-        name: 'Phi-3.5 Vision (Multimodal)',
-        description: 'Advanced Microsoft model with native vision capabilities. Can see and analyze images.'
-      },
-      smollm2135m: {
-        name: 'SmolLM2 135M (Ultra Fast)',
-        description: 'Ultralight model ideal for limited devices. Very fast responses with basic quality.'
-      },
-      smollm2360m: {
-        name: 'SmolLM2 360M (Fast)',
-        description: 'Small but capable model. Good balance between speed and quality.'
-      },
-      qwen205b: {
-        name: 'Qwen2.5 0.5B (Fast)',
-        description: 'Lightweight model from Alibaba. Excellent for simple tasks with low latency.'
-      },
-      lfm212btool: {
-        name: 'LFM2 1.2B Tool (Specialized)',
-        description: 'Optimized model for tools and MCP. High precision in function calling.'
-      },
-      lfm2516bq4: {
-        name: 'LFM 2.5 1.6B (Light)',
-        description: 'Efficient LiquidAI model. Innovative and fast architecture (1.1GB).'
-      },
-      tinyllama11b: {
-        name: 'TinyLlama 1.1B (Balanced)',
-        description: 'Compact model based on Llama. Good quality with moderate requirements.'
-      },
-      llama321b: {
-        name: 'Llama 3.2 1B (High Quality)',
-        description: 'Official Meta model. Excellent quality in compact size.'
-      },
-      qwen215b: {
-        name: 'Qwen2.5 1.5B (Recommended)',
-        description: 'Balanced model from Alibaba. Excellent quality/performance ratio.'
-      },
-      llama323b: {
-        name: 'Llama 3.2 3B (Max Quality)',
-        description: 'Large Meta model. Max quality, requires WebGPU and good memory.'
-      },
-      phi35mini: {
-        name: 'Phi 3.5 Mini (Advanced)',
-        description: 'Microsoft Research model. High reasoning capacity, requires WebGPU.'
-      },
-      lfm2audio15b: {
-        name: 'LFM2 Audio (Native Voice)',
-        description: 'Specialized model for real-time audio and voice processing.'
-      },
-      qwen205bembed: {
-        name: 'Qwen2 0.5B (CPU / Safe)',
-        description: 'Classic and safe option. Always works on CPU.'
-      },
-      snowflakeArcticEmbedMGpu: {
-        name: 'Arctic Embed M (GPU / Ultra Fast)',
-        description: 'Professional embedding model. Requires WebGPU. Very high precision.'
-      },
-      snowflakeArcticEmbedSGpu: {
-        name: 'Arctic Embed S (GPU / Instant)',
-        description: 'Lightweight Arctic version. Instant on WebGPU.'
-      },
-      bgem3: {
-        name: 'BGE-M3 (Dense Embedding)',
-        description: 'High-performance model for multilingual semantic search.'
-      },
-      monot5base: {
-        name: 'monoT5 (Reranker)',
-        description: 'Specialized model for re-ranking search results by relevance.'
-      },
-      bertmultilingual: {
-        name: 'BERT Multilingual (Classifier)',
-        description: 'Intent classifier to decide between RAG and Direct Chat.'
-      },
-      flant5large: {
-        name: 'Flan-T5 Large (HyDE/Generator)',
-        description: 'Advanced hypothesis generator and context compression model.'
-      },
+      phi35vision: { name: 'Phi-3.5 Vision', description: 'Advanced model with native vision.' },
+      smollm2135m: { name: 'SmolLM2 135M', description: 'Ultralight and very fast model.' },
+      smollm2360m: { name: 'SmolLM2 360M', description: 'Small but capable model.' },
+      qwen205b: { name: 'Qwen2.5 0.5B', description: 'Lightweight and great for simple tasks.' },
+      lfm2audio15b: { name: 'LFM2 Audio', description: 'Specialized in real-time voice.' },
+      lfm2516bq4: { name: 'LFM 2.5 1.6B', description: 'Innovative and fast architecture.' },
+      tinyllama11b: { name: 'TinyLlama 1.1B', description: 'Balanced with moderate requirements.' },
+      llama321b: { name: 'Llama 3.2 1B', description: 'High quality in compact size.' },
+      qwen215b: { name: 'Qwen2.5 1.5B', description: 'Recommended for its balance.' },
+      lfm212btool: { name: 'LFM2 Tool', description: 'Optimized for tools and MCP.' },
+      llama323b: { name: 'Llama 3.2 3B', description: 'Max quality, requires WebGPU.' },
+      phi35mini: { name: 'Phi 3.5 Mini', description: 'High reasoning capacity.' },
+      qwen205bembed: { name: 'Qwen2 0.5B (CPU)', description: 'Safe embeddings on CPU.' },
+      snowflakearcticembedmgpu: { name: 'Arctic Embed M (GPU)', description: 'Professional high-precision embeddings.' },
+      snowflakearcticembedsgpu: { name: 'Arctic Embed S (GPU)', description: 'Fast embeddings on WebGPU.' },
+      bgem3: { name: 'BGE-M3', description: 'High-performance dense multilingual embedding.' },
+      monot5base: { name: 'monoT5 (Reranker)', description: 'Re-ranks results by relevance.' },
+      bertmultilingual: { name: 'BERT Classifier', description: 'Classifies query intent.' },
+      flant5large: { name: 'Flan-T5 (HyDE)', description: 'Hypothesis generation and compression.' },
     },
     wizard: {
       welcome: 'Welcome to Edge.AI',

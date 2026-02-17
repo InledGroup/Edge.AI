@@ -86,7 +86,7 @@ export async function updateConversation(
  */
 export async function addMessage(
   conversationId: string,
-  message: Omit<Message, 'id' | 'timestamp'>
+  message: Omit<Message, 'id' | 'timestamp'> & { id?: string; timestamp?: number }
 ): Promise<Message> {
   const conversation = await getConversation(conversationId);
 
@@ -96,9 +96,9 @@ export async function addMessage(
 
   const newMessage: Message = {
     ...message,
-    id: generateUUID(),
-    timestamp: Date.now()
-  };
+    id: message.id || generateUUID(),
+    timestamp: message.timestamp || Date.now()
+  } as Message;
 
   conversation.messages.push(newMessage);
   await updateConversation(conversationId, {

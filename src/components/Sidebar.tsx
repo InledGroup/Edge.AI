@@ -1,6 +1,6 @@
 // Sidebar - ChatGPT-style sidebar with conversation history
 
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import {
   MessageSquare,
   Plus,
@@ -19,7 +19,8 @@ import {
   Linkedin,
   QrCode,
   Sparkles,
-  AppWindow
+  AppWindow,
+  Globe
 } from 'lucide-preact';
 import { conversationsStore, documentsStore, uiStore, extensionsStore, generatingTitleIdSignal } from '@/lib/stores';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
@@ -48,20 +49,22 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
   const [showMemoryManager, setShowMemoryManager] = useState(false);
   const [showMCPSettings, setShowMCPSettings] = useState(false);
   const [showCustomAppsSettings, setShowCustomAppsSettings] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Subscribe to language changes and conversations for re-rendering
   const lang = languageSignal.value;
   const allConversations = conversationsStore.all;
 
   function openFeedbackPopup() {
-    // Only run on client-side to avoid SSR errors
     if (typeof window === 'undefined') return;
-
     const width = 640;
     const height = 800;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
-
     window.open(
       'https://form.typeform.com/to/h0cyYt3d',
       'FeedbackEdgeAI',
@@ -77,11 +80,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
 
   async function handleDeleteConversation(id: string, e: Event) {
     e.stopPropagation();
-
-    if (!confirm(i18nStore.t('common.confirmDelete'))) {
-      return;
-    }
-
+    if (!confirm(i18nStore.t('common.confirmDelete'))) return;
     await deleteConversation(id);
     conversationsStore.remove(id);
   }
@@ -105,30 +104,25 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
     const diffInHours = diffInMs / (1000 * 60 * 60);
     const diffInDays = diffInHours / 24;
 
-    if (diffInHours < 24) {
-      return i18nStore.t('common.today');
-    } else if (diffInDays < 2) {
-      return i18nStore.t('common.yesterday');
-    } else if (diffInDays < 7) {
-      return i18nStore.t('common.thisWeek');
-    } else if (diffInDays < 30) {
-      return i18nStore.t('common.thisMonth');
-    } else {
-      return date.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', { month: 'short', year: 'numeric' });
-    }
+    if (diffInHours < 24) return i18nStore.t('common.today');
+    else if (diffInDays < 2) return i18nStore.t('common.yesterday');
+    else if (diffInDays < 7) return i18nStore.t('common.thisWeek');
+    else if (diffInDays < 30) return i18nStore.t('common.thisMonth');
+    else return date.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', { month: 'short', year: 'numeric' });
   }
 
   // Sort and group conversations by date
-  const sortedConversations = [...allConversations].sort((a, b) => b.updatedAt - a.updatedAt);
-
-  const groupedConversations = sortedConversations.reduce((groups, conv) => {
-    const label = formatDate(conv.updatedAt);
-    if (!groups[label]) {
-      groups[label] = [];
-    }
-    groups[label].push(conv);
-    return groups;
-  }, {} as Record<string, Conversation[]>);
+  const groupedConversations = useMemo(() => {
+    // Return empty during SSR or first client render to avoid mismatch
+    if (!isMounted) return {};
+    const sorted = [...allConversations].sort((a, b) => b.updatedAt - a.updatedAt);
+    return sorted.reduce((groups, conv) => {
+      const label = formatDate(conv.updatedAt);
+      if (!groups[label]) groups[label] = [];
+      groups[label].push(conv);
+      return groups;
+    }, {} as Record<string, Conversation[]>);
+  }, [isMounted, allConversations, lang]);
 
   const sidebarWidth = isOpen ? 'w-64' : 'w-0';
 
@@ -210,7 +204,11 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
         <div className="flex-1 overflow-y-auto px-3 py-2">
           {activeTab === 'conversations' ? (
             /* Conversations List */
-            Object.keys(groupedConversations).length === 0 ? (
+            !isMounted ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="spinner-sm opacity-20" />
+              </div>
+            ) : Object.keys(groupedConversations).length === 0 ? (
               <div className="text-center py-8 text-sm text-[var(--color-text-secondary)]">
                 <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
                 <p>{i18nStore.t('common.noConversations')}</p>
@@ -233,16 +231,14 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                           }`}
                       >
                         <MessageSquare size={14} className="flex-shrink-0 text-[var(--color-text-secondary)]" />
-                        <div className="flex-1 truncate">
+                        <div className="flex-1 truncate text-sm">
                           {generatingTitleIdSignal.value === conv.id ? (
                             <div className="flex items-center gap-2 text-[var(--color-primary)] animate-pulse">
                               <Sparkles size={12} className="animate-spin-slow" />
-                              <span className="text-sm italic">{i18nStore.t('chat.generatingTitle') || 'Generando título...'}</span>
+                              <span className="italic">{i18nStore.t('chat.generatingTitle') || 'Generando título...'}</span>
                             </div>
                           ) : (
-                            <span className="text-sm">
-                              {conv.title}
-                            </span>
+                            conv.title
                           )}
                         </div>
                         <button
@@ -353,7 +349,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">{app.name}</p>
-                      <p className="text-xs text-[var(--color-text-tertiary)] truncate">{app.url}</p>
+                      <p className="text-xs text-[var(--color-text-tertiary)] truncate text-ellipsis">{app.url}</p>
                     </div>
                     <ChevronRight size={14} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100" />
                   </div>

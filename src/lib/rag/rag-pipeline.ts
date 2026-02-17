@@ -2,7 +2,7 @@
 // 100% local processing: chunk → embed → search → generate
 
 import { chunkAndStoreDocument } from './chunking';
-import { searchSimilarChunks, createRAGContext } from './vector-search';
+import { searchSimilarChunks, createRAGContext, reciprocalRankFusion } from './vector-search';
 import { createEmbeddingsBatch } from '@/lib/db/embeddings';
 import { getChunksByDocument } from '@/lib/db/chunks';
 import { updateDocumentStatus } from '@/lib/db/documents';
@@ -143,45 +143,80 @@ export async function queryWithRAG(
     }
   }
 
-  // Optional: Expand query for better recall
-  let expandedText = searchQuery;
+  // 1. Optional: Query Expansion
+  let queries = [searchQuery];
   if (options?.useQueryExpansion && chatEngine) {
     try {
       const expanded = await expandQuery(searchQuery, chatEngine, {
         maxVariations: 2,
-        includeOriginal: true
+        includeOriginal: false
       });
-      expandedText = expanded.combined;
-      console.log(`🔍 Using expanded query (${expanded.expanded.length} variations)`);
+      queries = [...queries, ...expanded.expanded];
+      console.log(`🔍 Using expanded queries (${queries.length} total)`);
     } catch (error) {
-      console.warn('⚠️ Query expansion failed, using original');
+      console.warn('⚠️ Query expansion failed');
     }
   }
 
-  // Step 1: Generate embedding for query
-  console.log('🔢 Generating query embedding...');
-  const queryEmbedding = await embeddingEngine.generateEmbedding(expandedText);
+  // 2. Retrieve chunks for all query variations
+  const resultLists: any[][] = [];
+  
+  for (const q of queries) {
+    const queryEmbedding = await embeddingEngine.generateEmbedding(q);
+    const chunks = await searchSimilarChunks(
+      queryEmbedding,
+      topK + 10, // Fetch more for RRF and Reranking
+      documentIds,
+      searchQuery,
+      {
+        semanticWeight: 0.85,
+        lexicalWeight: 0.15,
+        useReranking: true,
+        minRelevance: 0.2
+      }
+    );
+    resultLists.push(chunks);
+  }
 
-  // Step 2: Hybrid search with BM25 + semantic
-  const chunks = await searchSimilarChunks(
-    queryEmbedding,
-    topK + 3, // Fetch more candidates initially
-    documentIds,
-    searchQuery, // Use original query for BM25
-    {
-      semanticWeight: 0.85, // Higher weight for our new better embedding model
-      lexicalWeight: 0.15,
-      useReranking: true,
-      minRelevance: 0.3 // Require minimum relevance to avoid noise
+  // 3. Combine results using RRF (Reciprocal Rank Fusion)
+  let combinedChunks = queries.length > 1 
+    ? reciprocalRankFusion(resultLists) 
+    : resultLists[0];
+
+  // 4. LLM-Based Reranking (Listwise)
+  if (chatEngine && combinedChunks.length > 1) {
+    try {
+      console.log('🔄 Performing LLM-based reranking...');
+      const candidates = combinedChunks.slice(0, 10);
+      const candidatesText = candidates.map((c, i) => `ID ${i}: ${c.chunk.content.substring(0, 200)}...`).join('\n\n');
+      
+      const rerankPrompt = `Dados estos fragmentos de documentos, ordénalos de más relevante a menos relevante para responder a la pregunta: "${query}". 
+Responde ÚNICAMENTE con los IDs separados por comas, del más al menos relevante.
+Ejemplo: 3, 0, 2, 1
+
+FRAGMENTOS:
+${candidatesText}`;
+
+      const rerankOrder = await chatEngine.generateText([{ role: 'user', content: rerankPrompt }], { maxTokens: 50 });
+      const orderIds = rerankOrder.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+      
+      if (orderIds.length > 0) {
+        const reranked = orderIds.map(idx => candidates[idx]).filter(Boolean);
+        // Add remaining chunks that weren't in the top 10
+        combinedChunks = [...reranked, ...combinedChunks.slice(10)];
+        console.log(`✅ LLM Reranking complete. Best ID: ${orderIds[0]}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ LLM Reranking failed, using original order');
     }
-  );
+  }
 
   const searchTime = Date.now() - startTime;
 
   return {
     query,
-    chunks,
-    totalSearched: chunks.length,
+    chunks: combinedChunks.slice(0, topK),
+    totalSearched: combinedChunks.length,
     searchTime
   };
 }
@@ -197,7 +232,7 @@ export async function generateRAGAnswer(
   onStream?: (chunk: string) => void,
   additionalContext?: string
 ): Promise<string> {
-  // Create context from retrieved chunks
+  // Create context from retrieved chunks (already reordered for Lost in the Middle)
   const context = createRAGContext(ragResult.chunks);
 
   console.log('💬 Generating answer with context and history...');
@@ -205,25 +240,20 @@ export async function generateRAGAnswer(
   // Build structured messages
   const messages: { role: string; content: string }[] = [];
 
-  // 1. System Prompt with Context - ENHANCED for better accuracy
-  let systemContent = `Eres un asistente de IA avanzado especializado en analizar documentos y responder preguntas basándote EXCLUSIVAMENTE en el contexto proporcionado. Tu objetivo es ser preciso, honesto y útil.
+  // 1. System Prompt with Context
+  let systemContent = `Eres un asistente de IA avanzado especializado en analizar documentos. 
+RESPONDE ÚNICAMENTE basándote en el contexto proporcionado.
 
-## CONTEXTO DE DOCUMENTOS (Ventana Ampliada):
-${context || 'No se encontraron documentos relevantes para esta consulta.'}
+## CONTEXTO DE DOCUMENTOS (Ventana Ampliada "Small-to-Big"):
+${context || 'No se encontraron documentos relevantes.'}
 
-## INSTRUCCIONES CRÍTICAS (NO ALUCINAR):
-1. **Regla de Oro:** Si la respuesta NO está explícitamente en el texto de arriba, DEBES decir: "Lo siento, los documentos proporcionados no contienen información sobre [tema de la pregunta]".
-   - 🚫 NO inventes definiciones.
-   - 🚫 NO asumas que una organización es "sin fines de lucro" o "tecnológica" si no lo dice.
-   - 🚫 NO uses tu conocimiento general para llenar vacíos de información específica.
+## INSTRUCCIONES:
+1. Si no conoces la respuesta, di que no está en los documentos. NO INVENTES.
+2. Puedes pedir leer más de un documento si crees que la información está cerca.
+   Para expandir conocimientos, indica al final de tu respuesta: "(nombre documento).readmore=(numero de lineas)".
+3. Cita las fuentes usando [Doc N].
 
-2. **Citas Precisas:** Cada afirmación debe estar respaldada. Usa [Doc N] al final de cada frase clave.
-
-3. **Manejo de Ambigüedad:** Si el contexto menciona el término pero no lo define (ej. aparece en un título pero falta el texto descriptivo), indícalo: "El documento menciona 'Inled Group' pero no proporciona una definición explícita."
-
-4. **Respuesta Directa:** Responde concisamente. Si la respuesta es una lista, usa viñetas.
-
-Analiza el contexto con cuidado. A menudo la respuesta está en el texto circundante (Contexto anterior/posterior).`;
+REGLA DE ORO: La precisión es lo más importante.`;
 
   if (additionalContext) {
     systemContent += `\n\n${additionalContext}`;

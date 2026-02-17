@@ -2,7 +2,7 @@
 // 100% in-browser, no server calls
 
 import { getAllEmbeddings } from '@/lib/db/embeddings';
-import { getChunk } from '@/lib/db/chunks';
+import { getChunk, getSurroundingChunks } from '@/lib/db/chunks';
 import { getDocument } from '@/lib/db/documents';
 import type { RetrievedChunk, Embedding } from '@/types';
 import { formatChunkWithContext } from './semantic-chunking';
@@ -99,6 +99,16 @@ export async function searchSimilarChunks(
 
   const retrievedChunks = Array.from(chunksMap.values());
 
+  // === SMALL-TO-BIG: Fetch surrounding context for top candidates ===
+  for (const rc of retrievedChunks) {
+    const surrounding = await getSurroundingChunks(rc.chunk.documentId, rc.chunk.index, 1);
+    const expandedContent = surrounding.map(c => c.content).join('\n\n');
+    rc.chunk.metadata = {
+      ...rc.chunk.metadata,
+      expandedContext: expandedContent
+    };
+  }
+
   // === SEMANTIC SEARCH ===
   const semanticScores = new Map<string, number>();
   embeddings.forEach(embedding => {
@@ -193,15 +203,69 @@ export async function searchSimilarChunks(
 }
 
 /**
+ * Reciprocal Rank Fusion (RRF)
+ * Combines multiple result lists into a single ranked list.
+ */
+export function reciprocalRankFusion(
+  resultLists: RetrievedChunk[][],
+  k: number = 60
+): RetrievedChunk[] {
+  const scores = new Map<string, { chunk: RetrievedChunk; rrfScore: number }>();
+
+  resultLists.forEach((list) => {
+    list.forEach((chunk, rank) => {
+      const id = chunk.chunk.id;
+      const current = scores.get(id) || { chunk, rrfScore: 0 };
+      // RRF formula: 1 / (k + rank)
+      current.rrfScore += 1 / (k + rank + 1);
+      scores.set(id, current);
+    });
+  });
+
+  return Array.from(scores.values())
+    .sort((a, b) => b.rrfScore - a.rrfScore)
+    .map((s) => ({
+      ...s.chunk,
+      score: s.rrfScore // Map RRF score back
+    }));
+}
+
+/**
+ * Reorder chunks to solve 'Lost in the Middle' problem
+ * Places most relevant chunks at the beginning and end of the prompt
+ */
+export function reorderForLostInTheMiddle(chunks: RetrievedChunk[]): RetrievedChunk[] {
+  if (chunks.length <= 2) return chunks;
+
+  const reordered: RetrievedChunk[] = [];
+  const sorted = [...chunks]; // Already sorted by relevance desc
+
+  let left = true;
+  while (sorted.length > 0) {
+    if (left) {
+      reordered.push(sorted.shift()!);
+    } else {
+      reordered.push(sorted.pop()!);
+    }
+    left = !left;
+  }
+
+  return reordered;
+}
+
+/**
  * Create context from retrieved chunks for RAG
- * Now includes expanded context for better coherence
+ * Now includes expanded context and 'Lost in the Middle' reordering
  */
 export function createRAGContext(chunks: RetrievedChunk[]): string {
   if (chunks.length === 0) {
     return '';
   }
 
-  const contextParts = chunks.map((rc, index) => {
+  // Apply Lost in the Middle reordering
+  const reorderedChunks = reorderForLostInTheMiddle(chunks);
+
+  const contextParts = reorderedChunks.map((rc, index) => {
     const docName = rc.document.name;
     const score = (rc.score * 100).toFixed(1);
 
@@ -218,11 +282,11 @@ export function createRAGContext(chunks: RetrievedChunk[]): string {
       }
     }
 
-    return `[Documento ${index + 1}: ${docName} (${score}% relevancia)]\n${chunkContent}`;
+    return `[Documento ${index + 1}: ${docName} (Relevancia: ${score}%)]\n${chunkContent}`;
   });
 
   const context = contextParts.join('\n\n---\n\n');
-  console.log(`📚 [RAG] Created context with ${chunks.length} chunks, total length: ${context.length} chars`);
+  console.log(`📚 [RAG] Created context with ${chunks.length} chunks, total length: ${context.length} chars (Reordered for Attention)`);
 
   return context;
 }

@@ -94,6 +94,24 @@ export type AudioDecoderWorkerMessage =
     };
 
 /**
+ * Advanced RAG worker messages
+ */
+export type AdvancedRAGWorkerMessage = 
+  | {
+      type: 'index-document';
+      payload: {
+        text: string;
+        metadata?: any;
+      };
+    }
+  | {
+      type: 'execute-query';
+      payload: {
+        query: string;
+      };
+    };
+
+/**
  * Generic worker error
  */
 export interface WorkerError {

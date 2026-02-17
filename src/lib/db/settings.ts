@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS: Settings = {
   useSpecializedToolModel: false, // Disabled by default - use only as fallback
   liveModeAudioType: 'system', // Use system TTS by default
   liveModeSttType: 'system', // Use system STT by default
-  useAdvancedRAG: false, // Disabled by default
+  useAdvancedRAG: false, // Disabled temporarily as requested
 };
 
 /**

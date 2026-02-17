@@ -21,7 +21,6 @@
     "@types/uuid": "^10.0.0",
     "@vite-pwa/astro": "^1.2.0",
     "@wllama/wllama": "^2.3.7",
-    "@zilliz/milvus2-sdk-node": "^2.6.10",
     "astro": "^4.0.8",
     "buffer": "^6.0.3",
     "clsx": "^2.1.1",

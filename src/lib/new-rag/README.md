@@ -9,7 +9,7 @@ This directory contains a complete, functional implementation of a high-performa
 3.  **Embedding**: 
     *   **Dense**: `Xenova/bge-m3` (State-of-the-art multilingual embedding).
     *   **Sparse**: Custom Hashing Vectorizer (TF-IDF equivalent) for lexical matching.
-4.  **Retrieval**: Hybrid Search (Dense + Sparse) stored in **Milvus**.
+4.  **Retrieval**: Hybrid Search (Dense + Sparse) stored in **Local IndexedDB** (Edge-Only).
 5.  **Reranking**: `monoT5` (Sequence-to-Sequence) reranker for precise relevance scoring.
 6.  **Repackaging**: Reverse order (most relevant last) to optimize for LLM recency bias.
 7.  **Compression**: Abstractive summarization (Recomp) using `flan-t5` to minimize context window usage.
@@ -19,7 +19,7 @@ This directory contains a complete, functional implementation of a high-performa
 ```typescript
 import { AdvancedRAGPipeline } from '@/lib/new-rag';
 
-const rag = new AdvancedRAGPipeline();
+const rag = AdvancedRAGPipeline.getInstance();
 
 // Indexing a document
 await rag.indexDocument(fullText, { title: "My Doc", source: "..." });
@@ -37,11 +37,11 @@ if (result.mode === 'rag') {
 
 ## Dependencies
 
-*   `@zilliz/milvus2-sdk-node`: Vector Database client.
 *   `@huggingface/transformers`: Local model inference.
+*   `idb`: Local IndexedDB management.
 *   `natural`: NLP utilities (tokenization).
 *   `uuid`: ID generation.
 
 ## Configuration
 
-Edit `src/lib/new-rag/config.ts` to adjust Milvus credentials and model selection.
+Edit `src/lib/new-rag/config.ts` to adjust model selection and local storage settings.

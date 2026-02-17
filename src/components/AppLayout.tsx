@@ -14,7 +14,7 @@ import LiveMode from './chat/LiveMode';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
 import { i18nStore } from '@/lib/stores/i18n';
-import { canvasSignal, canvasStore, extensionsSignal } from '@/lib/stores';
+import { canvasSignal, canvasStore, extensionsSignal, conversationsStore } from '@/lib/stores';
 import { checkIfMobile } from '@/lib/ai/device-profile';
 import { AlertTriangle, X } from 'lucide-preact';
 
@@ -112,7 +112,7 @@ export function AppLayout() {
         {/* Main Content Area */}
         <main className="flex-1 flex flex-row lg:ml-64 overflow-hidden">
           <div className="flex-1 flex flex-col min-w-0">
-            <ChatInterface />
+            <ChatInterface key={conversationsStore.activeId} />
           </div>
 
           {/* Right Sidebar (Canvas) */}

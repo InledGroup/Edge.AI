@@ -7,10 +7,12 @@ import { Card } from './ui/Card';
 import { ProgressBar } from './ui/ProgressBar';
 import { documentsStore, processingStore, processingSignal, modelsReady, modelsStore } from '@/lib/stores';
 import { parseDocument, validateFile } from '@/lib/parsers';
-import { createDocument } from '@/lib/db/documents';
+import { createDocument, updateDocumentStatus } from '@/lib/db/documents';
 import { processDocument } from '@/lib/rag/rag-pipeline';
+import { AdvancedRAGPipeline } from '@/lib/new-rag';
+import { getWorkerPool } from '@/lib/workers';
 import EngineManager from '@/lib/ai/engine-manager';
-import { getRAGSettings } from '@/lib/db/settings';
+import { getRAGSettings, getUseAdvancedRAG } from '@/lib/db/settings';
 import { i18nStore } from '@/lib/stores/i18n';
 
 export function DocumentUpload() {
@@ -131,14 +133,40 @@ export function DocumentUpload() {
 
   async function processDocumentRAG(documentId: string, text: string) {
     try {
-      // Get settings
-      const settings = await getRAGSettings();
+      const useAdvanced = await getUseAdvancedRAG();
+      
+      if (useAdvanced) {
+        // Use Advanced RAG Worker (Background Thread) to prevent UI freeze
+        const pool = getWorkerPool();
+        const worker = await pool.getAdvancedRAGWorker();
+        
+        await worker.indexDocument(text, { 
+          documentId, 
+          source: 'local_upload',
+          indexedAt: Date.now() 
+        }, (progress, message) => {
+          // Update the same processing signal used by the legacy pipeline
+          processingSignal.value = {
+            documentId,
+            stage: 'embedding',
+            progress,
+            message
+          };
+        });
+        
+        // PERSIST the status in the database
+        await updateDocumentStatus(documentId, 'ready');
+        
+        documentsStore.update(documentId, { status: 'ready' });
+        processingSignal.value = null;
+        console.log(`✅ Document ${documentId} indexed with Advanced RAG Worker`);
+        return;
+      }
 
-      // Get initialized embedding engine from global manager
-      // This was already loaded in ModelSelector
+      // Legacy RAG Flow
+      const settings = await getRAGSettings();
       const embeddingEngine = await EngineManager.getEmbeddingEngine();
 
-      // Process document
       await processDocument(
         documentId,
         text,
@@ -153,7 +181,7 @@ export function DocumentUpload() {
       );
 
       processingSignal.value = null;
-      console.log(`✅ Document ${documentId} processed with RAG`);
+      console.log(`✅ Document ${documentId} processed with Legacy RAG`);
 
     } catch (error) {
       console.error('❌ Failed to process document with RAG:', error);

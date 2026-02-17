@@ -9,10 +9,10 @@ export class SparseVectorizer {
   ]);
 
   /**
-   * Generates a Sparse Vector compatible with Milvus.
+   * Generates a Sparse Vector compatible with the local vector store.
    * Uses simple Term Frequency (TF) with Hashing Trick to map tokens to a fixed vector space.
    * This simulates SPLADE-like behavior by emphasizing rare terms (implicitly, by TF) 
-   * but lacks the learned weights of SPLADE. It serves as a robust BM25-proxy.
+   * but lacks the learned weights of SPLADE. It serves as a robust BM25-proxy for 100% local search.
    */
   static encode(text: string): Record<number, number> {
     const tokens = this.tokenizer.tokenize(text.toLowerCase());

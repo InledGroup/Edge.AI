@@ -81,6 +81,24 @@ export async function getChunkByIndex(
 }
 
 /**
+ * Get surrounding chunks for a given chunk
+ * Useful for "Small-to-Big" retrieval
+ */
+export async function getSurroundingChunks(
+  documentId: string,
+  index: number,
+  windowSize: number = 1
+): Promise<Chunk[]> {
+  const db = await getDB();
+  const chunks = await db.getAllFromIndex('chunks', 'by-document', documentId);
+  
+  // Filter chunks within the window
+  return chunks
+    .filter(c => Math.abs(c.index - index) <= windowSize)
+    .sort((a, b) => a.index - b.index);
+}
+
+/**
  * Get all chunks
  */
 export async function getAllChunks(): Promise<Chunk[]> {

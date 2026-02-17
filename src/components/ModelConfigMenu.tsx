@@ -220,6 +220,15 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
                       {EngineManager.isToolEngineReady() ? 'LFM2 Tool (Emergencia)' : i18nStore.t('models.notLoaded')}
                     </span>
                   </div>
+
+                  {useAdvancedRAG && (
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[var(--color-text-secondary)]">RAG Componentes:</span>
+                      <span className={modelsStore.advancedRAGLoading ? 'text-amber-500 animate-pulse' : 'text-[var(--color-success)]'}>
+                        {modelsStore.advancedRAGLoading ? 'Cargando...' : 'BGE-M3, BERT, Reranker, T5'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Advanced RAG Toggle */}

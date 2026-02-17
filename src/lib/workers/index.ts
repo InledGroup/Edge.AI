@@ -7,6 +7,66 @@ import { WorkerManager } from './worker-manager';
 import EmbeddingWorkerUrl from './embedding.worker.ts?worker&url';
 import ChunkingWorkerUrl from './chunking.worker.ts?worker&url';
 import WebSearchWorkerUrl from './web-search.worker.ts?worker&url';
+import AdvancedRAGWorkerUrl from './advanced-rag.worker.ts?worker&url';
+
+/**
+ * Advanced RAG Worker Manager
+ */
+export class AdvancedRAGWorkerManager {
+  private manager: WorkerManager;
+
+  constructor() {
+    this.manager = new WorkerManager(AdvancedRAGWorkerUrl);
+  }
+
+  async init(): Promise<void> {
+    await this.manager.init();
+  }
+
+  async indexDocument(
+    text: string,
+    metadata?: any,
+    onProgress?: (progress: number, message: string) => void
+  ): Promise<number> {
+    const { modelsStore } = await import('../stores');
+    const result = await this.manager.sendMessage(
+      'index-document',
+      { 
+        text, 
+        metadata,
+        chatModelId: modelsStore.chat?.id,
+        embeddingModelId: modelsStore.embedding?.id
+      },
+      onProgress
+    );
+    return result.count;
+  }
+
+  async execute(
+    query: string,
+    onProgress?: (progress: number, message: string) => void
+  ): Promise<any> {
+    const { modelsStore } = await import('../stores');
+    const result = await this.manager.sendMessage(
+      'execute-query',
+      { 
+        query,
+        chatModelId: modelsStore.chat?.id,
+        embeddingModelId: modelsStore.embedding?.id
+      },
+      onProgress
+    );
+    return result;
+  }
+
+  terminate(): void {
+    this.manager.terminate();
+  }
+
+  isInitialized(): boolean {
+    return this.manager.isInitialized();
+  }
+}
 
 /**
  * Embedding Worker Manager
@@ -239,6 +299,7 @@ class WorkerPool {
   public chunkingWorker: ChunkingWorkerManager | null = null;
   public searchWorker: SearchWorkerManager | null = null;
   public webSearchWorker: WebSearchWorkerManager | null = null;
+  public advancedRAGWorker: AdvancedRAGWorkerManager | null = null;
 
   private constructor() {}
 
@@ -293,6 +354,17 @@ class WorkerPool {
   }
 
   /**
+   * Get or create advanced RAG worker
+   */
+  async getAdvancedRAGWorker(): Promise<AdvancedRAGWorkerManager> {
+    if (!this.advancedRAGWorker) {
+      this.advancedRAGWorker = new AdvancedRAGWorkerManager();
+      await this.advancedRAGWorker.init();
+    }
+    return this.advancedRAGWorker;
+  }
+
+  /**
    * Terminate all workers
    */
   terminateAll(): void {
@@ -311,6 +383,10 @@ class WorkerPool {
     if (this.webSearchWorker) {
       this.webSearchWorker.terminate();
       this.webSearchWorker = null;
+    }
+    if (this.advancedRAGWorker) {
+      this.advancedRAGWorker.terminate();
+      this.advancedRAGWorker = null;
     }
   }
 }

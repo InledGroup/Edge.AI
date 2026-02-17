@@ -26,6 +26,8 @@ import type { WllamaEngine } from '../ai/wllama-engine';
 import type { WebLLMEngine } from '../ai/webllm-engine';
 import { WebSearchService } from './web-search';
 import { ContentExtractor } from './content-extractor';
+import { AdvancedRAGPipeline } from '../new-rag';
+import { getUseAdvancedRAG } from '../db/settings';
 import { semanticChunkText } from '../rag/semantic-chunking';
 import { cosineSimilarity } from '../rag/vector-search';
 import { getWorkerPool } from '../workers';
@@ -282,36 +284,68 @@ export class WebRAGOrchestrator {
       onProgress?.('chunking', 60);
       const chunkingStart = Date.now();
 
-      const webDocuments = await this.processWebDocuments(
-        cleanedContents,
-        searchQuery,
-        (progress) => {
-          onProgress?.('embedding', 60 + progress * 0.2);
+      const useAdvanced = await getUseAdvancedRAG();
+      let retrievedChunks: RetrievedWebChunk[] = [];
+      let webDocuments: WebDocument[] = [];
+      let totalChunks = 0;
+      let ragAnswer = '';
+
+      if (useAdvanced) {
+        console.log('[WebRAG] Using Advanced RAG Worker for web content');
+        const pool = getWorkerPool();
+        const worker = await pool.getAdvancedRAGWorker();
+        
+        // 1. Index all fetched pages in the advanced local store (Background Thread)
+        for (const content of cleanedContents) {
+          await worker.indexDocument(content.text, { 
+            url: content.url, 
+            title: content.title,
+            source: 'web_search'
+          });
         }
-      );
-      timestamps.chunking = Date.now() - chunkingStart;
-      timestamps.embedding = timestamps.chunking; // Incluido en chunking
+        
+        // 2. Execute the advanced pipeline (Background Thread)
+        const res = await worker.execute(userQuery, (progress, msg) => {
+          // Map pipeline steps to web search progress
+          onProgress?.('searching' as any, 60 + progress * 0.3, msg);
+        });
+        
+        ragAnswer = res.context || '';
+        // Map advanced results back to expected format for compatibility
+        retrievedChunks = (res.sources || []).map((s: any) => ({
+          content: '', 
+          score: 1.0,
+          document: {
+            id: s.id,
+            title: s.metadata?.title || 'Web Result',
+            url: s.metadata?.url || '',
+            type: 'web'
+          }
+        }));
+      } else {
+        // Legacy Path
+        webDocuments = await this.processWebDocuments(
+          cleanedContents,
+          searchQuery,
+          (progress) => {
+            onProgress?.('embedding', 60 + progress * 0.2);
+          }
+        );
+        timestamps.chunking = Date.now() - chunkingStart;
+        timestamps.embedding = timestamps.chunking;
 
-      const totalChunks = webDocuments.reduce((sum, doc) => sum + doc.chunks.length, 0);
-      console.log(
-        `[WebRAG] Processed ${webDocuments.length} web documents (${totalChunks} chunks)`
-      );
-
-      // ====================================================================
-      // PASO 7: Vector search
-      // ====================================================================
-      onProgress?.('vector_search', 80);
-      const searchVectorStart = Date.now();
-
-      const queryEmbedding = await this.embeddingEngine.generateEmbedding(userQuery);
-      const retrievedChunks = await this.searchWebDocuments(
-        queryEmbedding,
-        webDocuments,
-        topK
-      );
-      timestamps.vectorSearch = Date.now() - searchVectorStart;
-
-      console.log(`[WebRAG] Retrieved ${retrievedChunks.length} relevant chunks`);
+        totalChunks = webDocuments.reduce((sum, doc) => sum + doc.chunks.length, 0);
+        
+        onProgress?.('vector_search', 80);
+        const searchVectorStart = Date.now();
+        const queryEmbedding = await this.embeddingEngine.generateEmbedding(userQuery);
+        retrievedChunks = await this.searchWebDocuments(
+          queryEmbedding,
+          webDocuments,
+          topK
+        );
+        timestamps.vectorSearch = Date.now() - searchVectorStart;
+      }
 
       // ====================================================================
       // PASO 8: Generación de respuesta
@@ -319,7 +353,10 @@ export class WebRAGOrchestrator {
       onProgress?.('answer_generation', 90);
       const answerStart = Date.now();
 
-      const answer = await this.generateAnswer(userQuery, retrievedChunks, options.onToken);
+      const answer = useAdvanced 
+        ? await this.generateAnswerFromAdvancedContext(userQuery, ragAnswer, retrievedChunks, options.onToken)
+        : await this.generateAnswer(userQuery, retrievedChunks, options.onToken);
+      
       timestamps.answerGeneration = Date.now() - answerStart;
 
       console.log(`[WebRAG] Generated answer (${answer.length} characters)`);
@@ -662,6 +699,41 @@ INSTRUCCIONES:
     });
 
     return answer.trim();
+  }
+
+  private async generateAnswerFromAdvancedContext(
+    query: string,
+    context: string,
+    sources: RetrievedWebChunk[],
+    onToken?: (token: string) => void
+  ): Promise<string> {
+    const messages = [
+      {
+        role: 'system',
+        content: `Eres un asistente experto que sintetiza información web.
+        
+CONTEXTO COMPRIMIDO (RECOMP):
+${context}
+
+FUENTES:
+${sources.map((s, i) => `[Fuente ${i+1}]: ${s.document.title} - ${s.document.url}`).join('\n')}
+
+INSTRUCCIONES:
+- Responde basándote en el contexto comprimido.
+- Cita las fuentes por su número.
+- Si el contexto no es suficiente, indícalo.`
+      },
+      {
+        role: 'user',
+        content: `PREGUNTA: ${query}`
+      }
+    ];
+
+    return await this.generateText(messages, {
+      temperature: 0.7,
+      max_tokens: 1024,
+      onToken
+    });
   }
 
   // ==========================================================================
