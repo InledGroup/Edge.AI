@@ -8,6 +8,7 @@ import { getChunksByDocument } from '@/lib/db/chunks';
 import { updateDocumentStatus } from '@/lib/db/documents';
 import { expandQuery, rewriteQuery } from './query-expansion';
 import { calculateRAGMetrics, assessRAGQuality, calculateFaithfulness } from './rag-metrics';
+import { getGenerationSettings, getRAGSettings } from '@/lib/db/settings';
 import type { WllamaEngine } from '@/lib/ai/wllama-engine';
 import type { WebLLMEngine } from '@/lib/ai/webllm-engine';
 import type { RAGResult, ProcessingStatus } from '@/types';
@@ -125,6 +126,7 @@ export async function queryWithRAG(
   options?: {
     useQueryExpansion?: boolean;
     useQueryRewriting?: boolean;
+    chunkWindowSize?: number;
   }
 ): Promise<RAGResult> {
   const startTime = Date.now();
@@ -172,8 +174,9 @@ export async function queryWithRAG(
         semanticWeight: 0.85,
         lexicalWeight: 0.15,
         useReranking: true,
-        minRelevance: 0.2
-      }
+        minRelevance: 0.2,
+        chunkWindowSize: options?.chunkWindowSize
+      } as any
     );
     resultLists.push(chunks);
   }
@@ -182,34 +185,6 @@ export async function queryWithRAG(
   let combinedChunks = queries.length > 1 
     ? reciprocalRankFusion(resultLists) 
     : resultLists[0];
-
-  // 4. LLM-Based Reranking (Listwise)
-  if (chatEngine && combinedChunks.length > 1) {
-    try {
-      console.log('🔄 Performing LLM-based reranking...');
-      const candidates = combinedChunks.slice(0, 10);
-      const candidatesText = candidates.map((c, i) => `ID ${i}: ${c.chunk.content.substring(0, 200)}...`).join('\n\n');
-      
-      const rerankPrompt = `Dados estos fragmentos de documentos, ordénalos de más relevante a menos relevante para responder a la pregunta: "${query}". 
-Responde ÚNICAMENTE con los IDs separados por comas, del más al menos relevante.
-Ejemplo: 3, 0, 2, 1
-
-FRAGMENTOS:
-${candidatesText}`;
-
-      const rerankOrder = await chatEngine.generateText([{ role: 'user', content: rerankPrompt }], { maxTokens: 50 });
-      const orderIds = rerankOrder.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-      
-      if (orderIds.length > 0) {
-        const reranked = orderIds.map(idx => candidates[idx]).filter(Boolean);
-        // Add remaining chunks that weren't in the top 10
-        combinedChunks = [...reranked, ...combinedChunks.slice(10)];
-        console.log(`✅ LLM Reranking complete. Best ID: ${orderIds[0]}`);
-      }
-    } catch (error) {
-      console.warn('⚠️ LLM Reranking failed, using original order');
-    }
-  }
 
   const searchTime = Date.now() - startTime;
 
@@ -232,28 +207,31 @@ export async function generateRAGAnswer(
   onStream?: (chunk: string) => void,
   additionalContext?: string
 ): Promise<string> {
+  // Get dynamic generation settings
+  const genSettings = await getGenerationSettings();
+  const temperature = genSettings.temperature ?? 0.1;
+  const maxTokens = genSettings.maxTokens ?? 1024;
+
   // Create context from retrieved chunks (already reordered for Lost in the Middle)
   const context = createRAGContext(ragResult.chunks);
 
-  console.log('💬 Generating answer with context and history...');
+  console.log(`💬 Generating answer with context (Temp: ${temperature})...`);
 
   // Build structured messages
   const messages: { role: string; content: string }[] = [];
 
-  // 1. System Prompt with Context
-  let systemContent = `Eres un asistente de IA avanzado especializado en analizar documentos. 
-RESPONDE ÚNICAMENTE basándote en el contexto proporcionado.
+  // 1. System Prompt with Context - ULTRA-STRICT VERSION
+  let systemContent = `Eres un asistente de IA experto cuya ÚNICA fuente de información son los fragmentos de documentos proporcionados a continuación.
 
-## CONTEXTO DE DOCUMENTOS (Ventana Ampliada "Small-to-Big"):
-${context || 'No se encontraron documentos relevantes.'}
+REGLAS CRÍTICAS PARA EVITAR ALUCINACIONES:
+1. SI LA RESPUESTA NO ESTÁ EN EL TEXTO DE ABAJO, responde exactamente: "Lo siento, la información solicitada no se encuentra en los documentos disponibles."
+2. NO utilices tu conocimiento previo para rellenar huecos. Si el documento no lo dice, tú no lo sabes.
+3. NO hagas suposiciones sobre marcas, empresas o datos técnicos no explícitos.
+4. Si el documento menciona el tema pero no el detalle específico, di claramente qué es lo que sí se sabe y qué falta.
+5. Cita siempre la fuente usando [Doc N] al final de cada dato extraído.
 
-## INSTRUCCIONES:
-1. Si no conoces la respuesta, di que no está en los documentos. NO INVENTES.
-2. Puedes pedir leer más de un documento si crees que la información está cerca.
-   Para expandir conocimientos, indica al final de tu respuesta: "(nombre documento).readmore=(numero de lineas)".
-3. Cita las fuentes usando [Doc N].
-
-REGLA DE ORO: La precisión es lo más importante.`;
+## CONTEXTO DE DOCUMENTOS (Ventana Ampliada):
+${context || 'No se encontraron documentos relevantes.'}`;
 
   if (additionalContext) {
     systemContent += `\n\n${additionalContext}`;
@@ -266,7 +244,10 @@ REGLA DE ORO: La precisión es lo más importante.`;
 
   // 2. Conversation History
   if (conversationHistory && conversationHistory.length > 0) {
-    conversationHistory.forEach(msg => {
+    // Only use last N messages to keep focus on context
+    const historyLimit = genSettings.historyLimit || 5;
+    const limitedHistory = conversationHistory.slice(-historyLimit);
+    limitedHistory.forEach(msg => {
       messages.push({ role: msg.role, content: msg.content });
     });
   }
@@ -283,8 +264,8 @@ REGLA DE ORO: La precisión es lo más importante.`;
 
   // Generate response using structured messages
   const answer = await chatEngine.generateText(messages, {
-    temperature: 0.7,
-    maxTokens: 1024,
+    temperature: temperature,
+    maxTokens: maxTokens,
     stop: ['<|im_end|>', '<|end|>', '<|eot_id|>'],
     onStream
   });
@@ -309,6 +290,8 @@ export async function completeRAGFlow(
     useQueryRewriting?: boolean;
     calculateMetrics?: boolean;
     additionalContext?: string;
+    faithfulnessThreshold?: number;
+    chunkWindowSize?: number;
   }
 ): Promise<{
   answer: string;
@@ -322,19 +305,24 @@ export async function completeRAGFlow(
   const shouldRewrite = options?.useQueryRewriting !== false && (options?.useQueryRewriting || isShortQuery);
 
   // Step 1: Retrieve relevant chunks with enhanced options
+  const ragSettings = await getRAGSettings();
+  const effectiveTopK = topK || ragSettings.topK || 5;
+  const effectiveWindowSize = options?.chunkWindowSize ?? ragSettings.chunkWindowSize ?? 1;
+
   const ragResult = await queryWithRAG(
     query,
     embeddingEngine,
-    topK,
+    effectiveTopK,
     documentIds,
     chatEngine,
     {
       useQueryExpansion: options?.useQueryExpansion,
-      useQueryRewriting: shouldRewrite
+      useQueryRewriting: shouldRewrite,
+      chunkWindowSize: effectiveWindowSize
     }
   );
 
-  console.log(`📊 Retrieved ${ragResult.chunks.length} chunks in ${ragResult.searchTime}ms`);
+  console.log(`📊 Retrieved ${ragResult.chunks.length} chunks (Window: +${effectiveWindowSize}) in ${ragResult.searchTime}ms`);
 
   // Step 2: Calculate quality metrics (if enabled)
   let metrics, quality;
@@ -356,7 +344,9 @@ export async function completeRAGFlow(
   let faithfulness;
   if (options?.calculateMetrics !== false) {
     const context = createRAGContext(ragResult.chunks);
-    faithfulness = calculateFaithfulness(answer, context);
+    const threshold = options?.faithfulnessThreshold ?? 0.45;
+    console.log(`⚖️ [RAG Pipeline] Applying Faithfulness Threshold: ${threshold}`);
+    faithfulness = calculateFaithfulness(answer, context, threshold);
   }
 
   return { answer, ragResult, metrics, quality, faithfulness };

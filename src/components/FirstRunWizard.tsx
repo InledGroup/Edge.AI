@@ -656,28 +656,6 @@ export function FirstRunWizard({ onComplete }: FirstRunWizardProps) {
               </div>
             </div>
 
-            {/* Advanced RAG Option */}
-            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-4">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={enableAdvancedRAG}
-                  onChange={(e) => setEnableAdvancedRAG((e.target as HTMLInputElement).checked)}
-                />
-                <div>
-                  <div className="font-semibold flex items-center gap-2">
-                    <Zap size={16} className="text-amber-500" />
-                    RAG Avanzado (Máximo Rendimiento - Fudan University)
-                  </div>
-                  <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-                    Activa la arquitectura de búsqueda híbrida, re-ranking con monoT5 y compresión de contexto. 
-                    Requiere descargar ~5GB adicionales de modelos de alto rendimiento. Recomendado para PCs potentes.
-                  </p>
-                </div>
-              </label>
-            </div>
-
             {/* Error */}
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-500">

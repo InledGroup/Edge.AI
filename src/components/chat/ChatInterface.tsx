@@ -1,7 +1,7 @@
 // ChatInterface - Complete chat interface with RAG & Specialized MCP Support
 
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { Sparkles, AlertCircle, Server } from 'lucide-preact';
+import { Sparkles, AlertCircle, Server, History, Sliders, X } from 'lucide-preact';
 import { Message } from './Message';
 import { ChatInput } from './ChatInput';
 import { WebSearchProgress } from './WebSearchProgress';
@@ -15,10 +15,10 @@ import { AdvancedRAGPipeline } from '@/lib/new-rag';
 import EngineManager from '@/lib/ai/engine-manager';
 import { WebLLMEngine } from '@/lib/ai/webllm-engine';
 import { addMessage, getOrCreateConversation, getConversation, generateTitle, updateConversationTitle, aiGenerateTitle } from '@/lib/db/conversations';
-import { getRAGSettings, getWebSearchSettings, getSetting, getUseAdvancedRAG } from '@/lib/db/settings';
+import { getRAGSettings, getWebSearchSettings, getSetting, getUseAdvancedRAG, getGenerationSettings, updateGenerationSettings } from '@/lib/db/settings';
 import { getMemories, addMemory } from '@/lib/db/memories';
 import { WebRAGOrchestrator } from '@/lib/web-search';
-import { generateUUID } from '@/lib/utils';
+import { generateUUID, cn } from '@/lib/utils';
 import { speechService, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { mcpManager } from '@/lib/ai/mcp-manager';
 import { processExtensionIntent, getExtensionsSystemPrompt } from '@/lib/insuite-utils';
@@ -117,8 +117,40 @@ export function ChatInterface() {
     canvasStore.open(markdownToHTML(content));
   };
 
+  const handleRegenerate = async (msgId: string) => {
+    if (isGenerating) return;
+
+    const msgIndex = messages.findIndex(m => m.id === msgId);
+    if (msgIndex === -1) return;
+
+    // Find the associated user message
+    let userMsg = null;
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        userMsg = messages[i];
+        break;
+      }
+    }
+
+    if (!userMsg) return;
+
+    // Remove the assistant message from state
+    setMessages(prev => prev.filter(m => m.id !== msgId));
+    
+    // Re-trigger sending (this will add a new assistant message)
+    handleSendMessage(userMsg.content, 'local', userMsg.images);
+  };
+
   async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[], activeTool?: { type: 'app' | 'mcp', id: string, name: string } | null) {
     if (!isModelsReady) { alert(i18nStore.t('chat.loadModelsFirst')); return; }
+
+    // Load latest global settings before processing
+    const genSettings = await getGenerationSettings();
+    const ragSettings = await getRAGSettings();
+    const hWeight = genSettings.historyWeight;
+    const fThreshold = genSettings.faithfulnessThreshold;
+    const cWindow = ragSettings.chunkWindowSize;
+    const tK = ragSettings.topK;
 
     const originalContent = content; 
     let assistantPrompt = content;   
@@ -273,6 +305,7 @@ export function ChatInterface() {
 
       let finalContent = '';
       let finalSources: any[] | undefined = undefined;
+      let finalMetadata: any = {};
 
       if (effectiveMode === 'web') {
         const embeddingEngine = await EngineManager.getEmbeddingEngine();
@@ -332,21 +365,72 @@ export function ChatInterface() {
           }
           setWebSearchProgress(null);
         } else {
-          // Legacy RAG Flow
+          // Legacy RAG Flow (Optimized)
           const embeddingEngine = await EngineManager.getEmbeddingEngine();
-          const settings = await getRAGSettings();
-          const { answer, ragResult } = await completeRAGFlow(assistantPrompt, embeddingEngine, chatEngine, settings.topK, undefined, messages.slice(-5).map(m => ({ role: m.role, content: m.content })), (c) => {
-            finalContent += c;
-            setCurrentResponse(finalContent);
+          let streamedText = '';
+          
+          // Dynamic history based on weight
+          const maxHistory = Math.max(1, Math.round(hWeight * 20));
+          const history = messages.slice(-maxHistory).map(m => ({ role: m.role, content: m.content }));
+
+          // 1. Initial RAG Pass
+          const result = await completeRAGFlow(assistantPrompt, embeddingEngine, chatEngine, tK, undefined, history, (c) => {
+            streamedText += c;
+            setCurrentResponse(streamedText);
             processAudioChunk(c);
-            setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent } : m));
-          }, { additionalContext: canvasContext + memoryContext });
-          finalContent = answer;
-          finalSources = ragResult.chunks;
+            setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: streamedText } : m));
+          }, { 
+            additionalContext: canvasContext + memoryContext,
+            calculateMetrics: true,
+            faithfulnessThreshold: fThreshold,
+            chunkWindowSize: cWindow
+          });
+
+          let finalAnswer = result.answer;
+          let finalChunks = result.ragResult.chunks;
+          
+          // 2. Check for 'Read More' pattern in the response
+          const readMoreMatch = finalAnswer.match(/\((.*?)\)\.readmore=(\d+)/);
+          if (readMoreMatch) {
+            const [_, docName, lines] = readMoreMatch;
+            setWebSearchProgress({ step: 'searching' as any, progress: 50, message: `Expandiendo lectura: ${docName}...` });
+            
+            const allDocs = await import('@/lib/db/documents').then(m => m.getAllDocuments());
+            const targetDoc = allDocs.find(d => d.name.toLowerCase().includes(docName.toLowerCase()));
+            
+            if (targetDoc) {
+              const extraK = Math.min(parseInt(lines) || 5, 10);
+              const secondResult = await completeRAGFlow(assistantPrompt, embeddingEngine, chatEngine, tK + extraK, [targetDoc.id], history, (c) => {
+                streamedText = c;
+                setCurrentResponse(streamedText);
+                setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: streamedText } : m));
+              }, { 
+                additionalContext: `\n\nINFO ADICIONAL DE ${targetDoc.name}:\nEl usuario (via comando) solicitó leer más. Aquí tienes contexto expandido. RE-ESCRIBE tu respuesta integrando estos nuevos datos.`,
+                calculateMetrics: true,
+                faithfulnessThreshold: fThreshold,
+                chunkWindowSize: cWindow
+              });
+              
+              finalAnswer = secondResult.answer;
+              finalChunks = secondResult.ragResult.chunks;
+            }
+            setWebSearchProgress(null);
+          }
+
+          finalContent = finalAnswer;
+          finalSources = finalChunks;
+          
+          // Set metadata for UI indicators
+          finalMetadata = {
+            ragQuality: result.quality?.overall,
+            ragMetrics: result.metrics,
+            faithfulness: result.faithfulness
+          };
         }
       } else {
         // Conversation mode
-        const history = [...messages.slice(-10), userMessage].map(m => ({ role: m.role, content: m.content }));
+        const maxHistory = Math.max(1, Math.round(hWeight * 20));
+        const history = messages.slice(-maxHistory).map(m => ({ role: m.role, content: m.content }));
         
         let customAppPrompt = '';
         if (activeTool && activeTool.type === 'app') {
@@ -477,7 +561,8 @@ export function ChatInterface() {
         content: finalContent, 
         timestamp: Date.now(),
         sources: finalSources as any,
-        streaming: false
+        streaming: false,
+        metadata: finalMetadata
       };
 
       setMessages(prev => prev.map(m => m.id === assistantId ? finalizedAssistantMsg as any : m));
@@ -491,7 +576,7 @@ export function ChatInterface() {
         role: 'assistant',
         content: finalContent,
         sources: finalSources,
-        metadata: finalizedAssistantMsg.metadata
+        metadata: finalMetadata
       });
 
       // Refresh conversation list/title in background
@@ -570,7 +655,7 @@ export function ChatInterface() {
               // Skip empty assistant messages
               if (m.role === 'assistant' && !m.content && !(m as any).tool_calls) return null;
               
-              return <Message key={m.id} message={m} onOpenInCanvas={handleOpenInCanvas} />;
+              return <Message key={m.id} message={m} onOpenInCanvas={handleOpenInCanvas} onRegenerate={() => handleRegenerate(m.id)} />;
             })}
             {isGenerating && !currentResponse && !webSearchProgress && (
               <div className="flex gap-3 animate-slideUp">

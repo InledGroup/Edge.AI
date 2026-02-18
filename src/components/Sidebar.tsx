@@ -20,7 +20,8 @@ import {
   QrCode,
   Sparkles,
   AppWindow,
-  Globe
+  Globe,
+  Sliders
 } from 'lucide-preact';
 import { conversationsStore, documentsStore, uiStore, extensionsStore, generatingTitleIdSignal } from '@/lib/stores';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
@@ -362,6 +363,14 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
         {/* Bottom Actions */}
         <div className="border-t border-[var(--color-border)] p-3 space-y-2">
           
+          <button
+            onClick={() => uiStore.toggleRAGSettings()}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          >
+            <Sliders size={16} />
+            <span>Configuración RAG</span>
+          </button>
+
           <button
             onClick={() => setShowMCPSettings(true)}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"

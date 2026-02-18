@@ -1,6 +1,6 @@
 // Message Component - Individual chat message
 
-import { User, Bot, FileText, Copy, FileEdit, Volume2, VolumeX, Linkedin, QrCode, Globe, AppWindow } from 'lucide-preact';
+import { User, Bot, FileText, Copy, FileEdit, Volume2, VolumeX, Linkedin, QrCode, Globe, AppWindow, Zap, AlertCircle, X, CheckCircle, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import type { Message as MessageType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -12,15 +12,118 @@ import { speechService, voiceState } from '@/lib/voice/speech-service';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
 import { extensionsStore, extensionsSignal } from '@/lib/stores';
 import { generateInLinkedUrl, generateInQRUrl, isUrl } from '@/lib/insuite-utils';
+import { updateChunkRelevance, getChunkVote } from '@/lib/db/relevance';
+import { useEffect } from 'preact/hooks';
+
+/**
+ * Quality Indicator Component
+ */
+function QualityIndicator({ quality, score }: { quality?: string, score?: number }) {
+  if (!quality) return null;
+
+  const config = {
+    excellent: { color: 'text-green-500', bg: 'bg-green-500/10', label: 'Excelente', icon: CheckCircle },
+    good: { color: 'text-blue-500', bg: 'bg-blue-500/10', label: 'Buena', icon: CheckCircle },
+    fair: { color: 'text-amber-500', bg: 'bg-amber-500/10', label: 'Regular', icon: AlertCircle },
+    poor: { color: 'text-red-500', bg: 'bg-red-500/10', label: 'Baja', icon: AlertCircle },
+  }[quality as any] || { color: 'text-gray-500', bg: 'bg-gray-500/10', label: quality, icon: Zap };
+
+  const showWarning = quality === 'poor' || quality === 'fair';
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider w-fit", config.bg, config.color)}>
+        <config.icon size={12} />
+        <span>Calidad RAG: {config.label}</span>
+        {typeof score === 'number' && !isNaN(score) && (
+          <span className="opacity-60 ml-1">({(score * 100).toFixed(0)}% precisión)</span>
+        )}
+      </div>
+      {showWarning && (
+        <div className="text-[10px] text-red-400/80 italic px-1 flex items-center gap-1">
+          <AlertCircle size={10} />
+          <span>Sugerencia: Añade más contexto, pregunta de nuevo o <a href="#" onClick={(e) => { e.preventDefault(); window.open('https://form.typeform.com/to/h0cyYt3d', '_blank'); }} className="underline hover:text-red-400 transition-colors">comparte feedback con Inled</a> para mejorar.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Modal para visualizar el contenido completo del chunk
+ */
+function ChunkPreviewModal({ id, content, docName, score, onClose }: { id: string, content: string, docName: string, score: number, onClose: () => void }) {
+  const [voted, setVoted] = useState<'up' | 'down' | null>(null);
+
+  useEffect(() => {
+    if (id) {
+      getChunkVote(id).then(setVoted);
+    }
+  }, [id]);
+
+  const handleVote = async (type: 'up' | 'down') => {
+    setVoted(type);
+    await updateChunkRelevance(id, type);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-2xl bg-[var(--color-bg)] border border-[var(--color-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="p-4 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-[var(--color-primary)]/10 flex items-center justify-center">
+              <FileText size={16} className="text-[var(--color-primary)]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold truncate max-w-[300px]">{docName}</h3>
+              <p className="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-widest font-bold">Fragmento del Documento • {(score * 100).toFixed(1)}% relevancia</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-[var(--color-bg-tertiary)] rounded-lg p-1 mr-2 border border-[var(--color-border)]">
+              <button 
+                onClick={() => handleVote('up')}
+                className={cn("p-1.5 rounded-md transition-colors", voted === 'up' ? "bg-green-500/20 text-green-500" : "hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-tertiary)]")}
+                title="Este fragmento es útil"
+              >
+                <ThumbsUp size={14} />
+              </button>
+              <button 
+                onClick={() => handleVote('down')}
+                className={cn("p-1.5 rounded-md transition-colors", voted === 'down' ? "bg-red-500/20 text-red-500" : "hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-tertiary)]")}
+                title="Este fragmento NO es útil"
+              >
+                <ThumbsDown size={14} />
+              </button>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-[var(--color-bg-tertiary)] rounded-lg transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="p-6 overflow-y-auto custom-scrollbar bg-[var(--color-bg-tertiary)]/30 text-left">
+          <div className="prose prose-invert max-w-none text-sm leading-relaxed whitespace-pre-wrap font-mono opacity-90">
+            {content}
+          </div>
+        </div>
+        <div className="p-3 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-center text-[10px] text-[var(--color-text-tertiary)]">
+          {voted ? "¡Gracias por tu feedback! El sistema aprenderá de esta valoración." : "Vota este fragmento para que el sistema aprenda su importancia real."}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export interface MessageProps {
   message: MessageType;
   onOpenInCanvas?: (content: string) => void;
+  onRegenerate?: () => void;
 }
 
-export function Message({ message, onOpenInCanvas }: MessageProps) {
+export function Message({ message, onOpenInCanvas, onRegenerate }: MessageProps) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const [previewChunk, setPreviewChunk] = useState<{ id: string, content: string, docName: string, score: number } | null>(null);
   const vState = voiceState.value;
   const lang = languageSignal.value;
 
@@ -148,7 +251,13 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
               <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
             </div>
           ) : (
-            <MarkdownRenderer content={message.content} className="leading-relaxed" />
+            <div className="flex flex-col gap-3 text-left">
+              <MarkdownRenderer content={message.content} className="leading-relaxed" />
+              {/* Quality Indicator below the text */}
+              {!isUser && message.metadata?.ragQuality && (
+                <QualityIndicator quality={message.metadata.ragQuality} score={message.metadata.faithfulness} />
+              )}
+            </div>
           )}
         </div>
 
@@ -167,14 +276,20 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
               {message.sources!.map((source, idx) => (
                 <div
                   key={idx}
-                  className="text-xs px-2 py-1 bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] rounded-md border border-[var(--color-border)] flex items-center gap-1.5 hover:border-[var(--color-primary)] transition-colors"
-                  title={source.chunk.content.substring(0, 100)}
+                  onClick={() => setPreviewChunk({ 
+                    id: source.chunk.id,
+                    content: source.chunk.metadata?.expandedContext || source.chunk.content, 
+                    docName: source.document.name, 
+                    score: source.score 
+                  })}
+                  className="text-xs px-2 py-1 bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] rounded-md border border-[var(--color-border)] flex items-center gap-1.5 hover:border-[var(--color-primary)] transition-colors cursor-pointer group/source"
+                  title="Ver fragmento original"
                 >
-                  <FileText size={12} />
+                  <FileText size={12} className="group-hover/source:text-[var(--color-primary)]" />
                   <span className="truncate max-w-[120px]">
                     {source.document.name}
                   </span>
-                  <span className="text-[var(--color-primary)]">
+                  <span className="text-[var(--color-primary)] font-bold">
                     {(source.score * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -221,6 +336,19 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
               <FileEdit size={14} className="mr-1" />
               {i18nStore.t('message.openCanvas')}
             </Button>
+
+            {!isUser && onRegenerate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onRegenerate}
+                className="h-7 px-2 text-xs"
+                title="Regenerar respuesta"
+              >
+                <RefreshCw size={14} className="mr-1" />
+                Regenerar
+              </Button>
+            )}
 
             {/* Extension Buttons */}
             <div className="h-4 w-[1px] bg-[var(--color-border)] mx-1" />
@@ -273,6 +401,14 @@ export function Message({ message, onOpenInCanvas }: MessageProps) {
         <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--color-bg-tertiary)] flex items-center justify-center border border-[var(--color-border)]">
           <User size={18} />
         </div>
+      )}
+
+      {/* Chunk Preview Modal */}
+      {previewChunk && (
+        <ChunkPreviewModal 
+          {...previewChunk} 
+          onClose={() => setPreviewChunk(null)} 
+        />
       )}
     </div>
   );

@@ -1,6 +1,11 @@
+> [!WARNING]
+> This is a work in progress and is not yet ready for production use. It fails in many cases and its response quality is not yet good enough. Please, read the code in the other folder /rag if you need a full-featured RAG pipeline. To enable this new RAG pipeline in the main UI (fot testing purposes), type sudo("use-experimental --rag-fudan") to activate it or sudo("use-experimental --disable-rag-fudan") to deactivate it.
+
 # New RAG Pipeline (Maximum Performance)
 
 This directory contains a complete, functional implementation of a high-performance RAG pipeline based on the [Fudan University study](https://arxiv.org/pdf/2407.01219).
+
+
 
 ## Architecture
 

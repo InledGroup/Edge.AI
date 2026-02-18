@@ -70,10 +70,48 @@ import '@/styles/global.css';
     <!-- Initialize stores -->
     <script>
         import { initializeStores } from '@/lib/stores';
+        import { setUseAdvancedRAG } from '@/lib/db/settings';
 
         // Initialize on client side
         if (typeof window !== 'undefined') {
             initializeStores().catch(console.error);
+
+            // Secret experimental command handler
+            // Usage: sudo("use-experimental --rag-fudan")
+            // @ts-ignore
+            window.sudo = (cmd: string) => {
+                if (cmd === 'use-experimental --rag-fudan') {
+                    console.log('🚀 [AdvancedRAG] Activating Fudan High-Perf Pipeline...');
+                    setUseAdvancedRAG(true).then(() => {
+                        console.log('✅ [AdvancedRAG] Mode activated.');
+                        if (confirm('RAG Avanzado activado. ¿Recargar página ahora para aplicar?')) {
+                            window.location.reload();
+                        }
+                    });
+                    return 'Command accepted. Check confirmation dialog.';
+                }
+                
+                if (cmd === 'use-experimental --disable-rag-fudan') {
+                    setUseAdvancedRAG(false).then(() => {
+                        console.log('❌ [AdvancedRAG] Mode deactivated.');
+                        window.location.reload();
+                    });
+                    return 'Deactivating...';
+                }
+
+                if (cmd === 'db-reset-hard') {
+                    if (confirm('¿ESTÁS SEGURO? Esto borrará TODOS tus documentos y conversaciones para reparar la base de datos.')) {
+                        indexedDB.deleteDatabase('edge-ai-db');
+                        window.location.reload();
+                    }
+                    return 'Resetting...';
+                }
+
+                console.warn('❌ Unknown sudo command. Available: "use-experimental --rag-fudan", "use-experimental --disable-rag-fudan", "db-reset-hard"');
+                return 'Error: Invalid command';
+            };
+
+            console.log('💻 Edge AI Console Ready. Type sudo("use-experimental --rag-fudan") to enable experimental features.');
         }
     </script>
 

@@ -201,13 +201,15 @@ interface UIState {
   theme: 'light' | 'dark' | 'auto';
   showSettings: boolean;
   showLiveMode: boolean;
+  showRAGSettings: boolean;
 }
 
 export const uiSignal = signal<UIState>({
   sidebarOpen: true,
   theme: 'auto',
   showSettings: false,
-  showLiveMode: false
+  showLiveMode: false,
+  showRAGSettings: false
 });
 
 export const uiStore = {
@@ -225,6 +227,10 @@ export const uiStore = {
 
   get showLiveMode() {
     return uiSignal.value.showLiveMode;
+  },
+
+  get showRAGSettings() {
+    return uiSignal.value.showRAGSettings;
   },
 
   toggleSidebar() {
@@ -254,6 +260,13 @@ export const uiStore = {
     uiSignal.value = {
       ...uiSignal.value,
       showLiveMode: !uiSignal.value.showLiveMode
+    };
+  },
+
+  toggleRAGSettings() {
+    uiSignal.value = {
+      ...uiSignal.value,
+      showRAGSettings: !uiSignal.value.showRAGSettings
     };
   }
 };

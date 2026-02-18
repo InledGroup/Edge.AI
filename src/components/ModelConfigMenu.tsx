@@ -220,40 +220,6 @@ export function ModelConfigMenu({ onOpenWizard }: ModelConfigMenuProps) {
                       {EngineManager.isToolEngineReady() ? 'LFM2 Tool (Emergencia)' : i18nStore.t('models.notLoaded')}
                     </span>
                   </div>
-
-                  {useAdvancedRAG && (
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[var(--color-text-secondary)]">RAG Componentes:</span>
-                      <span className={modelsStore.advancedRAGLoading ? 'text-amber-500 animate-pulse' : 'text-[var(--color-success)]'}>
-                        {modelsStore.advancedRAGLoading ? 'Cargando...' : 'BGE-M3, BERT, Reranker, T5'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Advanced RAG Toggle */}
-                <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Zap size={16} className={useAdvancedRAG ? "text-amber-500" : "text-[var(--color-text-tertiary)]"} />
-                      <div>
-                        <div className="text-sm font-medium">RAG Avanzado (Fudan)</div>
-                        <div className="text-[10px] text-[var(--color-text-tertiary)]">Máximo rendimiento y precisión</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleToggleAdvancedRAG}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                        useAdvancedRAG ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-bg-tertiary)]'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          useAdvancedRAG ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
                 </div>
 
                 {modelsReady.value && (

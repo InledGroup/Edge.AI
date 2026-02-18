@@ -10,6 +10,7 @@ import { ExtensionsPanel } from './ExtensionsPanel';
 import { FirstRunWizard } from './FirstRunWizard';
 import { ModelLoadingIndicator } from './ModelLoadingIndicator';
 import { ExtensionStatus } from './ExtensionStatus';
+import { RAGSettingsPopup } from './RAGSettings';
 import LiveMode from './chat/LiveMode';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
@@ -180,6 +181,9 @@ export function AppLayout() {
 
       {/* Live Mode Overlay */}
       <LiveMode />
+
+      {/* RAG Settings Global Popup */}
+      <RAGSettingsPopup />
 
       {/* Mobile Warning Modal */}
       {showMobileWarning && (

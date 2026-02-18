@@ -90,8 +90,14 @@ export async function updateDocumentStatus(
 export async function deleteDocument(id: string): Promise<void> {
   const db = await getDB();
 
-  // Start transaction for all stores
-  const tx = db.transaction(['documents', 'chunks', 'embeddings'], 'readwrite');
+  // Dynamic list of stores to handle migrations safely
+  const stores = ['documents', 'chunks', 'embeddings'];
+  if (db.objectStoreNames.contains('chunk_relevance' as any)) {
+    stores.push('chunk_relevance');
+  }
+
+  // Start transaction
+  const tx = db.transaction(stores as any, 'readwrite');
 
   try {
     // Delete the document
@@ -100,8 +106,17 @@ export async function deleteDocument(id: string): Promise<void> {
     // Delete all chunks for this document
     const chunksStore = tx.objectStore('chunks');
     const chunkKeys = await chunksStore.index('by-document').getAllKeys(id);
+    
+    const relevanceStore = db.objectStoreNames.contains('chunk_relevance' as any) 
+      ? tx.objectStore('chunk_relevance' as any) 
+      : null;
+
     for (const key of chunkKeys) {
       await chunksStore.delete(key);
+      // Also delete associated relevance data
+      if (relevanceStore) {
+        await relevanceStore.delete(key);
+      }
     }
 
     // Delete all embeddings for this document
@@ -125,12 +140,20 @@ export async function deleteDocument(id: string): Promise<void> {
  */
 export async function deleteAllDocuments(): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(['documents', 'chunks', 'embeddings'], 'readwrite');
+  const stores = ['documents', 'chunks', 'embeddings'];
+  if (db.objectStoreNames.contains('chunk_relevance' as any)) {
+    stores.push('chunk_relevance');
+  }
+
+  const tx = db.transaction(stores as any, 'readwrite');
 
   try {
     await tx.objectStore('documents').clear();
     await tx.objectStore('chunks').clear();
     await tx.objectStore('embeddings').clear();
+    if (db.objectStoreNames.contains('chunk_relevance' as any)) {
+      await tx.objectStore('chunk_relevance' as any).clear();
+    }
     await tx.done;
   } catch (error) {
     console.error('Failed to delete all documents:', error);

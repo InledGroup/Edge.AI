@@ -146,6 +146,10 @@ export interface Settings {
   liveModeAudioType?: 'system' | 'model'; // Use system TTS or model-generated audio
   liveModeSttType?: 'system' | 'model'; // Use system STT or model-based STT
   useAdvancedRAG?: boolean; // Use Fudan High-Perf RAG pipeline
+  historyWeight?: number; // 0-1, how much previous messages matter
+  historyLimit?: number; // max messages from history to include
+  faithfulnessThreshold?: number; // 0-1, sensitivity of accuracy algorithm
+  chunkWindowSize?: number; // 0-3, surrounding context for Small-to-Big
 }
 
 /**

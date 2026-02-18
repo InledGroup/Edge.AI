@@ -165,45 +165,54 @@ export function assessRAGQuality(metrics: RAGMetrics): {
 
 /**
  * Calculate answer faithfulness (how well answer is grounded in context)
- * Simplified version - checks if key entities/facts from answer appear in context
+ * Standard version with strict term matching and configurable threshold
  */
 export function calculateFaithfulness(
   answer: string,
-  context: string
+  context: string,
+  threshold: number = 0.45
 ): number {
-  // Extract potential facts/entities from answer (simple heuristic)
-  const answerSentences = answer.split(/[.!?]+/).filter(s => s.trim().length > 10);
+  const cleanContext = context.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ');
+  const answerSentences = answer.split(/[.!?\n]+/).filter(s => s.trim().length > 15);
 
-  if (answerSentences.length === 0) {
-    return 1.0;
-  }
+  if (answerSentences.length === 0) return 1.0;
 
-  const contextLower = context.toLowerCase();
+  const stopWords = new Set([
+    'esta', 'este', 'estos', 'estas', 'esto', 'que', 'para', 'con', 'por', 'como', 'muy', 'más', 'menos', 
+    'todo', 'toda', 'todos', 'todas', 'un', 'una', 'unos', 'unas', 'el', 'la', 'los', 'las', 'del', 'al',
+    'the', 'this', 'that', 'these', 'those', 'with', 'from', 'have', 'been', 'were', 'their', 'what', 
+    'when', 'where', 'which', 'and', 'but', 'not', 'for', 'are', 'was', 'has', 'had'
+  ]);
+
   let supportedCount = 0;
 
   answerSentences.forEach(sentence => {
-    // Extract key words from sentence (more than 4 chars, not common words)
     const words = sentence.toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .split(/\s+/)
-      .filter(w => w.length > 4 && !/^(esta|este|estos|estas|que|para|con|por|como|muy|más|menos|todo|toda|todos|todas|the|this|that|these|those|with|from|have|been|were|their|what|when|where|which)$/.test(w));
+      .filter(w => w.length > 3 && !stopWords.has(w));
 
     if (words.length === 0) {
-      supportedCount++; // Skip generic sentences
+      supportedCount++; 
       return;
     }
 
-    // Check if majority of key words appear in context
-    const foundWords = words.filter(w => contextLower.includes(w)).length;
-    const ratio = foundWords / words.length;
+    // Strict matching: Count how many key words from answer exist in the context
+    let matches = 0;
+    for (const word of words) {
+      if (cleanContext.includes(word)) matches++;
+    }
 
-    if (ratio >= 0.5) {
+    const ratio = matches / words.length;
+
+    // If matches exceed the user-defined threshold, the sentence is faithful
+    if (ratio >= threshold) {
       supportedCount++;
     }
   });
 
   const faithfulness = supportedCount / answerSentences.length;
-
-  console.log(`🔍 [Faithfulness] ${supportedCount}/${answerSentences.length} sentences supported (${(faithfulness * 100).toFixed(1)}%)`);
-
+  console.log(`🔍 [Faithfulness] ${supportedCount}/${answerSentences.length} sentences grounded (${(faithfulness * 100).toFixed(1)}%)`);
+  
   return faithfulness;
 }

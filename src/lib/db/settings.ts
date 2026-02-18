@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
   chunkSize: 512,
   chunkOverlap: 50,
   topK: 5,
-  temperature: 0.7,
+  temperature: 0.1,
   maxTokens: 2048,
   theme: 'auto',
   language: 'es',
@@ -25,6 +25,10 @@ const DEFAULT_SETTINGS: Settings = {
   liveModeAudioType: 'system', // Use system TTS by default
   liveModeSttType: 'system', // Use system STT by default
   useAdvancedRAG: false, // Disabled temporarily as requested
+  historyWeight: 0.5, // Balanced by default
+  historyLimit: 10, // Default limit
+  faithfulnessThreshold: 0.45, // Default sensitivity
+  chunkWindowSize: 1, // Default Small-to-Big window
 };
 
 /**
@@ -151,16 +155,18 @@ export async function setSelectedModels(
  * Get RAG settings
  */
 export async function getRAGSettings() {
-  const [chunkSize, chunkOverlap, topK] = await Promise.all([
+  const [chunkSize, chunkOverlap, topK, chunkWindowSize] = await Promise.all([
     getSetting('chunkSize'),
     getSetting('chunkOverlap'),
-    getSetting('topK')
+    getSetting('topK'),
+    getSetting('chunkWindowSize')
   ]);
 
   return {
     chunkSize,
     chunkOverlap,
-    topK
+    topK,
+    chunkWindowSize: chunkWindowSize ?? 1
   };
 }
 
@@ -171,6 +177,7 @@ export async function updateRAGSettings(settings: {
   chunkSize?: number;
   chunkOverlap?: number;
   topK?: number;
+  chunkWindowSize?: number;
 }): Promise<void> {
   await updateSettings(settings);
 }
@@ -179,14 +186,20 @@ export async function updateRAGSettings(settings: {
  * Get generation settings
  */
 export async function getGenerationSettings() {
-  const [temperature, maxTokens] = await Promise.all([
+  const [temperature, maxTokens, historyWeight, historyLimit, faithfulnessThreshold] = await Promise.all([
     getSetting('temperature'),
-    getSetting('maxTokens')
+    getSetting('maxTokens'),
+    getSetting('historyWeight'),
+    getSetting('historyLimit'),
+    getSetting('faithfulnessThreshold')
   ]);
 
   return {
     temperature,
-    maxTokens
+    maxTokens,
+    historyWeight: historyWeight ?? 0.5,
+    historyLimit: historyLimit ?? 10,
+    faithfulnessThreshold: faithfulnessThreshold ?? 0.45
   };
 }
 
@@ -196,6 +209,9 @@ export async function getGenerationSettings() {
 export async function updateGenerationSettings(settings: {
   temperature?: number;
   maxTokens?: number;
+  historyWeight?: number;
+  historyLimit?: number;
+  faithfulnessThreshold?: number;
 }): Promise<void> {
   await updateSettings(settings);
 }

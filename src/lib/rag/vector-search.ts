@@ -4,6 +4,7 @@
 import { getAllEmbeddings } from '@/lib/db/embeddings';
 import { getChunk, getSurroundingChunks } from '@/lib/db/chunks';
 import { getDocument } from '@/lib/db/documents';
+import { getChunkBoosts } from '@/lib/db/relevance';
 import type { RetrievedChunk, Embedding } from '@/types';
 import { formatChunkWithContext } from './semantic-chunking';
 import { BM25 } from './bm25';
@@ -53,6 +54,7 @@ export interface HybridSearchConfig {
   lexicalWeight?: number;  // 0-1, default 0.3
   useReranking?: boolean;  // default true
   minRelevance?: number;   // Minimum relevance score (0-1)
+  chunkWindowSize?: number;
 }
 
 /**
@@ -100,8 +102,10 @@ export async function searchSimilarChunks(
   const retrievedChunks = Array.from(chunksMap.values());
 
   // === SMALL-TO-BIG: Fetch surrounding context for top candidates ===
+  const windowSize = config?.chunkWindowSize ?? 1;
+  console.log(`🪟 [Hybrid Search] Applying Context Window Size: +${windowSize}`);
   for (const rc of retrievedChunks) {
-    const surrounding = await getSurroundingChunks(rc.chunk.documentId, rc.chunk.index, 1);
+    const surrounding = await getSurroundingChunks(rc.chunk.documentId, rc.chunk.index, windowSize);
     const expandedContent = surrounding.map(c => c.content).join('\n\n');
     rc.chunk.metadata = {
       ...rc.chunk.metadata,
@@ -173,6 +177,18 @@ export async function searchSimilarChunks(
 
   // Sort by hybrid score
   retrievedChunks.sort((a, b) => b.score - a.score);
+
+  // === LEARNING: Apply user feedback boosts ===
+  const boosts = await getChunkBoosts(retrievedChunks.slice(0, topK * 5).map(rc => rc.chunk.id));
+  retrievedChunks.forEach(rc => {
+    const boost = boosts.get(rc.chunk.id) || 1.0;
+    rc.score *= boost;
+  });
+  
+  // Re-sort after boosts
+  if (boosts.size > 0) {
+    retrievedChunks.sort((a, b) => b.score - a.score);
+  }
 
   // Take top K before reranking
   let topResults = retrievedChunks.slice(0, topK * 3); // Get 3x for reranking to have more candidates
