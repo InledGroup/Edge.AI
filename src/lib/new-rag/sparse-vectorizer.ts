@@ -1,7 +1,8 @@
-import natural from 'natural';
 
 export class SparseVectorizer {
-  private static tokenizer = new natural.WordTokenizer();
+  private static tokenize(text: string): string[] {
+    return text.toLowerCase().split(/\W+/).filter(t => t.length > 0);
+  }
   // Multilingual stopwords (English + Spanish commonly used)
   private static stopWords = new Set([
     'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'for', 'with', 'as', 'by', 'it', 'that', 'this',
@@ -15,7 +16,7 @@ export class SparseVectorizer {
    * but lacks the learned weights of SPLADE. It serves as a robust BM25-proxy for 100% local search.
    */
   static encode(text: string): Record<number, number> {
-    const tokens = this.tokenizer.tokenize(text.toLowerCase());
+    const tokens = this.tokenize(text);
     const vector: Record<number, number> = {};
 
     if (!tokens) return vector;
@@ -35,11 +36,11 @@ export class SparseVectorizer {
     Object.entries(tf).forEach(([token, count]) => {
       const hash = this.fnv1aHash(token);
       const index = Math.abs(hash % DIMENSION);
-      
+
       // Log-saturation for weight: log(1 + TF)
       // This prevents high-frequency words from dominating too much
       const weight = Math.log(1 + count);
-      
+
       // Accumulate if collision occurs
       vector[index] = (vector[index] || 0) + weight;
     });

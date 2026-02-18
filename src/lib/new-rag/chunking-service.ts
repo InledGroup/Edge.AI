@@ -1,9 +1,23 @@
 import { DEFAULT_CONFIG } from './config';
 import type { Chunk } from './types';
-import natural from 'natural';
 
 export class ChunkingService {
-  private static tokenizer = new natural.SentenceTokenizer();
+  /**
+   * Simple browser-safe sentence tokenizer using regex
+   */
+  private static tokenize(text: string): string[] {
+    // Split by . ! ? followed by whitespace, keeping the punctuation
+    return text
+      .split(/([.!?]+[\s\n]+)/)
+      .reduce((acc: string[], part, i, arr) => {
+        if (i % 2 === 0 && part.trim()) {
+          const sentence = part + (arr[i + 1] || '');
+          acc.push(sentence.trim());
+        }
+        return acc;
+      }, [])
+      .filter((s) => s.length > 0);
+  }
 
   /**
    * Small-to-Big Chunking Logic (Robust Implementation)
@@ -12,7 +26,7 @@ export class ChunkingService {
    * 3. For each small chunk, expand window to form parent chunk (approx 512 tokens).
    */
   static splitSmallToBig(text: string): Chunk[] {
-    const sentences = this.tokenizer.tokenize(text);
+    const sentences = this.tokenize(text);
     if (!sentences || sentences.length === 0) return [];
 
     const smallChunks: { text: string; startIndex: number; endIndex: number }[] = [];
@@ -21,7 +35,7 @@ export class ChunkingService {
 
     // Helper to count tokens (approximate)
     const countTokens = (s: string) => s.trim().split(/\s+/).length;
-    
+
     // Step 1: Create Small Chunks
     let currentChunkSentences: string[] = [];
     let currentTokenCount = 0;
@@ -60,10 +74,10 @@ export class ChunkingService {
     return smallChunks.map(small => {
       let parentText = small.text;
       let currentParentTokens = countTokens(parentText);
-      
+
       let left = small.startIndex - 1;
       let right = small.endIndex + 1;
-      
+
       // Expand outwards until size limit or boundaries reached
       while ((left >= 0 || right < sentences.length) && currentParentTokens < parentSize) {
         // Try expand left
@@ -76,10 +90,10 @@ export class ChunkingService {
             left--;
           } else {
             // Optimization: Stop expanding this direction if we can't fit the sentence
-            left = -1; 
+            left = -1;
           }
         }
-        
+
         // Try expand right
         if (right < sentences.length && currentParentTokens < parentSize) {
           const sent = sentences[right];
