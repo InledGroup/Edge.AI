@@ -4,9 +4,9 @@ import { Menu, X, Globe } from "lucide-preact";
 const { currentLang = "en", translations = {} } = Astro.props;
 
 const navLinks = [
-  { href: "#features", label: translations.features || "Features" },
-  { href: "#privacy", label: translations.privacy || "Privacy" },
-  { href: "#apps", label: translations.apps || "Apps" },
+  { href: "/aicloud", label: translations.chatbot || "Crea tu propio chatbot" },
+  { href: currentLang === "es" ? "/modelos" : "/models", label: translations.models || "Descubre modelos" },
+  { href: "https://inled.es/contacto", label: translations.contact || "Contacta con nosotros" },
 ];
 ---
 

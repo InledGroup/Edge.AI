@@ -156,6 +156,7 @@ const getModelUrl = (id: string, lang: string) => {
     gap: 1.25rem;
     width: 100%;
     margin: 0 auto;
+    justify-items: center;
   }
 
   @media (min-width: 768px) {
@@ -182,6 +183,14 @@ const getModelUrl = (id: string, lang: string) => {
     border-radius: 1rem;
     transition: all 0.3s ease;
     animation: fadeInUp 0.5s ease backwards;
+    width: 100%;
+    max-width: 450px;
+  }
+
+  @media (min-width: 768px) {
+    .model-card {
+      max-width: none;
+    }
   }
 
   @keyframes fadeInUp {

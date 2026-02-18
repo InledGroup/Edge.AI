@@ -1,8 +1,14 @@
 ---
-import { Heart, Github, Twitter } from "lucide-preact";
+import { Heart } from "lucide-preact";
 
-const { translations = {} } = Astro.props;
+const { translations = {}, currentLang = "en" } = Astro.props;
 const currentYear = new Date().getFullYear();
+
+const footerLinks = [
+  { href: "/aicloud", label: translations.link1 || "Crea tu propio chatbot" },
+  { href: currentLang === "es" ? "/modelos" : "/models", label: translations.link2 || "Descubre modelos" },
+  { href: "https://inled.es/contacto", label: translations.link3 || "Contacta con nosotros" },
+];
 ---
 
 <footer class="footer">
@@ -19,9 +25,11 @@ const currentYear = new Date().getFullYear();
       </div>
 
       <div class="footer-links">
-        <a href="#features" class="footer-link">{translations.link1 || 'Features'}</a>
-        <a href="#privacy" class="footer-link">{translations.link2 || 'Privacy'}</a>
-        <a href="#apps" class="footer-link">{translations.link3 || 'Integrations'}</a>
+        {
+          footerLinks.map((link) => (
+            <a href={link.href} class="footer-link">{link.label}</a>
+          ))
+        }
       </div>
     </div>
 

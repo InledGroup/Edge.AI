@@ -287,7 +287,7 @@ export const translations = {
         business_btn: 'Entrar como Empresa'
       },
       nav: {
-        features: 'Características',
+        aicloud: 'Crea tu propio chatbot',
         use_cases: 'Casos de Uso',
         compliance: 'Cumplimiento',
         switch: 'Cambiar Perfil',

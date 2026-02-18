@@ -14,9 +14,9 @@ const { lang = urlLang } = Astro.props;
 const translations = {
   en: {
     nav: {
-      features: "Features",
-      privacy: "Privacy",
-      apps: "Integrations",
+      chatbot: "Create your own chatbot",
+      models: "Discover models",
+      contact: "Contact us",
       cta: "Open App",
     },
     hero: {
@@ -26,6 +26,7 @@ const translations = {
       subtitle:
         "Chat with your documents, search the web, and use powerful AI tools. Everything stays on your device. Nothing is sent to the cloud.",
       cta: "Start Now",
+      chatbotCta: "Create your own chatbot",
       feature1: "No data leaves your device",
       feature2: "Works offline",
       card1Title: "Your Documents",
@@ -114,9 +115,9 @@ const translations = {
   },
   es: {
     nav: {
-      features: "Características",
-      privacy: "Privacidad",
-      apps: "Integraciones",
+      chatbot: "Crea tu propio chatbot",
+      models: "Descubre modelos",
+      contact: "Contacta con nosotros",
       cta: "Abrir App",
     },
     hero: {
@@ -126,6 +127,7 @@ const translations = {
       subtitle:
         "Chatea con tus documentos, busca en la web y usa herramientas de IA potentes. Todo se queda en tu dispositivo. Nada se envía a la nube.",
       cta: "Comenzar",
+      chatbotCta: "Crea tu propio chatbot",
       feature1: "Ningún dato sale de tu dispositivo",
       feature2: "Funciona sin internet",
       card1Title: "Tus Documentos",
@@ -218,8 +220,8 @@ const t = translations[lang as keyof typeof translations] || translations.en;
 console.log(
   "Rendering LandingLayout with lang:",
   lang,
-  "t.nav.features:",
-  t.nav.features,
+  "t.nav.chatbot:",
+  t.nav.chatbot,
 );
 ---
 
@@ -279,7 +281,7 @@ console.log(
       <Apps translations={t.apps} />
       <Models translations={t.models} lang={lang} />
     </main>
-    <Footer translations={t.footer} />
+    <Footer translations={t.footer} currentLang={lang} />
 
     <script is:inline define:vars={{ translations }}>
       document.addEventListener("DOMContentLoaded", function () {
@@ -318,9 +320,9 @@ console.log(
           // Navbar
           const navLinks = document.querySelectorAll(".nav-link");
           if (navLinks.length >= 3) {
-            navLinks[0].textContent = t.nav.features;
-            navLinks[1].textContent = t.nav.privacy;
-            navLinks[2].textContent = t.nav.apps;
+            navLinks[0].textContent = t.nav.chatbot;
+            navLinks[1].textContent = t.nav.models;
+            navLinks[2].textContent = t.nav.contact;
           }
           document
             .querySelectorAll(".cta-btn")
@@ -331,6 +333,7 @@ console.log(
           updateTitle(".hero-title", t.hero.title, t.hero.title2);
           updateText(".hero-subtitle", t.hero.subtitle);
           updateText(".hero-cta span", t.hero.cta);
+          updateText(".hero-cta-secondary span", t.hero.chatbotCta);
 
           const heroFeatures = document.querySelectorAll(
             ".hero-feature span:last-child",
