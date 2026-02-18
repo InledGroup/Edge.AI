@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
   chunkSize: 512,
   chunkOverlap: 50,
   topK: 5,
-  temperature: 0.1,
+  temperature: 0.3,
   maxTokens: 2048,
   theme: 'auto',
   language: 'es',

@@ -187,7 +187,6 @@ export async function queryWithRAG(
     : resultLists[0];
 
   // 4. Optional: LLM-Based Reranking (Listwise)
-  // This significantly improves precision by having the LLM judge the top candidates
   if (chatEngine && combinedChunks.length > 1) {
     try {
       console.log('🔄 [RAG Pipeline] Performing LLM-based reranking...');
@@ -248,7 +247,7 @@ export async function generateRAGAnswer(
 ): Promise<string> {
   // Get dynamic generation settings from database
   const genSettings = await getGenerationSettings();
-  const temperature = 0.1; // Strict temperature for precision
+  const temperature = genSettings.temperature ?? 0.3; 
   const maxTokens = genSettings.maxTokens ?? 1024;
 
   // Estimate model context window
@@ -274,25 +273,19 @@ export async function generateRAGAnswer(
     }
   }
 
-  console.log(`💬 Generating structured answer (Window: ${estimatedWindow}, Temp: ${temperature})...`);
+  console.log(`💬 Generating synthesized answer (Window: ${estimatedWindow}, Temp: ${temperature})...`);
 
   // Build structured messages
   const messages: { role: string; content: string }[] = [];
 
-  // 1. System Prompt with Chain-of-Thought instructions
-  let systemContent = `Eres un asistente experto en análisis técnico de documentos.
-Tu objetivo es proporcionar respuestas precisas y honestas basadas ÚNICAMENTE en el contexto proporcionado.
+  // 1. System Prompt with Enhanced Synthesis instructions
+  let systemContent = `Eres un analista técnico experto. Tu misión es sintetizar la información de múltiples documentos para responder preguntas de forma exhaustiva y precisa.
 
-## INSTRUCCIONES DE RAZONAMIENTO - Sigue este proceso mental internamente:
-PASO 1 (ANÁLISIS): Identifica qué partes de los documentos responden a la pregunta. Si no hay información, admítelo.
-PASO 2 (SÍNTESIS): Combina la información de forma lógica, citando siempre la fuente [Doc N].
-PASO 3 (RESPUESTA): Redacta una respuesta clara, técnica y directa.
-
-## REGLAS CRÍTICAS:
-- REGLA DE ORO: SI LA INFORMACIÓN NO ESTÁ EN LOS DOCUMENTOS, responde exactamente: "Lo siento, la información solicitada no se encuentra en los documentos disponibles."
-- NUNCA uses tu conocimiento previo para rellenar vacíos.
-- CITAS OBLIGATORIAS: Usa [Doc N] al final de cada dato extraído.
-- Si hay contradicciones entre documentos, menciónalas.
+## REGLAS DE ORO:
+1. SIEMPRE utiliza la información de los fragmentos proporcionados.
+2. Si la información no está, di: "Lo siento, la información solicitada no se encuentra en los documentos disponibles."
+3. CITA OBLIGATORIAS: Usa [Doc N] al final de cada dato relevante.
+4. NO copies y pegues directamente; explica y conecta los conceptos de forma profesional.
 
 ## CONTEXTO DE DOCUMENTOS:
 ${context || 'No hay documentos relevantes.'}`;
@@ -315,8 +308,8 @@ ${context || 'No hay documentos relevantes.'}`;
     });
   }
 
-  // 3. User Question with prompt for structured response
-  const finalPrompt = `Pregunta: ${query}\n\nAnaliza los documentos y responde siguiendo los 3 pasos (Análisis, Síntesis y Respuesta Final). Proporciona solo la respuesta bien estructurada.`;
+  // 3. User Question with emphasis on synthesis
+  const finalPrompt = `Pregunta del usuario: "${query}"\n\nInstrucción: Analiza todos los fragmentos proporcionados arriba y redacta una respuesta coherente y detallada que sintetice los puntos clave. Asegúrate de citar las fuentes [Doc N].`;
 
   messages.push({
     role: 'user',

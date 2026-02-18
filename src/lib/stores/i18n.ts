@@ -23,9 +23,22 @@ export const i18nStore = {
   /**
    * Initialize language from settings or browser
    */
-  async init() {
+  async function init() {
     try {
-      // First check DB
+      // 1. Check URL first (overrides everything)
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlLang = urlParams.get('lang');
+        if (urlLang && (urlLang === 'es' || urlLang === 'en')) {
+          languageSignal.value = urlLang as Language;
+          updateHtmlLang(urlLang as Language);
+          await setSetting('language', urlLang);
+          console.log('🗣️ Language loaded from URL:', urlLang);
+          return;
+        }
+      }
+
+      // 2. Check DB
       const storedLang = await getSetting('language');
       if (storedLang && (storedLang === 'es' || storedLang === 'en')) {
         languageSignal.value = storedLang;
@@ -34,7 +47,7 @@ export const i18nStore = {
         return;
       }
 
-      // If not in DB, use browser detection
+      // 3. If not in DB, use browser detection
       const browserLang = getBrowserLanguage();
       languageSignal.value = browserLang;
       console.log('🗣️ Language detected from browser:', browserLang);

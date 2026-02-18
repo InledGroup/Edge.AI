@@ -84,17 +84,11 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
-        navigateFallback: '/',
-        cleanupOutdatedCaches: true,
-        // Evitar cachear llamadas de desarrollo
-        navigateFallbackDenylist: [/^\/node_modules/],
       },
       devOptions: {
-        enabled: true, // Habilitar en desarrollo para pruebas de PWA
+        enabled: false,
         suppressWarnings: true,
-        type: 'module',
-        navigateFallbackAllowlist: [/^\//],
-      },
+      }
     })
   ],
   vite: {

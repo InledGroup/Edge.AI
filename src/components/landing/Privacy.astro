@@ -1,0 +1,264 @@
+---
+import { Shield, Lock, Eye, Server, Check } from "lucide-preact";
+
+const { translations = {} } = Astro.props;
+
+const privacyPoints = [
+  translations.point1 || 'No data sent to external servers',
+  translations.point2 || 'All processing happens locally',
+  translations.point3 || 'Your documents stay on your device',
+  translations.point4 || 'No tracking or analytics'
+];
+---
+
+<section id="privacy" class="privacy">
+  <div class="container">
+    <div class="privacy-content">
+      <div class="privacy-visual">
+        <div class="privacy-shield">
+          <Shield size={64} />
+        </div>
+        <div class="privacy-rings">
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+          <div class="ring ring-3"></div>
+        </div>
+      </div>
+      
+      <div class="privacy-text">
+        <span class="privacy-label">{translations.label || 'Privacy First'}</span>
+        <h2 class="privacy-title">
+          {translations.title || 'Your data stays'}
+          <span class="gradient-text">{translations.title2 || 'with you.'}</span>
+        </h2>
+        <p class="privacy-description">
+          {translations.description || 'Traditional AI services upload your data to their servers. Edge.AI is different. Everything runs 100% locally in your browser. Your documents, chats, and searches never leave your device.'}
+        </p>
+        
+        <ul class="privacy-list">
+          {privacyPoints.map(point => (
+            <li class="privacy-item">
+              <span class="privacy-check">
+                <Check size={14} />
+              </span>
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .privacy {
+    padding: 5rem 1rem;
+    background: var(--color-bg-secondary);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .privacy::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--color-border), transparent);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .privacy-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3rem;
+    align-items: center;
+  }
+
+  @media (min-width: 768px) {
+    .privacy-content {
+      grid-template-columns: 1fr 1.2fr;
+      gap: 4rem;
+    }
+  }
+
+  .privacy-visual {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+  }
+
+  .privacy-shield {
+    width: 140px;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(40, 229, 24, 0.1);
+    border: 2px solid var(--color-primary);
+    border-radius: 2rem;
+    color: var(--color-primary);
+    z-index: 2;
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(40, 229, 24, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(40, 229, 24, 0.5);
+    }
+  }
+
+  .privacy-rings {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ring {
+    position: absolute;
+    border: 1px solid var(--color-primary);
+    border-radius: 50%;
+    opacity: 0.3;
+    animation: expand 4s ease-out infinite;
+  }
+
+  .ring-1 {
+    width: 160px;
+    height: 160px;
+    animation-delay: 0s;
+  }
+
+  .ring-2 {
+    width: 220px;
+    height: 220px;
+    animation-delay: 1s;
+  }
+
+  .ring-3 {
+    width: 280px;
+    height: 280px;
+    animation-delay: 2s;
+  }
+
+  @keyframes expand {
+    0% {
+      transform: scale(0.8);
+      opacity: 0.5;
+    }
+    100% {
+      transform: scale(1.4);
+      opacity: 0;
+    }
+  }
+
+  .privacy-text {
+    text-align: center;
+  }
+
+  @media (min-width: 768px) {
+    .privacy-text {
+      text-align: left;
+    }
+  }
+
+  .privacy-label {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: rgba(40, 229, 24, 0.1);
+    border: 1px solid rgba(40, 229, 24, 0.3);
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.5rem;
+  }
+
+  .privacy-title {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  @media (min-width: 768px) {
+    .privacy-title {
+      font-size: 2.5rem;
+    }
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, var(--color-primary) 0%, #a3ff7a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .privacy-description {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+    margin-bottom: 2rem;
+  }
+
+  @media (min-width: 768px) {
+    .privacy-description {
+      font-size: 1.0625rem;
+    }
+  }
+
+  .privacy-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 768px) {
+    .privacy-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+  }
+
+  .privacy-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9375rem;
+    color: var(--color-text-secondary);
+  }
+
+  .privacy-check {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(40, 229, 24, 0.1);
+    border-radius: 50%;
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  @media (prefers-color-scheme: light) {
+    .privacy-title {
+      font-weight: 900;
+    }
+  }
+</style>

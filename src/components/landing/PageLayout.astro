@@ -1,0 +1,99 @@
+---
+import Navbar from './Navbar.astro';
+import Footer from './Footer.astro';
+
+const { lang = 'en', title = 'Models' } = Astro.props;
+
+const navTranslations = {
+  en: { features: 'Features', privacy: 'Privacy', apps: 'Integrations', cta: 'Open App' },
+  es: { features: 'Características', privacy: 'Privacidad', apps: 'Integraciones', cta: 'Abrir App' }
+};
+
+const footerTranslations = {
+  en: { tagline: 'AI that respects your privacy.', link1: 'Features', link2: 'Privacy', link3: 'Integrations', license: 'Open Source', made: 'Made with', made2: 'for privacy' },
+  es: { tagline: 'IA que respeta tu privacidad.', link1: 'Características', link2: 'Privacidad', link3: 'Integraciones', license: 'Código Abierto', made: 'Hecho con', made2: 'para la privacidad' }
+};
+
+const t = { nav: navTranslations[lang as keyof typeof navTranslations] || navTranslations.en, footer: footerTranslations[lang as keyof typeof footerTranslations] || footerTranslations.en };
+---
+
+<!doctype html>
+<html lang={lang} data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Edge.AI - 100% Local AI. Chat with your documents, search the web, and use powerful AI tools. Everything stays on your device." />
+  <title>{title} | Edge.AI</title>
+  <link rel="icon" type="image/png" href="/inledai.png" />
+  <style is:global>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  </style>
+</head>
+<body>
+  <Navbar currentLang={lang} translations={t.nav} />
+  <main>
+    <slot />
+  </main>
+  <Footer translations={t.footer} />
+</body>
+</html>
+
+<style is:global>
+  :root {
+    --color-primary: #28e518;
+    --color-primary-hover: #20b813;
+    --color-bg: #212121;
+    --color-bg-secondary: #2f2f2f;
+    --color-bg-tertiary: #3f3f3f;
+    --color-bg-hover: #4a4a4a;
+    --color-text: #ececec;
+    --color-text-secondary: #b4b4b4;
+    --color-text-tertiary: #8e8e8e;
+    --color-border: #3f3f3f;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --color-primary: #20b813;
+      --color-bg: #ffffff;
+      --color-bg-secondary: #f8f9fa;
+      --color-bg-tertiary: #f1f3f5;
+      --color-bg-hover: #e9ecef;
+      --color-text: #0a0a0a;
+      --color-text-secondary: #525252;
+      --color-text-tertiary: #a3a3a3;
+      --color-border: #e5e7eb;
+    }
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: #000;
+  }
+</style>

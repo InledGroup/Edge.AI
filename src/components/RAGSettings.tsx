@@ -213,7 +213,7 @@ export function RAGSettingsPopup() {
                 historyWeight: 0.5,
                 historyLimit: 10,
                 faithfulnessThreshold: 0.45,
-                temperature: 0.1,
+                temperature: 0.3,
                 maxTokens: 1024
               };
               const optimalRAG = {

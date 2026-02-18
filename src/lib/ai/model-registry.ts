@@ -254,6 +254,24 @@ export const MODEL_REGISTRY: ModelMetadata[] = [
   // CHAT MODELS - Large (3GB+)
   // ========================================================================
   {
+    id: 'alia-40b',
+    name: 'ALIA-40b-instruct-2601',
+    displayName: 'ALIA 40B (Potente)',
+    description: 'Modelo de 40 mil millones de parámetros. Alta capacidad de razonamiento y generación de texto.',
+    type: 'chat',
+    engine: 'wllama',
+    ggufUrl: 'https://huggingface.co/mradermacher/ALIA-40b-instruct-2601-i1-GGUF/resolve/main/ALIA-40b-instruct-2601.i1-Q4_0.gguf',
+    sizeGB: 24,
+    speed: 'slow',
+    quality: 'excellent',
+    quantization: 'q4',
+    minMemoryGB: 28,
+    preferredMemoryGB: 32,
+    requiresWebGPU: false,
+    contextSize: 8192,
+    tags: ['large', 'alia', 'powerful', 'reasoning']
+  },
+  {
     id: 'llama-3.2-3b',
     name: 'Llama-3.2-3B-Instruct',
     displayName: 'Llama 3.2 3B (Máxima Calidad)',
@@ -449,4 +467,10 @@ export function getEmbeddingModels(): ModelMetadata[] {
  */
 export function getModelsByTag(tag: string): ModelMetadata[] {
   return MODEL_REGISTRY.filter(m => m.tags.includes(tag));
+}
+
+const HIDDEN_MODELS = ['bge-reranker', 'bert-multilingual', 'lfm2-1.2b-tool', 'lfm-2-audio-1.5b', 'flan-t5-large'];
+
+export function getVisibleChatModels(): ModelMetadata[] {
+  return MODEL_REGISTRY.filter(m => m.type === 'chat' && !HIDDEN_MODELS.includes(m.id));
 }
