@@ -202,6 +202,7 @@ interface UIState {
   showSettings: boolean;
   showLiveMode: boolean;
   showRAGSettings: boolean;
+  showExportChatbot: boolean;
 }
 
 export const uiSignal = signal<UIState>({
@@ -209,7 +210,8 @@ export const uiSignal = signal<UIState>({
   theme: 'auto',
   showSettings: false,
   showLiveMode: false,
-  showRAGSettings: false
+  showRAGSettings: false,
+  showExportChatbot: false
 });
 
 export const uiStore = {
@@ -231,6 +233,10 @@ export const uiStore = {
 
   get showRAGSettings() {
     return uiSignal.value.showRAGSettings;
+  },
+
+  get showExportChatbot() {
+    return uiSignal.value.showExportChatbot;
   },
 
   toggleSidebar() {
@@ -267,6 +273,13 @@ export const uiStore = {
     uiSignal.value = {
       ...uiSignal.value,
       showRAGSettings: !uiSignal.value.showRAGSettings
+    };
+  },
+
+  toggleExportChatbot() {
+    uiSignal.value = {
+      ...uiSignal.value,
+      showExportChatbot: !uiSignal.value.showExportChatbot
     };
   }
 };

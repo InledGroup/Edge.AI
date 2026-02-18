@@ -11,6 +11,7 @@ import { FirstRunWizard } from './FirstRunWizard';
 import { ModelLoadingIndicator } from './ModelLoadingIndicator';
 import { ExtensionStatus } from './ExtensionStatus';
 import { RAGSettingsPopup } from './RAGSettings';
+import { ExportChatbotModal } from './ExportChatbotModal';
 import LiveMode from './chat/LiveMode';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
@@ -184,6 +185,9 @@ export function AppLayout() {
 
       {/* RAG Settings Global Popup */}
       <RAGSettingsPopup />
+
+      {/* Export Chatbot Modal */}
+      <ExportChatbotModal />
 
       {/* Mobile Warning Modal */}
       {showMobileWarning && (

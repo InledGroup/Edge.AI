@@ -19,7 +19,7 @@ class MCPManager {
   private tools: Map<string, MCPTool[]> = new Map();
   private static instance: MCPManager;
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): MCPManager {
     if (!MCPManager.instance) {
@@ -43,7 +43,7 @@ class MCPManager {
         localStorage.removeItem(`mcp_oauth_code_${server.id}`);
         await this.completeOAuth(server, code);
       }
-      
+
       await this.connect(server);
     }
   }
@@ -55,13 +55,13 @@ class MCPManager {
     try {
       console.log(`🔑 Completing OAuth for ${server.name}...`);
       const provider = new BrowserOAuthProvider(server);
-      
+
       // We use the SDK's auth function which handles the exchange if code is provided
       await auth(provider, {
         serverUrl: new URL(server.url),
         authorizationCode: code
       });
-      
+
       console.log(`✅ OAuth completed for ${server.name}`);
     } catch (error) {
       console.error(`❌ OAuth failed for ${server.name}:`, error);
@@ -79,23 +79,16 @@ class MCPManager {
       const provider = new BrowserOAuthProvider(server);
 
       if (server.transport === 'http') {
-        // SSEClientTransport is generally more compatible with existing MCP servers
-        // We attempt to pass the token in the URL if it exists in headers, 
-        // as browser EventSource does not support custom headers.
-        const url = new URL(server.url);
-        if (server.headers && server.headers['Authorization']) {
-          const auth = server.headers['Authorization'];
-          if (auth.startsWith('Bearer ')) {
-            url.searchParams.set('token', auth.substring(7));
-          }
-        }
-
-        transport = new SSEClientTransport(url, {
+        // Use StreamableHTTPClientTransport as it is the recommended modern transport 
+        // for HTTP-based MCP servers like Notion.
+        transport = new StreamableHTTPClientTransport(new URL(server.url), {
           requestInit: {
             headers: {
+              'Accept': 'application/json, text/event-stream',
               ...(server.headers || {})
             }
-          }
+          },
+          authProvider: provider
         });
       } else {
         transport = new WebSocketClientTransport(new URL(server.url));
@@ -105,14 +98,12 @@ class MCPManager {
         name: "edge-ai-client",
         version: "1.0.0",
       }, {
-        capabilities: {
-          tools: {},
-        }
+        capabilities: {}
       });
 
       await client.connect(transport);
       this.clients.set(server.id, client);
-      
+
       // Fetch tools
       const result = await client.listTools();
       const serverTools = result.tools.map(t => ({
@@ -125,14 +116,14 @@ class MCPManager {
       console.log(`✅ Connected to MCP server: ${server.name}`);
     } catch (error: any) {
       console.error(`❌ Failed to connect to MCP server ${server.name}:`, error);
-      
+
       let errorMessage = error.message;
       if (errorMessage.includes('404')) {
         errorMessage += ' (Check URL path)';
       } else if (errorMessage.includes('405')) {
         errorMessage += ' (Method Not Allowed - check if server requires WebSocket or URL is correct)';
       }
-      
+
       await updateMCPServerStatus(server.id, 'error', errorMessage);
     }
   }
@@ -160,7 +151,7 @@ class MCPManager {
    */
   async getTools(serverNameFilter?: string): Promise<MCPTool[]> {
     const allTools: MCPTool[] = [];
-    
+
     // Refresh tools if needed? For now assume static list after connect
     // Or we could re-fetch. Let's rely on cache for speed.
 
@@ -168,11 +159,11 @@ class MCPManager {
       // Find server config to check name
       // This is inefficient, we should store server name in map or look up
       // For now, we stored serverName in the tool object itself!
-      
-      const matchingTools = serverNameFilter 
+
+      const matchingTools = serverNameFilter
         ? tools.filter(t => t.serverName.toLowerCase() === serverNameFilter.toLowerCase())
         : tools;
-        
+
       allTools.push(...matchingTools);
     }
 
@@ -191,9 +182,9 @@ class MCPManager {
     // We need to map serverName -> serverId -> client
     // Since we don't have that map handy, let's look up servers from DB or store metadata
     // We'll search active clients
-    
+
     // Optimization: Store serverName -> clientId mapping
-    
+
     // For now, iterate
     for (const [clientId, tools] of this.tools.entries()) {
       if (tools.length > 0 && tools[0].serverName === serverName) {

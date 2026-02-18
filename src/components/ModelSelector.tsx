@@ -1,394 +1,156 @@
-// ModelSelector Island - Select and load AI models
+// ModelSelector - Selector de modelos de IA
 
-import { useState, useEffect } from 'preact/hooks';
-import { signal } from '@preact/signals';
-import { Button } from './ui/Button';
-import { Card } from './ui/Card';
-import { ProgressBar } from './ui/ProgressBar';
-import { modelsStore, modelsReady } from '@/lib/stores';
-import { Check, X, CheckCircle2, Cpu, Zap } from 'lucide-preact';
-import { probeActualLimits } from '@/lib/ai/gpu-limits';
-import { selectOptimalModel } from '@/lib/ai/model-selector';
-import { WebLLMEngine } from '@/lib/ai/webllm-engine';
-import { WllamaEngine } from '@/lib/ai/wllama-engine';
-import EngineManager from '@/lib/ai/engine-manager';
-import { i18nStore } from '@/lib/stores/i18n';
+import { Cpu, Zap, Trophy, AlertCircle } from 'lucide-preact';
 
-interface LoadingState {
-  progress: number;
-  message: string;
+interface ModelOption {
+  id: string;
+  name: string;
+  size: string;
+  description: string;
+  bestFor: string;
+  tier: 'entry' | 'balanced' | 'performance';
 }
 
-const chatLoadingState = signal<LoadingState | null>(null);
-const embeddingLoadingState = signal<LoadingState | null>(null);
-const capabilities = signal<{
-  hasWebGPU: boolean;
-  memoryGB: number;
-  gpuTier?: string;
-} | null>(null);
+const models: ModelOption[] = [
+  {
+    id: 'SmolLM2-135M-Instruct-q0f16-MLC',
+    name: 'SmolLM2 135M',
+    size: '~135 MB',
+    description: 'El modelo más pequeño y rápido. Ideal para dispositivos móviles o con recursos limitados.',
+    bestFor: 'Máxima velocidad',
+    tier: 'entry',
+  },
+  {
+    id: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
+    name: 'SmolLM2 360M',
+    size: '~200 MB',
+    description: 'Balance excelente entre tamaño y calidad. Funciona bien en la mayoría de dispositivos.',
+    bestFor: 'Dispositivos móviles',
+    tier: 'entry',
+  },
+  {
+    id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
+    name: 'Qwen 2.5 0.5B',
+    size: '~350 MB',
+    description: 'Modelo ligero con buen rendimiento. Recomendado para la mayoría de casos de uso.',
+    bestFor: 'Uso general (Recomendado)',
+    tier: 'balanced',
+  },
+  {
+    id: 'TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC',
+    name: 'TinyLlama 1.1B',
+    size: '~550 MB',
+    description: 'Modelo intermedio con mejor capacidad de razonamiento.',
+    bestFor: 'Razonamiento básico',
+    tier: 'balanced',
+  },
+  {
+    id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+    name: 'Llama 3.2 1B',
+    size: '~700 MB',
+    description: 'Excelente balance entre calidad y rendimiento. Muy buena comprensión.',
+    bestFor: 'Calidad/rendimiento',
+    tier: 'balanced',
+  },
+  {
+    id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',
+    name: 'Phi-3.5 Mini',
+    size: '~1.9 GB',
+    description: 'Modelo más potente. Requiere más recursos pero ofrece la mejor calidad.',
+    bestFor: 'Máxima calidad',
+    tier: 'performance',
+  },
+];
 
-/**
- * Convert MLC model name to GGUF model URL for Wllama
- * Maps WebLLM model names to their GGUF equivalents
- */
-function convertToGGUFModel(mlcModelName: string): string {
-  // Map of MLC models to GGUF URLs
-  const modelMap: Record<string, string> = {
-    // SmolLM2 models
-    'SmolLM2-135M-Instruct-q0f16-MLC':
-      'https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct-GGUF/resolve/main/smollm2-135m-instruct-q4_k_m.gguf',
-    'SmolLM2-360M-Instruct-q4f16_1-MLC':
-      'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf',
-
-    // Qwen models
-    'Qwen2.5-0.5B-Instruct-q4f16_1-MLC':
-      'https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf',
-    'Qwen2.5-1.5B-Instruct-q4f16_1-MLC':
-      'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
-
-    // TinyLlama
-    'TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC':
-      'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf',
-
-    // Llama models
-    'Llama-3.2-1B-Instruct-q4f16_1-MLC':
-      'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
-    'Llama-3.2-3B-Instruct-q4f16_1-MLC':
-      'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-
-    // Phi models
-    'Phi-3.5-mini-instruct-q4f16_1-MLC':
-      'https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf',
-  };
-
-  // If we have a direct mapping, use it
-  if (modelMap[mlcModelName]) {
-    return modelMap[mlcModelName];
-  }
-
-  // Default fallback: Qwen2-0.5B (smallest, fastest)
-  console.warn(`⚠️ No GGUF mapping for ${mlcModelName}, using default Qwen2-0.5B`);
-  return 'https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_k_m.gguf';
+interface ModelSelectorProps {
+  selectedModel: string;
+  onSelect: (modelId: string) => void;
 }
 
-export function ModelSelector() {
-  const [initialized, setInitialized] = useState(false);
-  const [autoLoadAttempted, setAutoLoadAttempted] = useState(false);
-
-  useEffect(() => {
-    detectCapabilities();
-    setInitialized(true);
-  }, []);
-
-  // Auto-load models after capabilities are detected
-  useEffect(() => {
-    if (initialized && capabilities.value && !autoLoadAttempted) {
-      setAutoLoadAttempted(true);
-      console.log('🚀 Auto-loading models...');
-
-      // Load models sequentially to avoid OPFS access handle conflicts
-      (async () => {
-        try {
-          await loadChatModel();
-          await loadEmbeddingModel();
-        } catch (err) {
-          console.error('Failed to auto-load models:', err);
-        }
-      })();
-    }
-  }, [initialized, capabilities.value, autoLoadAttempted]);
-
-  async function detectCapabilities() {
-    try {
-      const gpuLimits = await probeActualLimits();
-      const hasWebGPU = gpuLimits !== null;
-
-      // Estimate available memory (rough)
-      const memoryGB = (navigator as any).deviceMemory || 4;
-
-      capabilities.value = {
-        hasWebGPU,
-        memoryGB,
-        gpuTier: gpuLimits?.tier
-      };
-
-      console.log('💻 Capabilities:', capabilities.value);
-    } catch (error) {
-      console.error('Failed to detect capabilities:', error);
-      capabilities.value = {
-        hasWebGPU: false,
-        memoryGB: 4
-      };
-    }
-  }
-
-  async function loadChatModel() {
-    if (!capabilities.value) {
-      alert('Capabilities not detected yet');
-      return;
-    }
-
-    try {
-      modelsStore.setChatLoading(true);
-      chatLoadingState.value = { progress: 0, message: i18nStore.t('models.initializing') };
-
-      // Get recommended model
-      const recommended = selectOptimalModel(
-        capabilities.value.memoryGB,
-        capabilities.value.hasWebGPU,
-        null // TODO: pass GPU config
-      );
-
-      console.log('🎯 Recommended chat model:', recommended);
-
-      // CRITICAL: Choose engine based on WebGPU availability
-      let engine: WebLLMEngine | WllamaEngine;
-      let engineName: string;
-      let modelUrl: string;
-
-      if (capabilities.value.hasWebGPU) {
-        // Use WebLLM with GPU
-        console.log('🚀 Using WebLLM (GPU acceleration)');
-        try {
-          engine = new WebLLMEngine();
-          engineName = 'webllm';
-          modelUrl = recommended.modelName;
-
-          await engine.initialize(modelUrl, (progress, status) => {
-            chatLoadingState.value = { progress, message: status };
-          });
-        } catch (webLlmError) {
-          console.warn('⚠️ WebLLM initialization failed, trying fallback to Wllama:', webLlmError);
-          
-          // Fallback to Wllama
-          chatLoadingState.value = { progress: 0, message: i18nStore.t('wizard.webGpuFallback') };
-          
-          engine = new WllamaEngine();
-          engineName = 'wllama';
-          modelUrl = convertToGGUFModel(recommended.modelName);
-          
-          await engine.initialize(modelUrl, (progress, status) => {
-            chatLoadingState.value = { progress, message: status };
-          });
-        }
-      } else {
-        // Use Wllama with CPU (no WebGPU)
-        console.log('🚀 Using Wllama (CPU, no WebGPU available)');
-        engine = new WllamaEngine();
-        engineName = 'wllama';
-
-        // Convert MLC model name to GGUF URL
-        modelUrl = convertToGGUFModel(recommended.modelName);
-        console.log(`📦 Loading GGUF model: ${modelUrl}`);
-
-        await engine.initialize(modelUrl, (progress, status) => {
-          chatLoadingState.value = { progress, message: status };
-        });
-      }
-
-      // Register engine instance in global manager
-      EngineManager.setChatEngine(engine, recommended.modelName);
-
-      modelsStore.setChatModel({
-        id: recommended.modelName,
-        name: recommended.displayName,
-        type: 'chat',
-        engine: engineName,
-        contextSize: 2048,
-        requiresGPU: capabilities.value.hasWebGPU,
-        sizeGB: parseFloat(recommended.size) / 1000
-      });
-
-      chatLoadingState.value = null;
-      console.log('✅ Chat model loaded');
-    } catch (error) {
-      console.error('❌ Failed to load chat model:', error);
-      alert(`Error loading model: ${error}`);
-      chatLoadingState.value = null;
-    } finally {
-      modelsStore.setChatLoading(false);
-    }
-  }
-
-  async function loadEmbeddingModel() {
-    try {
-      modelsStore.setEmbeddingLoading(true);
-      embeddingLoadingState.value = { progress: 0, message: i18nStore.t('models.initializing') };
-
-      const engine = new WllamaEngine();
-
-      // Use default small model for embeddings
-      await engine.initialize(undefined, (progress, status) => {
-        embeddingLoadingState.value = { progress, message: status };
-      });
-
-      // Register engine instance in global manager
-      EngineManager.setEmbeddingEngine(engine, 'qwen2-0.5b-embed');
-
-      modelsStore.setEmbeddingModel({
-        id: 'qwen2-0.5b-embed',
-        name: 'Qwen2 0.5B (Embeddings)',
-        type: 'embedding',
-        engine: 'wllama',
-        contextSize: 2048,
-        requiresGPU: false,
-        sizeGB: 0.35
-      });
-
-      embeddingLoadingState.value = null;
-      console.log('✅ Embedding model loaded');
-    } catch (error) {
-      console.error('❌ Failed to load embedding model:', error);
-      alert(`Error loading embedding model: ${error}`);
-      embeddingLoadingState.value = null;
-    } finally {
-      modelsStore.setEmbeddingLoading(false);
-    }
-  }
-
-  if (!initialized) {
-    return (
-      <Card>
-        <div className="text-center py-8">
-          <div className="spinner text-[var(--color-primary)] mx-auto mb-2" />
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {i18nStore.t('models.detecting')}
-          </p>
-        </div>
-      </Card>
-    );
-  }
-
+export function ModelSelector({ selectedModel, onSelect }: ModelSelectorProps) {
   return (
-    <Card>
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold mb-2">{i18nStore.t('models.title')}</h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {i18nStore.t('models.subtitle')}
+    <div class="space-y-4">
+      {/* Info Box */}
+      <div class="p-4 bg-blue-900/20 border border-blue-800 rounded-lg flex items-start gap-3 mb-6">
+        <AlertCircle size={20} class="text-blue-400 flex-shrink-0 mt-0.5" />
+        <div class="text-sm text-blue-200">
+          <p class="font-semibold mb-1">El modelo se ejecuta 100% en el navegador</p>
+          <p>
+            La primera vez que un visitante use el chatbot, el modelo se descargará y cacheará. 
+            Las siguientes veces cargará instantáneamente.
           </p>
         </div>
-
-        {/* Capabilities Info */}
-        {capabilities.value && (
-          <div className="text-xs text-[var(--color-text-tertiary)] space-y-1">
-            <div className="flex items-center gap-1.5">
-              {capabilities.value.hasWebGPU ? (
-                <Zap size={12} className="text-amber-400" />
-              ) : (
-                <Cpu size={12} />
-              )}
-              {capabilities.value.hasWebGPU ? i18nStore.t('models.webGpuAvailable') : i18nStore.t('models.cpuOnly')}
-            </div>
-            {capabilities.value.gpuTier && (
-              <div>Tier: {capabilities.value.gpuTier}</div>
-            )}
-            <div>{i18nStore.t('models.memory')}: ~{capabilities.value.memoryGB}GB</div>
-          </div>
-        )}
-
-        {/* Chat Model */}
-        <div className="border-t border-[var(--color-border)] pt-4">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h4 className="font-medium">{i18nStore.t('models.chatModel')}</h4>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                {i18nStore.t('models.chatSubtitle')}
-              </p>
-            </div>
-            <div>
-              {modelsStore.chat ? (
-                <span className="text-sm text-[var(--color-success)] font-medium">
-                  ✓ {i18nStore.t('models.loaded')}
-                </span>
-              ) : (
-                <Button
-                  onClick={loadChatModel}
-                  loading={modelsStore.chatLoading}
-                  disabled={modelsStore.chatLoading}
-                  size="sm"
-                >
-                  {i18nStore.t('models.load')}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {chatLoadingState.value && (
-            <ProgressBar
-              progress={chatLoadingState.value.progress}
-              label={chatLoadingState.value.message}
-              size="sm"
-            />
-          )}
-
-          {modelsStore.chat && (
-            <div className="mt-2 text-xs text-[var(--color-text-tertiary)]">
-              {(() => {
-                const key = `modelRegistry.${modelsStore.chat.id}.name`;
-                const translation = i18nStore.t(key);
-                return translation !== key ? translation : modelsStore.chat.name;
-              })()} ({modelsStore.chat.engine})
-            </div>
-          )}
-        </div>
-
-        {/* Embedding Model */}
-        <div className="border-t border-[var(--color-border)] pt-4">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h4 className="font-medium">{i18nStore.t('models.embeddingModel')}</h4>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                {i18nStore.t('models.embeddingSubtitle')}
-              </p>
-            </div>
-            <div>
-              {modelsStore.embedding ? (
-                <span className="text-sm text-[var(--color-success)] font-medium">
-                  ✓ {i18nStore.t('models.loaded')}
-                </span>
-              ) : (
-                <Button
-                  onClick={loadEmbeddingModel}
-                  loading={modelsStore.embeddingLoading}
-                  disabled={modelsStore.embeddingLoading}
-                  size="sm"
-                >
-                  {i18nStore.t('models.load')}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {embeddingLoadingState.value && (
-            <ProgressBar
-              progress={embeddingLoadingState.value.progress}
-              label={embeddingLoadingState.value.message}
-              size="sm"
-            />
-          )}
-
-          {modelsStore.embedding && (
-            <div className="mt-2 text-xs text-[var(--color-text-tertiary)]">
-              {(() => {
-                const key = `modelRegistry.${modelsStore.embedding.id}.name`;
-                const translation = i18nStore.t(key);
-                return translation !== key ? translation : modelsStore.embedding.name;
-              })()} ({modelsStore.embedding.engine})
-            </div>
-          )}
-        </div>
-
-        {/* Status Summary */}
-        {modelsReady.value && (
-          <div className="bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 rounded-lg p-3 flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-[var(--color-success)]" />
-            <p className="text-sm text-[var(--color-success)] font-medium">
-              {i18nStore.t('models.allReady')}
-            </p>
-          </div>
-        )}
       </div>
-    </Card>
+
+      {/* Model Cards */}
+      <div class="grid gap-4">
+        {models.map((model) => {
+          const isSelected = selectedModel === model.id;
+          
+          return (
+            <div
+              key={model.id}
+              onClick={() => onSelect(model.id)}
+              class={`
+                relative p-5 rounded-xl border-2 cursor-pointer transition-all duration-200
+                ${isSelected
+                  ? 'border-[var(--inled-green)] bg-[var(--inled-green)]/10'
+                  : 'border-gray-700 bg-gray-800/50 hover:border-gray-500'
+                }
+              `}
+            >
+              {isSelected && (
+                <div class="absolute top-3 right-3 text-[var(--inled-green)]">
+                  <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+              )}
+              
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-2">
+                    <h3 class="text-lg font-bold text-white">{model.name}</h3>
+                    {model.tier === 'balanced' && (
+                      <span class="px-2 py-0.5 bg-[var(--inled-green)] text-black text-xs font-semibold rounded-full">
+                        Recomendado
+                      </span>
+                    )}
+                    {model.tier === 'performance' && (
+                      <span class="px-2 py-0.5 bg-purple-600 text-white text-xs font-semibold rounded-full flex items-center gap-1">
+                        <Trophy size={12} />
+                        Premium
+                      </span>
+                    )}
+                  </div>
+                  
+                  <p class="text-sm text-gray-400 mb-3">{model.description}</p>
+                  
+                  <div class="flex items-center gap-4 text-xs">
+                    <div class="flex items-center gap-1 text-gray-500">
+                      <Cpu size={14} />
+                      <span>{model.size}</span>
+                    </div>
+                    <div class="flex items-center gap-1 text-gray-500">
+                      <Zap size={14} />
+                      <span>{model.bestFor}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Technical Note */}
+      <div class="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+        <p class="text-xs text-gray-400">
+          <strong class="text-gray-300">Nota técnica:</strong> Todos los modelos usan cuantización Q4_K_M 
+          (4-bit) para optimizar el tamaño sin perder mucha calidad. El modelo seleccionado se incluirá 
+          en el HTML exportado y se ejecutará completamente en el navegador del visitante.
+        </p>
+      </div>
+    </div>
   );
 }
