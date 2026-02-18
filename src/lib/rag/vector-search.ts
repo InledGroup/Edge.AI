@@ -101,18 +101,6 @@ export async function searchSimilarChunks(
 
   const retrievedChunks = Array.from(chunksMap.values());
 
-  // === SMALL-TO-BIG: Fetch surrounding context for top candidates ===
-  const windowSize = config?.chunkWindowSize ?? 1;
-  console.log(`🪟 [Hybrid Search] Applying Context Window Size: +${windowSize}`);
-  for (const rc of retrievedChunks) {
-    const surrounding = await getSurroundingChunks(rc.chunk.documentId, rc.chunk.index, windowSize);
-    const expandedContent = surrounding.map(c => c.content).join('\n\n');
-    rc.chunk.metadata = {
-      ...rc.chunk.metadata,
-      expandedContext: expandedContent
-    };
-  }
-
   // === SEMANTIC SEARCH ===
   const semanticScores = new Map<string, number>();
   embeddings.forEach(embedding => {
@@ -157,63 +145,63 @@ export async function searchSimilarChunks(
   let lexicalWeight = config?.lexicalWeight ?? 0.3;
   let minRelevance = config?.minRelevance;
 
-  // Dynamic weight adjustment for specific entity queries
-  // If query is short (< 6 words) and has capitalized words (potential entities), boost lexical search
-  if (query && query.split(/\s+/).length < 6 && /[A-ZÁÉÍÓÚÑ]/.test(query)) {
-    console.log('⚡ [Hybrid Search] Detected specific entity query. Boosting lexical search.');
-    semanticWeight = 0.5;
-    lexicalWeight = 0.5;
-    // Relax min relevance slightly for entity searches as embeddings might be less precise
-    if (minRelevance) minRelevance = Math.max(0.1, minRelevance - 0.1); 
-  }
-
   retrievedChunks.forEach(rc => {
     const semanticScore = semanticScores.get(rc.chunk.id) || 0;
     const lexicalScore = lexicalScores.get(rc.chunk.id) || 0;
-
-    // Hybrid score: weighted combination
     rc.score = (semanticWeight * semanticScore) + (lexicalWeight * lexicalScore);
   });
 
-  // Sort by hybrid score
+  // Sort and take top candidates for expensive operations
   retrievedChunks.sort((a, b) => b.score - a.score);
+  
+  // Take more candidates initially to allow for reranking
+  let topCandidates = retrievedChunks.slice(0, Math.max(topK * 3, 15));
+
+  // === SMALL-TO-BIG: Fetch surrounding context ONLY for top candidates ===
+  const windowSize = config?.chunkWindowSize ?? 1;
+  console.log(`🪟 [Hybrid Search] Expanding context for ${topCandidates.length} candidates (Window: +${windowSize})`);
+  
+  for (const rc of topCandidates) {
+    try {
+      const surrounding = await getSurroundingChunks(rc.chunk.documentId, rc.chunk.index, windowSize);
+      const expandedContent = surrounding.map(c => c.content).join('\n\n');
+      rc.chunk.metadata = {
+        ...rc.chunk.metadata,
+        expandedContext: expandedContent
+      };
+    } catch (err) {
+      console.warn(`⚠️ Failed to fetch context for chunk ${rc.chunk.id}`);
+    }
+  }
 
   // === LEARNING: Apply user feedback boosts ===
-  const boosts = await getChunkBoosts(retrievedChunks.slice(0, topK * 5).map(rc => rc.chunk.id));
-  retrievedChunks.forEach(rc => {
+  const boosts = await getChunkBoosts(topCandidates.map(rc => rc.chunk.id));
+  topCandidates.forEach(rc => {
     const boost = boosts.get(rc.chunk.id) || 1.0;
     rc.score *= boost;
   });
   
   // Re-sort after boosts
   if (boosts.size > 0) {
-    retrievedChunks.sort((a, b) => b.score - a.score);
+    topCandidates.sort((a, b) => b.score - a.score);
   }
-
-  // Take top K before reranking
-  let topResults = retrievedChunks.slice(0, topK * 3); // Get 3x for reranking to have more candidates
 
   // === RERANKING ===
+  let rerankedResults = topCandidates;
   if (config?.useReranking !== false && query) {
-    topResults = rerankResults(topResults, query);
+    rerankedResults = rerankResults(topCandidates, query);
   }
 
-  // Filter by minimum relevance if provided
+  // Filter by minimum relevance
   if (minRelevance) {
-    const minScore = minRelevance;
-    topResults = topResults.filter(r => r.score >= minScore);
-    console.log(`🧹 Filtered ${retrievedChunks.length - topResults.length} chunks below threshold ${minScore}`);
+    rerankedResults = rerankedResults.filter(r => r.score >= minRelevance);
   }
 
   // Final top K
-  const finalResults = topResults.slice(0, topK);
+  const finalResults = rerankedResults.slice(0, topK);
 
   const searchTime = Date.now() - startTime;
   console.log(`✅ [Hybrid Search] Found ${finalResults.length} chunks in ${searchTime}ms`);
-
-  if (finalResults.length > 0) {
-    console.log(`📊 Top score: ${(finalResults[0].score * 100).toFixed(1)}%, lowest: ${(finalResults[finalResults.length - 1].score * 100).toFixed(1)}%`);
-  }
 
   return finalResults;
 }
@@ -249,24 +237,16 @@ export function reciprocalRankFusion(
 /**
  * Reorder chunks to solve 'Lost in the Middle' problem
  * Places most relevant chunks at the beginning and end of the prompt
+ * Resulting order: [1, 3, 5, ..., 6, 4, 2]
  */
 export function reorderForLostInTheMiddle(chunks: RetrievedChunk[]): RetrievedChunk[] {
   if (chunks.length <= 2) return chunks;
 
-  const reordered: RetrievedChunk[] = [];
-  const sorted = [...chunks]; // Already sorted by relevance desc
-
-  let left = true;
-  while (sorted.length > 0) {
-    if (left) {
-      reordered.push(sorted.shift()!);
-    } else {
-      reordered.push(sorted.pop()!);
-    }
-    left = !left;
-  }
-
-  return reordered;
+  const evens = chunks.filter((_, i) => i % 2 === 0);
+  const odds = chunks.filter((_, i) => i % 2 !== 0);
+  
+  // Place even-indexed chunks at the start and reversed odd-indexed chunks at the end
+  return [...evens, ...odds.reverse()];
 }
 
 /**
@@ -379,31 +359,27 @@ export function rerankResults(
 
     if (queryTokens.size > 0) {
       const overlapRatio = overlapCount / queryTokens.size;
-      rerankScore *= (1 + overlapRatio * 0.4); // Increased to 40% bonus for high overlap
+      rerankScore *= (1 + overlapRatio * 0.15); // Restored to 15% bonus
     }
 
     // === EXACT PHRASE MATCH ===
-    // Significant bonus if the chunk contains the exact query phrase
     if (chunkContentLower.includes(query.toLowerCase())) {
-        rerankScore *= 1.5; // 50% bonus for exact phrase match
+        rerankScore *= 1.2; // Reduced to 20% bonus
     } else {
         // === PARTIAL PHRASE / PROXIMITY ===
-        // If exact match fails, check if significant subsets of the query appear
-        // e.g. "Inled Group" in "qué es Inled Group"
         for (let i = 0; i < queryTerms.length - 1; i++) {
             const bigram = `${queryTerms[i]} ${queryTerms[i+1]}`;
             if (chunkContentLower.includes(bigram)) {
-                rerankScore *= 1.2; // 20% bonus for bigram match
-                break; // Apply once
+                rerankScore *= 1.1; // 10% bonus for bigram match
+                break;
             }
         }
     }
 
     // === CHUNK QUALITY ===
-    // Longer chunks with context are often better
     const hasContext = chunk.chunk.metadata?.expandedContext || chunk.chunk.metadata?.prevContext;
     if (hasContext) {
-      rerankScore *= 1.1; // 10% bonus for contextual chunks
+      rerankScore *= 1.05; // Restored to 5% bonus
     }
 
     return {
@@ -418,8 +394,9 @@ export function rerankResults(
 
   console.log(`✅ [Reranking] Complete. Score changes:`);
   reranked.slice(0, 3).forEach((chunk, i) => {
-    const change = ((chunk.score / (chunk.originalScore || chunk.score) - 1) * 100).toFixed(1);
-    console.log(`  ${i + 1}. ${chunk.document.name.substring(0, 30)} (${change > 0 ? '+' : ''}${change}%)`);
+    const rawChange = ((chunk.score / (chunk.originalScore || chunk.score) - 1) * 100);
+    const changeStr = rawChange.toFixed(1);
+    console.log(`  ${i + 1}. ${chunk.document.name.substring(0, 30)} (${rawChange > 0 ? '+' : ''}${changeStr}%)`);
   });
 
   return reranked;

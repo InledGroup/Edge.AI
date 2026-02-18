@@ -206,7 +206,41 @@ export function RAGSettingsPopup() {
           </div>
         )}
 
-        <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex justify-end">
+        <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex justify-between items-center">
+          <Button 
+            onClick={async () => {
+              const optimalGen = {
+                historyWeight: 0.5,
+                historyLimit: 10,
+                faithfulnessThreshold: 0.45,
+                temperature: 0.1,
+                maxTokens: 1024
+              };
+              const optimalRAG = {
+                topK: 7,
+                chunkWindowSize: 2
+              };
+              
+              setLoading(true);
+              await Promise.all([
+                updateGenerationSettings(optimalGen),
+                updateRAGSettings(optimalRAG)
+              ]);
+              
+              setHistoryWeight(optimalGen.historyWeight);
+              setHistoryLimit(optimalGen.historyLimit);
+              setFaithfulnessThreshold(optimalGen.faithfulnessThreshold);
+              setTemperature(optimalGen.temperature);
+              setChunkWindowSize(optimalRAG.chunkWindowSize);
+              setTopK(optimalRAG.topK);
+              setLoading(false);
+            }} 
+            variant="ghost" 
+            size="sm"
+            className="text-[10px] text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10"
+          >
+            Configuración Óptima
+          </Button>
           <Button onClick={() => uiStore.toggleRAGSettings()} variant="primary" size="sm">
             Guardar y Cerrar
           </Button>

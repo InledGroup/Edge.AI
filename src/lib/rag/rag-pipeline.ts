@@ -169,12 +169,12 @@ export async function queryWithRAG(
       queryEmbedding,
       topK + 10, // Fetch more for RRF and Reranking
       documentIds,
-      searchQuery,
+      q, // Use expanded query for BM25 as well
       {
-        semanticWeight: 0.85,
-        lexicalWeight: 0.15,
+        semanticWeight: 0.8,
+        lexicalWeight: 0.2,
         useReranking: true,
-        minRelevance: 0.2,
+        minRelevance: 0.15,
         chunkWindowSize: options?.chunkWindowSize
       } as any
     );
@@ -185,6 +185,44 @@ export async function queryWithRAG(
   let combinedChunks = queries.length > 1 
     ? reciprocalRankFusion(resultLists) 
     : resultLists[0];
+
+  // 4. Optional: LLM-Based Reranking (Listwise)
+  // This significantly improves precision by having the LLM judge the top candidates
+  if (chatEngine && combinedChunks.length > 1) {
+    try {
+      console.log('🔄 [RAG Pipeline] Performing LLM-based reranking...');
+      const candidates = combinedChunks.slice(0, 10);
+      const candidatesText = candidates.map((c, i) => `[ID ${i}]: ${c.chunk.content.substring(0, 300)}...`).join('\n\n');
+      
+      const rerankPrompt = `Dados estos fragmentos de documentos, ordénalos de más relevante a menos relevante para responder a la pregunta: "${query}". 
+Responde ÚNICAMENTE con los IDs separados por comas, del más al menos relevante.
+Ejemplo: 3, 0, 2, 1
+
+FRAGMENTOS:
+${candidatesText}`;
+
+      const rerankOrder = await chatEngine.generateText([{ role: 'user', content: rerankPrompt }], { 
+        maxTokens: 50,
+        temperature: 0.1 
+      });
+      
+      const orderIds = rerankOrder
+        .split(/[,\s]+/)
+        .map(s => parseInt(s.replace(/[^0-9]/g, '')))
+        .filter(n => !isNaN(n) && n >= 0 && n < candidates.length);
+      
+      if (orderIds.length > 0) {
+        const reranked = orderIds.map(idx => candidates[idx]).filter(Boolean);
+        // Add remaining candidates and then the rest of the chunks
+        const rerankedIds = new Set(orderIds);
+        const remainingCandidates = candidates.filter((_, i) => !rerankedIds.has(i));
+        combinedChunks = [...reranked, ...remainingCandidates, ...combinedChunks.slice(10)];
+        console.log(`✅ [RAG Pipeline] LLM Reranking complete. Best chunk ID: ${orderIds[0]}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ [RAG Pipeline] LLM Reranking failed, using original order');
+    }
+  }
 
   const searchTime = Date.now() - startTime;
 
@@ -198,6 +236,7 @@ export async function queryWithRAG(
 
 /**
  * Generate answer using RAG context
+ * RESTAURADO: Estructura de razonamiento Chain-of-Thought (CoT) de alta precisión
  */
 export async function generateRAGAnswer(
   query: string,
@@ -207,34 +246,59 @@ export async function generateRAGAnswer(
   onStream?: (chunk: string) => void,
   additionalContext?: string
 ): Promise<string> {
-  // Get dynamic generation settings
+  // Get dynamic generation settings from database
   const genSettings = await getGenerationSettings();
-  const temperature = genSettings.temperature ?? 0.1;
+  const temperature = 0.1; // Strict temperature for precision
   const maxTokens = genSettings.maxTokens ?? 1024;
 
-  // Create context from retrieved chunks (already reordered for Lost in the Middle)
-  const context = createRAGContext(ragResult.chunks);
+  // Estimate model context window
+  const engineLimit = (chatEngine as any).getContextWindowSize?.() || 4096;
+  const estimatedWindow = engineLimit; 
+  const safetyMargin = Math.min(600, Math.floor(estimatedWindow * 0.2));
+  const maxPromptTokens = estimatedWindow - maxTokens - safetyMargin;
+  
+  // 1 token ≈ 3 chars (very conservative for technical/CoT prompts)
+  const maxPromptChars = maxPromptTokens * 3; 
 
-  console.log(`💬 Generating answer with context (Temp: ${temperature})...`);
+  // Create context from retrieved chunks
+  let contextChunks = [...ragResult.chunks];
+  let context = createRAGContext(contextChunks);
+
+  // Dynamic truncation
+  if (context.length > maxPromptChars) {
+    console.warn(`⚠️ [RAG Pipeline] Truncating context for CoT...`);
+    while (context.length > maxPromptChars && contextChunks.length > 1) {
+      const middleIndex = Math.floor(contextChunks.length / 2);
+      contextChunks.splice(middleIndex, 1);
+      context = createRAGContext(contextChunks);
+    }
+  }
+
+  console.log(`💬 Generating structured answer (Window: ${estimatedWindow}, Temp: ${temperature})...`);
 
   // Build structured messages
   const messages: { role: string; content: string }[] = [];
 
-  // 1. System Prompt with Context - ULTRA-STRICT VERSION
-  let systemContent = `Eres un asistente de IA experto cuya ÚNICA fuente de información son los fragmentos de documentos proporcionados a continuación.
+  // 1. System Prompt with Chain-of-Thought instructions
+  let systemContent = `Eres un asistente experto en análisis técnico de documentos.
+Tu objetivo es proporcionar respuestas precisas y honestas basadas ÚNICAMENTE en el contexto proporcionado.
 
-REGLAS CRÍTICAS PARA EVITAR ALUCINACIONES:
-1. SI LA RESPUESTA NO ESTÁ EN EL TEXTO DE ABAJO, responde exactamente: "Lo siento, la información solicitada no se encuentra en los documentos disponibles."
-2. NO utilices tu conocimiento previo para rellenar huecos. Si el documento no lo dice, tú no lo sabes.
-3. NO hagas suposiciones sobre marcas, empresas o datos técnicos no explícitos.
-4. Si el documento menciona el tema pero no el detalle específico, di claramente qué es lo que sí se sabe y qué falta.
-5. Cita siempre la fuente usando [Doc N] al final de cada dato extraído.
+## INSTRUCCIONES DE RAZONAMIENTO - Sigue este proceso mental internamente:
+PASO 1 (ANÁLISIS): Identifica qué partes de los documentos responden a la pregunta. Si no hay información, admítelo.
+PASO 2 (SÍNTESIS): Combina la información de forma lógica, citando siempre la fuente [Doc N].
+PASO 3 (RESPUESTA): Redacta una respuesta clara, técnica y directa.
 
-## CONTEXTO DE DOCUMENTOS (Ventana Ampliada):
-${context || 'No se encontraron documentos relevantes.'}`;
+## REGLAS CRÍTICAS:
+- REGLA DE ORO: SI LA INFORMACIÓN NO ESTÁ EN LOS DOCUMENTOS, responde exactamente: "Lo siento, la información solicitada no se encuentra en los documentos disponibles."
+- NUNCA uses tu conocimiento previo para rellenar vacíos.
+- CITAS OBLIGATORIAS: Usa [Doc N] al final de cada dato extraído.
+- Si hay contradicciones entre documentos, menciónalas.
+
+## CONTEXTO DE DOCUMENTOS:
+${context || 'No hay documentos relevantes.'}`;
 
   if (additionalContext) {
-    systemContent += `\n\n${additionalContext}`;
+    systemContent += `\n\n## CONTEXTO ADICIONAL:\n${additionalContext}`;
   }
 
   messages.push({
@@ -244,44 +308,39 @@ ${context || 'No se encontraron documentos relevantes.'}`;
 
   // 2. Conversation History
   if (conversationHistory && conversationHistory.length > 0) {
-    // Only use last N messages to keep focus on context
     const historyLimit = genSettings.historyLimit || 5;
-    const limitedHistory = conversationHistory.slice(-historyLimit);
+    let limitedHistory = conversationHistory.slice(-historyLimit);
     limitedHistory.forEach(msg => {
       messages.push({ role: msg.role, content: msg.content });
     });
   }
 
-  // 3. User Question
-  // Ensure we don't duplicate the last message if it's already in history
-  const lastHistoryMsg = conversationHistory?.[conversationHistory.length - 1];
-  if (!lastHistoryMsg || lastHistoryMsg.content !== query) {
-    messages.push({
-      role: 'user',
-      content: query
-    });
-  }
+  // 3. User Question with prompt for structured response
+  const finalPrompt = `Pregunta: ${query}\n\nAnaliza los documentos y responde siguiendo los 3 pasos (Análisis, Síntesis y Respuesta Final). Proporciona solo la respuesta bien estructurada.`;
 
-  // Generate response using structured messages
-  const answer = await chatEngine.generateText(messages, {
+  messages.push({
+    role: 'user',
+    content: finalPrompt
+  });
+
+  // Generate response
+  return await chatEngine.generateText(messages, {
     temperature: temperature,
     maxTokens: maxTokens,
     stop: ['<|im_end|>', '<|end|>', '<|eot_id|>'],
     onStream
   });
-
-  return answer;
 }
 
 /**
  * Complete RAG flow: query → retrieve → generate
- * MEJORADO: Incluye métricas de calidad
+ * MEJORADO: Incluye métricas de calidad y carga completa de settings
  */
 export async function completeRAGFlow(
   query: string,
   embeddingEngine: WllamaEngine,
   chatEngine: WebLLMEngine | WllamaEngine,
-  topK: number = 5,
+  topK?: number,
   documentIds?: string[],
   conversationHistory?: Array<{role: string, content: string}>,
   onStream?: (chunk: string) => void,
@@ -300,14 +359,19 @@ export async function completeRAGFlow(
   quality?: ReturnType<typeof assessRAGQuality>;
   faithfulness?: number;
 }> {
+  // Load settings from database
+  const ragSettings = await getRAGSettings();
+  const genSettings = await getGenerationSettings();
+
   // Auto-enable query rewriting for short queries
   const isShortQuery = query.split(/\s+/).length < 8;
   const shouldRewrite = options?.useQueryRewriting !== false && (options?.useQueryRewriting || isShortQuery);
 
-  // Step 1: Retrieve relevant chunks with enhanced options
-  const ragSettings = await getRAGSettings();
-  const effectiveTopK = topK || ragSettings.topK || 5;
-  const effectiveWindowSize = options?.chunkWindowSize ?? ragSettings.chunkWindowSize ?? 1;
+  // Use effective parameters from settings if not explicitly provided
+  const effectiveTopK = topK ?? ragSettings.topK ?? 5;
+  const effectiveWindowSize = options?.chunkWindowSize !== undefined 
+    ? options.chunkWindowSize 
+    : (ragSettings.chunkWindowSize ?? 1);
 
   const ragResult = await queryWithRAG(
     query,
@@ -332,9 +396,6 @@ export async function completeRAGFlow(
     quality = assessRAGQuality(metrics);
 
     console.log(`✅ [RAG Quality] Overall: ${quality.overall}`);
-    if (quality.warnings.length > 0) {
-      console.log(`⚠️ [RAG Quality] Warnings:`, quality.warnings);
-    }
   }
 
   // Step 3: Generate answer with conversation history
@@ -344,7 +405,7 @@ export async function completeRAGFlow(
   let faithfulness;
   if (options?.calculateMetrics !== false) {
     const context = createRAGContext(ragResult.chunks);
-    const threshold = options?.faithfulnessThreshold ?? 0.45;
+    const threshold = options?.faithfulnessThreshold ?? genSettings.faithfulnessThreshold ?? 0.45;
     console.log(`⚖️ [RAG Pipeline] Applying Faithfulness Threshold: ${threshold}`);
     faithfulness = calculateFaithfulness(answer, context, threshold);
   }

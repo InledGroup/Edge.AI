@@ -268,5 +268,14 @@ Assistant: {"tool": "some__list_items", "args": {}}`;
   getBackend(): 'webgpu' { return this.backend; }
   isReady(): boolean { return this.isInitialized && this.engine !== null; }
   getModelName(): string { return this.modelName; }
+  
+  /**
+   * Get the context window size for the current model
+   */
+  getContextWindowSize(): number {
+    // Try to get from engine if possible, otherwise fallback to standard values
+    return (this.engine as any)?.config?.context_window_size || 4096;
+  }
+
   async reset() { this.engine = null; this.isInitialized = false; }
 }

@@ -309,5 +309,13 @@ Asistente: { "tool": "search", "args": { "query": "notas" } }
   getBackend(): 'wasm' { return 'wasm'; }
   isReady(): boolean { return this.isInitialized && this.wllama !== null; }
   getModelUrl(): string { return this.modelUrl; }
+
+  /**
+   * Get the context window size for the current model
+   */
+  getContextWindowSize(): number {
+    return this.currentCtxSize || 8192;
+  }
+
   async reset() { if (this.wllama) { await this.wllama.exit(); this.wllama = null; this.isInitialized = false; } }
 }
