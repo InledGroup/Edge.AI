@@ -1,41 +1,161 @@
 ---
-import Navbar from './Navbar.astro';
-import Footer from './Footer.astro';
+import Navbar from "./Navbar.astro";
+import Footer from "./Footer.astro";
+import { getLanguageFromURL } from "@/lib/i18n";
 
-const { lang = 'en', title = 'Models' } = Astro.props;
+const urlLang = getLanguageFromURL(Astro.url);
+const { lang = urlLang, title = "Models" } = Astro.props;
 
 const navTranslations = {
-  en: { features: 'Features', privacy: 'Privacy', apps: 'Integrations', cta: 'Open App' },
-  es: { features: 'Características', privacy: 'Privacidad', apps: 'Integraciones', cta: 'Abrir App' }
+  en: {
+    features: "Features",
+    privacy: "Privacy",
+    apps: "Integrations",
+    cta: "Open App",
+  },
+  es: {
+    features: "Características",
+    privacy: "Privacidad",
+    apps: "Integraciones",
+    cta: "Abrir App",
+  },
 };
 
 const footerTranslations = {
-  en: { tagline: 'AI that respects your privacy.', link1: 'Features', link2: 'Privacy', link3: 'Integrations', license: 'Open Source', made: 'Made with', made2: 'for privacy' },
-  es: { tagline: 'IA que respeta tu privacidad.', link1: 'Características', link2: 'Privacidad', link3: 'Integraciones', license: 'Código Abierto', made: 'Hecho con', made2: 'para la privacidad' }
+  en: {
+    tagline: "AI that respects your privacy.",
+    link1: "Features",
+    link2: "Privacy",
+    link3: "Integrations",
+    license: "Open Source",
+    made: "Made with",
+    made2: "for privacy",
+  },
+  es: {
+    tagline: "IA que respeta tu privacidad.",
+    link1: "Características",
+    link2: "Privacidad",
+    link3: "Integraciones",
+    license: "Código Abierto",
+    made: "Hecho con",
+    made2: "para la privacidad",
+  },
 };
 
-const t = { nav: navTranslations[lang as keyof typeof navTranslations] || navTranslations.en, footer: footerTranslations[lang as keyof typeof footerTranslations] || footerTranslations.en };
+const t = {
+  nav:
+    navTranslations[lang as keyof typeof navTranslations] || navTranslations.en,
+  footer:
+    footerTranslations[lang as keyof typeof footerTranslations] ||
+    footerTranslations.en,
+};
 ---
 
 <!doctype html>
 <html lang={lang} data-theme="dark">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Edge.AI - 100% Local AI. Chat with your documents, search the web, and use powerful AI tools. Everything stays on your device." />
-  <title>{title} | Edge.AI</title>
-  <link rel="icon" type="image/png" href="/inledai.png" />
-  <style is:global>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-  </style>
-</head>
-<body>
-  <Navbar currentLang={lang} translations={t.nav} />
-  <main>
-    <slot />
-  </main>
-  <Footer translations={t.footer} />
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Edge.AI - 100% Local AI. Chat with your documents, search the web, and use powerful AI tools. Everything stays on your device."
+    />
+    <title>{title} | Edge.AI</title>
+    <link rel="icon" type="image/png" href="/inledai.png" />
+    <style is:global>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+    </style>
+    <script is:inline>
+      (function () {
+        const urlParams = new URLSearchParams(window.location.search);
+        const storedLang = localStorage.getItem("edgeai-lang");
+        const currentURL = new URL(window.location.href);
+
+        if (
+          !urlParams.has("lang") &&
+          storedLang &&
+          ["en", "es"].includes(storedLang)
+        ) {
+          const currentHtmlLang = document.documentElement.lang;
+          if (storedLang !== currentHtmlLang) {
+            let newPath = currentURL.pathname;
+            if (storedLang === "es") {
+              newPath = newPath
+                .replace("/model/", "/modelo/")
+                .replace("/models", "/modelos");
+            } else {
+              newPath = newPath
+                .replace("/modelo/", "/model/")
+                .replace("/modelos", "/models");
+            }
+            currentURL.pathname = newPath;
+            currentURL.searchParams.set("lang", storedLang);
+            window.location.replace(currentURL.toString());
+          }
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <script is:inline define:vars={{ navTranslations, footerTranslations }}>
+      document.addEventListener("DOMContentLoaded", function () {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlLang =
+          urlParams.get("lang") || localStorage.getItem("edgeai-lang") || "es";
+        const currentHtmlLang = document.documentElement.lang;
+
+        if (urlLang !== currentHtmlLang) {
+          const nt = navTranslations[urlLang] || navTranslations.en;
+          const ft = footerTranslations[urlLang] || footerTranslations.en;
+
+          // Update Navbar
+          const navLinks = document.querySelectorAll(".nav-link");
+          if (navLinks.length >= 3) {
+            navLinks[0].textContent = nt.features;
+            navLinks[1].textContent = nt.privacy;
+            navLinks[2].textContent = nt.apps;
+          }
+          document
+            .querySelectorAll(".cta-btn")
+            .forEach((btn) => (btn.textContent = nt.cta));
+
+          // Update Footer
+          const footerTagline = document.querySelector(".footer-tagline");
+          if (footerTagline) footerTagline.textContent = ft.tagline;
+
+          const footerLinks = document.querySelectorAll(".footer-link");
+          if (footerLinks.length >= 3) {
+            footerLinks[0].textContent = ft.link1;
+            footerLinks[1].textContent = ft.link2;
+            footerLinks[2].textContent = ft.link3;
+          }
+
+          // Update HTML lang
+          document.documentElement.lang = urlLang;
+          localStorage.setItem("edgeai-lang", urlLang);
+
+          // Update language switcher
+          const langBtn = document.getElementById("langSwitcherLink");
+          if (langBtn) {
+            langBtn.setAttribute("data-current-lang", urlLang);
+            const langSpan = langBtn.querySelector("span");
+            if (langSpan) langSpan.textContent = urlLang === "en" ? "ES" : "EN";
+
+            // Update URL to opposite for next click
+            const nextLang = urlLang === "en" ? "es" : "en";
+            const currentURL = new URL(window.location.href);
+            currentURL.searchParams.set("lang", nextLang);
+            langBtn.href = currentURL.toString();
+          }
+        }
+      });
+    </script>
+    <Navbar currentLang={lang} translations={t.nav} />
+    <main>
+      <slot />
+    </main>
+    <Footer translations={t.footer} />
+  </body>
 </html>
 
 <style is:global>
@@ -50,7 +170,7 @@ const t = { nav: navTranslations[lang as keyof typeof navTranslations] || navTra
     --color-text-secondary: #b4b4b4;
     --color-text-tertiary: #8e8e8e;
     --color-border: #3f3f3f;
-    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   }
 
   @media (prefers-color-scheme: light) {
@@ -67,7 +187,9 @@ const t = { nav: navTranslations[lang as keyof typeof navTranslations] || navTra
     }
   }
 
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;

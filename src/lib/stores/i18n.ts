@@ -23,7 +23,7 @@ export const i18nStore = {
   /**
    * Initialize language from settings or browser
    */
-  async function init() {
+  async init() {
     try {
       // 1. Check URL first (overrides everything)
       if (typeof window !== 'undefined') {

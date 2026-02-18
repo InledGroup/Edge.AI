@@ -1,97 +1,176 @@
 ---
-import PageLayout from '@/components/landing/PageLayout.astro';
-import { getVisibleChatModels } from '@/lib/ai/model-registry';
+import PageLayout from "@/components/landing/PageLayout.astro";
+import { getVisibleChatModels } from "@/lib/ai/model-registry";
+import { getLanguageFromURL } from "@/lib/i18n";
 
-const lang = Astro.url.searchParams.get('lang') || 'es';
+const lang = getLanguageFromURL(Astro.url);
 
 const translations = {
   es: {
-    title: 'Todos los modelos',
-    subtitle: 'Selecciona un modelo para ver sus características y comenzar a usarlo.',
-    cta: 'Probar',
-    size: 'Tamaño',
-    memory: 'RAM',
-    context: 'Contexto',
+    title: "Todos los modelos",
+    subtitle:
+      "Selecciona un modelo para ver sus características y comenzar a usarlo.",
+    cta: "Probar",
+    size: "Tamaño",
+    memory: "RAM",
+    context: "Contexto",
   },
   en: {
-    title: 'All Models',
-    subtitle: 'Select a model to see its features and start using it.',
-    cta: 'Try',
-    size: 'Size',
-    memory: 'RAM',
-    context: 'Context',
-  }
+    title: "All Models",
+    subtitle: "Select a model to see its features and start using it.",
+    cta: "Try",
+    size: "Size",
+    memory: "RAM",
+    context: "Context",
+  },
 };
 
 const t = translations[lang as keyof typeof translations] || translations.es;
 const models = getVisibleChatModels();
 
 const groupedModels = {
-  small: models.filter(m => m.sizeGB < 1),
-  medium: models.filter(m => m.sizeGB >= 1 && m.sizeGB < 3),
-  large: models.filter(m => m.sizeGB >= 3)
+  small: models.filter((m) => m.sizeGB < 1),
+  medium: models.filter((m) => m.sizeGB >= 1 && m.sizeGB < 3),
+  large: models.filter((m) => m.sizeGB >= 3),
 };
 
 const groupLabels = {
-  small: lang === 'es' ? 'Pequeños (< 1GB)' : 'Small (< 1GB)',
-  medium: lang === 'es' ? 'Medianos (1-3GB)' : 'Medium (1-3GB)',
-  large: lang === 'es' ? 'Grandes (> 3GB)' : 'Large (> 3GB)'
+  small: lang === "es" ? "Pequeños (< 1GB)" : "Small (< 1GB)",
+  medium: lang === "es" ? "Medianos (1-3GB)" : "Medium (1-3GB)",
+  large: lang === "es" ? "Grandes (> 3GB)" : "Large (> 3GB)",
 };
 
 function getModelUrl(id: string) {
-  return `/${lang === 'es' ? 'modelo' : 'model'}/${id}`;
+  return `/${lang === "es" ? "modelo" : "model"}/${id}`;
 }
 ---
 
 <PageLayout lang={lang} title={t.title}>
+  <script is:inline define:vars={{ translations }}>
+    (function () {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlLang =
+        urlParams.get("lang") || localStorage.getItem("edgeai-lang") || "es";
+      const currentHtmlLang = document.documentElement.lang;
+
+      if (urlLang !== currentHtmlLang) {
+        const t = translations[urlLang] || translations.es;
+
+        const updateText = (selector, text) => {
+          const el = document.querySelector(selector);
+          if (el) el.textContent = text;
+        };
+
+        updateText(".page-title", t.title);
+        updateText(".page-subtitle", t.subtitle);
+
+        document.querySelectorAll(".spec-label").forEach((el) => {
+          if (
+            el.textContent === translations.es.size ||
+            el.textContent === translations.en.size
+          )
+            el.textContent = t.size;
+          if (
+            el.textContent === translations.es.memory ||
+            el.textContent === translations.en.memory
+          )
+            el.textContent = t.memory;
+          if (
+            el.textContent === translations.es.context ||
+            el.textContent === translations.en.context
+          )
+            el.textContent = t.context;
+        });
+
+        document.querySelectorAll(".model-cta span").forEach((el) => {
+          el.textContent = t.cta + " →";
+        });
+
+        document.querySelectorAll(".tag.recommended").forEach((el) => {
+          el.textContent = urlLang === "es" ? "Recomendado" : "Recommended";
+        });
+
+        const groupTitles = document.querySelectorAll(".group-title");
+        groupTitles.forEach((el) => {
+          if (
+            el.textContent.includes("Small") ||
+            el.textContent.includes("Pequeños")
+          )
+            el.textContent =
+              urlLang === "es" ? "Pequeños (< 1GB)" : "Small (< 1GB)";
+          if (
+            el.textContent.includes("Medium") ||
+            el.textContent.includes("Medianos")
+          )
+            el.textContent =
+              urlLang === "es" ? "Medianos (1-3GB)" : "Medium (1-3GB)";
+          if (
+            el.textContent.includes("Large") ||
+            el.textContent.includes("Grandes")
+          )
+            el.textContent =
+              urlLang === "es" ? "Grandes (> 3GB)" : "Large (> 3GB)";
+        });
+      }
+    })();
+  </script>
   <div class="models-page">
     <header class="page-header">
       <h1 class="page-title">{t.title}</h1>
       <p class="page-subtitle">{t.subtitle}</p>
     </header>
 
-    {Object.entries(groupedModels).map(([group, groupModels]) => (
-      groupModels.length > 0 && (
-        <section class="model-group">
-          <h2 class="group-title">{groupLabels[group as keyof typeof groupLabels]}</h2>
-          <div class="models-grid">
-            {groupModels.map(model => (
-              <a href={getModelUrl(model.id)} class="model-card">
-                <div class="model-header">
-                  <h3 class="model-name">{model.displayName}</h3>
-                  <div class="model-tags">
-                    {model.tags.includes('recommended') && (
-                      <span class="tag recommended">{lang === 'es' ? 'Recomendado' : 'Recommended'}</span>
-                    )}
-                    {model.requiresWebGPU && (
-                      <span class="tag gpu">GPU</span>
-                    )}
-                  </div>
-                </div>
-                <p class="model-desc">{model.description}</p>
-                <div class="model-specs">
-                  <div class="spec">
-                    <span class="spec-label">{t.size}</span>
-                    <span class="spec-value">{model.sizeGB} GB</span>
-                  </div>
-                  <div class="spec">
-                    <span class="spec-label">{t.memory}</span>
-                    <span class="spec-value">{model.minMemoryGB} GB</span>
-                  </div>
-                  <div class="spec">
-                    <span class="spec-label">{t.context}</span>
-                    <span class="spec-value">{(model.contextSize / 1000)}k</span>
-                  </div>
-                </div>
-                <div class="model-cta">
-                  <span>{t.cta} →</span>
-                </div>
-              </a>
-            ))}
-          </div>
-        </section>
+    {
+      Object.entries(groupedModels).map(
+        ([group, groupModels]) =>
+          groupModels.length > 0 && (
+            <section class="model-group">
+              <h2 class="group-title">
+                {groupLabels[group as keyof typeof groupLabels]}
+              </h2>
+              <div class="models-grid">
+                {groupModels.map((model) => (
+                  <a href={getModelUrl(model.id)} class="model-card">
+                    <div class="model-header">
+                      <h3 class="model-name">{model.displayName}</h3>
+                      <div class="model-tags">
+                        {model.tags.includes("recommended") && (
+                          <span class="tag recommended">
+                            {lang === "es" ? "Recomendado" : "Recommended"}
+                          </span>
+                        )}
+                        {model.requiresWebGPU && (
+                          <span class="tag gpu">GPU</span>
+                        )}
+                      </div>
+                    </div>
+                    <p class="model-desc">{model.description}</p>
+                    <div class="model-specs">
+                      <div class="spec">
+                        <span class="spec-label">{t.size}</span>
+                        <span class="spec-value">{model.sizeGB} GB</span>
+                      </div>
+                      <div class="spec">
+                        <span class="spec-label">{t.memory}</span>
+                        <span class="spec-value">{model.minMemoryGB} GB</span>
+                      </div>
+                      <div class="spec">
+                        <span class="spec-label">{t.context}</span>
+                        <span class="spec-value">
+                          {model.contextSize / 1000}k
+                        </span>
+                      </div>
+                    </div>
+                    <div class="model-cta">
+                      <span>{t.cta} →</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ),
       )
-    ))}
+    }
   </div>
 </PageLayout>
 

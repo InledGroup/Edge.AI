@@ -1,20 +1,26 @@
 ---
 import { Menu, X, Globe } from "lucide-preact";
 
-const { currentLang = 'en', translations = {} } = Astro.props;
+const { currentLang = "en", translations = {} } = Astro.props;
 
 const navLinks = [
-  { href: '#features', label: translations.features || 'Features' },
-  { href: '#privacy', label: translations.privacy || 'Privacy' },
-  { href: '#apps', label: translations.apps || 'Apps' },
+  { href: "#features", label: translations.features || "Features" },
+  { href: "#privacy", label: translations.privacy || "Privacy" },
+  { href: "#apps", label: translations.apps || "Apps" },
 ];
 ---
 
 <nav class="fixed top-0 left-0 right-0 z-50 glass-nav">
-  <div class="container mx-auto px-4 md:px-6 h-16 md:h-20 flex items-center justify-between">
+  <div
+    class="container mx-auto px-4 md:px-6 h-16 md:h-20 flex items-center justify-between"
+  >
     <!-- Logo -->
     <div class="flex items-center gap-3">
-      <img src="/inledai.png" class="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl" alt="Edge.AI">
+      <img
+        src="/inledai.png"
+        class="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl"
+        alt="Edge.AI"
+      />
       <a class="text-lg md:text-xl font-bold tracking-tight" href="/landing">
         Edge<span class="text-primary">.AI</span>
       </a>
@@ -22,33 +28,40 @@ const navLinks = [
 
     <!-- Desktop Navigation -->
     <div class="hidden md:flex items-center gap-8">
-      {navLinks.map(link => (
-        <a href={link.href} class="nav-link text-sm font-medium">
-          {link.label}
-        </a>
-      ))}
+      {
+        navLinks.map((link) => (
+          <a href={link.href} class="nav-link text-sm font-medium">
+            {link.label}
+          </a>
+        ))
+      }
     </div>
 
     <!-- Right Section -->
     <div class="flex items-center gap-3">
       <!-- Language Switcher -->
-      <a 
-        href="#" 
+      <a
+        href="#"
         class="lang-btn"
         id="langSwitcherLink"
         data-current-lang={currentLang}
       >
         <Globe size={18} />
-        <span class="hidden sm:inline">{currentLang === 'en' ? 'ES' : 'EN'}</span>
+        <span class="hidden sm:inline"
+          >{currentLang === "en" ? "ES" : "EN"}</span
+        >
       </a>
 
       <!-- CTA Button -->
       <a href="/" class="cta-btn">
-        {translations.cta || 'Open App'}
+        {translations.cta || "Open App"}
       </a>
 
       <!-- Mobile Menu Button -->
-      <button id="mobileMenuBtn" class="md:hidden p-2 text-text-secondary hover:text-text transition-colors">
+      <button
+        id="mobileMenuBtn"
+        class="md:hidden p-2 text-text-secondary hover:text-text transition-colors"
+      >
         <Menu size={24} />
       </button>
     </div>
@@ -58,17 +71,25 @@ const navLinks = [
 <!-- Mobile Menu Overlay -->
 <div id="mobileNav" class="mobile-nav hidden">
   <div class="mobile-nav-content">
-    <button id="closeMobileNav" class="absolute top-4 right-4 p-2 text-text-secondary hover:text-text">
+    <button
+      id="closeMobileNav"
+      class="absolute top-4 right-4 p-2 text-text-secondary hover:text-text"
+    >
       <X size={28} />
     </button>
     <div class="flex flex-col items-center gap-8">
-      {navLinks.map(link => (
-        <a href={link.href} class="mobile-nav-link text-2xl font-bold">
-          {link.label}
-        </a>
-      ))}
-      <a href="/" class="mt-4 px-8 py-4 bg-primary text-black font-bold rounded-xl">
-        {translations.cta || 'Open App'}
+      {
+        navLinks.map((link) => (
+          <a href={link.href} class="mobile-nav-link text-2xl font-bold">
+            {link.label}
+          </a>
+        ))
+      }
+      <a
+        href="/"
+        class="mt-4 px-8 py-4 bg-primary text-black font-bold rounded-xl"
+      >
+        {translations.cta || "Open App"}
       </a>
     </div>
   </div>
@@ -96,7 +117,7 @@ const navLinks = [
   }
 
   .nav-link::after {
-    content: '';
+    content: "";
     position: absolute;
     bottom: -4px;
     left: 0;
@@ -203,47 +224,67 @@ const navLinks = [
 </style>
 
 <script>
-  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-  const mobileNav = document.getElementById('mobileNav');
-  const closeMobileNav = document.getElementById('closeMobileNav');
+  const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+  const mobileNav = document.getElementById("mobileNav");
+  const closeMobileNav = document.getElementById("closeMobileNav");
 
-  mobileMenuBtn?.addEventListener('click', () => {
-    mobileNav?.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
+  mobileMenuBtn?.addEventListener("click", () => {
+    mobileNav?.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
   });
 
-  closeMobileNav?.addEventListener('click', () => {
-    mobileNav?.classList.add('hidden');
-    document.body.style.overflow = '';
+  closeMobileNav?.addEventListener("click", () => {
+    mobileNav?.classList.add("hidden");
+    document.body.style.overflow = "";
   });
 
-  // Guardar preferencia al hacer clic en el enlace
-  const langSwitcher = document.getElementById('langSwitcherLink');
+  // Robust Language Switcher
+  const langSwitcher = document.getElementById("langSwitcherLink");
   if (langSwitcher) {
-    // Update initial href just in case
-    const currentLang = langSwitcher.getAttribute('data-current-lang');
-    const newLang = currentLang === 'en' ? 'es' : 'en';
-    const url = new URL(window.location.href);
-    url.searchParams.set('lang', newLang);
-    (langSwitcher as HTMLAnchorElement).href = url.toString();
-
-    langSwitcher.addEventListener('click', (e) => {
-      e.preventDefault();
-      const currentLang = langSwitcher.getAttribute('data-current-lang');
-      const newLang = currentLang === 'en' ? 'es' : 'en';
-      
+    const updateSwitcherHref = () => {
+      const currentLang =
+        langSwitcher.getAttribute("data-current-lang") || "en";
+      const newLang = currentLang === "en" ? "es" : "en";
       const url = new URL(window.location.href);
-      url.searchParams.set('lang', newLang);
-      
-      localStorage.setItem('edgeai-lang', newLang);
-      window.location.href = url.toString();
+
+      // Update the path if necessary (e.g., /model/ -> /modelo/)
+      let newPath = url.pathname;
+      if (newLang === "es") {
+        newPath = newPath
+          .replace("/model/", "/modelo/")
+          .replace("/models", "/modelos");
+      } else {
+        newPath = newPath
+          .replace("/modelo/", "/model/")
+          .replace("/modelos", "/models");
+      }
+
+      url.pathname = newPath;
+      url.searchParams.set("lang", newLang);
+      (langSwitcher as HTMLAnchorElement).href = url.toString();
+    };
+
+    // Initial update
+    updateSwitcherHref();
+
+    langSwitcher.addEventListener("click", (e) => {
+      // Allow the actual href navigation, but sync localStorage first
+      const currentLang =
+        langSwitcher.getAttribute("data-current-lang") || "en";
+      const newLang = currentLang === "en" ? "es" : "en";
+      localStorage.setItem("edgeai-lang", newLang);
+
+      // We don't necessarily need e.preventDefault() if the href is already correct
+      // But let's be safe and handle it explicitly to ensure URL is always fresh
+      e.preventDefault();
+      window.location.href = (langSwitcher as HTMLAnchorElement).href;
     });
   }
 
-  document.querySelectorAll('.mobile-nav-link').forEach(link => {
-    link.addEventListener('click', () => {
-      mobileNav?.classList.add('hidden');
-      document.body.style.overflow = '';
+  document.querySelectorAll(".mobile-nav-link").forEach((link) => {
+    link.addEventListener("click", () => {
+      mobileNav?.classList.add("hidden");
+      document.body.style.overflow = "";
     });
   });
 </script>

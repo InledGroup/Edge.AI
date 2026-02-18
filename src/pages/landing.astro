@@ -1,14 +1,8 @@
 ---
-import LandingLayout from '@/components/landing/LandingLayout.astro';
+import LandingLayout from "@/components/landing/LandingLayout.astro";
+import { getLanguageFromURL } from "@/lib/i18n";
 
-const acceptedLanguages = ['en', 'es'];
-const urlLang = Astro.url.searchParams.get('lang');
-
-// Detection logic
-let detectedLang = 'es';
-if (urlLang && acceptedLanguages.includes(urlLang)) {
-  detectedLang = urlLang;
-}
+const detectedLang = getLanguageFromURL(Astro.url);
 ---
 
 <LandingLayout lang={detectedLang} />
