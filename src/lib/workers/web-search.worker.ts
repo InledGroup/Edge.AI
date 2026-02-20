@@ -26,13 +26,6 @@ interface FetchPagesMessage {
 // ============================================================================
 
 /**
- * DEPRECADO! Ahora ya no se usa el proxy de aiproxy al descubrirse que realmente no ofrecía la máxima privacidad y haber vulnerabilidades que podían comprometernos
- */
-function getCorsProxy(): string {
-  return 'https://aiproxy.inled.es/?url=';
-}
-
-/**
  * Descarga una única página web
  */
 async function fetchPage(
@@ -54,51 +47,24 @@ async function fetchPage(
     throw new Error(`Invalid URL: ${url}`);
   }
 
-  // Aplicar proxy CORS si estamos en localhost o si el proxy está disponible
-  const corsProxy = getCorsProxy();
-  const fetchUrl = corsProxy ? `${corsProxy}${encodeURIComponent(url)}` : url;
-
   console.log(`[WebSearchWorker] Fetching: ${url}`);
-  if (corsProxy) {
-    console.log(`[WebSearchWorker] Using proxy: ${corsProxy}`);
-  }
 
   // Crear AbortController para timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    // Realizar fetch
-    let response: Response;
-    try {
-      response = await fetch(fetchUrl, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          Accept: 'text/html,application/xhtml+xml',
-          'User-Agent': 'EdgeAI/1.0 (Local Browser Agent; +https://github.com/InledGroup/Edge.AI)',
-          ...headers,
-        },
-        redirect: followRedirects ? 'follow' : 'manual',
-      });
-    } catch (fetchError) {
-      console.warn(`[WebSearchWorker] Proxy fetch failed for ${url}, trying direct...`, fetchError);
-      // Fallback a fetch directo si el proxy falla (CORS podría bloquearlo, pero vale la pena intentar)
-      if (corsProxy && !controller.signal.aborted) {
-        response = await fetch(url, {
-          method: 'GET',
-          signal: controller.signal,
-          headers: {
-            Accept: 'text/html,application/xhtml+xml',
-            'User-Agent': 'EdgeAI/1.0 (Local Browser Agent; +https://github.com/InledGroup/Edge.AI)',
-            ...headers,
-          },
-          redirect: followRedirects ? 'follow' : 'manual',
-        });
-      } else {
-        throw fetchError;
-      }
-    }
+    // Realizar fetch directo (Solo funcionará si el servidor destino permite CORS)
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': 'EdgeAI/1.0 (Local Browser Agent; +https://github.com/InledGroup/Edge.AI)',
+        ...headers,
+      },
+      redirect: followRedirects ? 'follow' : 'manual',
+    });
 
     clearTimeout(timeoutId);
 

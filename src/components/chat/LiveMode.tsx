@@ -3,8 +3,8 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import EngineManager from '@/lib/ai/engine-manager';
 import { uiStore, conversationsStore, activeConversationIdSignal } from '@/lib/stores';
 import { addMessage, getOrCreateConversation, updateConversationTitle, generateTitle } from '@/lib/db/conversations';
-import { speechService, voiceState, isVoiceModeEnabled } from '@/lib/voice/speech-service';
-import { Mic, MicOff, PhoneOff, X, MoreHorizontal, Settings, Volume2, Captions, Loader2, Check } from 'lucide-preact';
+import { speechService, voiceState, isVoiceModeEnabled, voiceError } from '@/lib/voice/speech-service';
+import { Mic, MicOff, PhoneOff, X, MoreHorizontal, Settings, Volume2, Captions, Loader2, Check, AlertCircle } from 'lucide-preact';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { useTranslations } from '@/lib/stores/i18n';
 import { getSetting, setSetting } from '@/lib/db/settings';
@@ -219,12 +219,23 @@ export default function LiveMode() {
     draw();
   }
 
-  // Handle conversation loop
+  // 1. Initial Start Listening
+  useEffect(() => {
+    if (modelReady && !isMuted) {
+      console.log('🎤 LiveMode: Initial start listening');
+      speechService.startListening();
+    }
+  }, [modelReady]); // Only on model ready
+
+  // 2. Handle conversation loop and voice mode sync
   useEffect(() => {
     if (!modelReady) return;
 
-    // Force enable voice mode for continuous interaction
-    isVoiceModeEnabled.value = true;
+    // Ensure voice mode is enabled when entering Live Mode or unmuting
+    // but don't use it as a dependency to avoid infinite loops if the service disables it
+    if (!isMuted && !isVoiceModeEnabled.value) {
+      isVoiceModeEnabled.value = true;
+    }
 
     let active = true;
 
@@ -387,16 +398,11 @@ export default function LiveMode() {
       }
     };
 
-    if (!isMuted) {
-      // Start listening loop
-      speechService.startListening(handleSpeechResult);
-    }
+    // Attach current callback
+    speechService.startListening(handleSpeechResult);
 
     return () => {
       active = false;
-      // We do NOT stop listening/speaking here to allow "background mode" 
-      // and prevent state resets during accidental remounts.
-      // Explicit closing is handled by handleClose().
     };
   }, [isMuted, modelReady]);
 
@@ -583,14 +589,20 @@ export default function LiveMode() {
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-md px-6">
         
         {/* State Text */}
-        <div className="mb-4 h-6 text-center">
-             {voiceState.value === 'listening' && !isMuted && (
+        <div className="mb-4 min-h-[24px] text-center max-w-xs">
+             {voiceError.value && (
+               <div className="flex items-center gap-2 text-red-400 text-xs animate-in fade-in slide-in-from-top-1 bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/20">
+                 <AlertCircle className="w-3.5 h-3.5" />
+                 <span>{voiceError.value}</span>
+               </div>
+             )}
+             {!voiceError.value && voiceState.value === 'listening' && !isMuted && (
                <span className="text-gray-400 text-sm tracking-wide animate-pulse">{t('live.listening')}</span>
              )}
-             {voiceState.value === 'processing' && (
+             {!voiceError.value && voiceState.value === 'processing' && (
                <span className="text-emerald-400 text-sm tracking-wide animate-pulse">{t('live.thinking')}</span>
              )}
-             {isMuted && (
+             {!voiceError.value && isMuted && (
                <span className="text-red-400 text-sm tracking-wide">{t('live.micDisabled')}</span>
              )}
         </div>

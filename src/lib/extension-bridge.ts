@@ -71,14 +71,17 @@ export class ExtensionBridge {
           break;
 
         case 'SEARCH_RESPONSE':
+        case 'EXTRACT_URLS_RESPONSE':
           this.handleSearchResponse(message.data);
           break;
 
         case 'SEARCH_DENIED':
+        case 'EXTRACT_URLS_DENIED':
           this.handleSearchDenied(message.data);
           break;
 
         case 'SEARCH_ERROR':
+        case 'EXTRACT_URLS_ERROR':
           this.handleSearchError(message.data);
           break;
       }
@@ -143,10 +146,27 @@ export class ExtensionBridge {
     clearTimeout(pending.timeout);
     this.pendingRequests.delete(requestId);
 
-    console.log('[ExtensionBridge] ✅ Search completed:', results?.length || 0, 'results');
+    // DEBUG: Log the full data object to see what the extension actually returned
+    console.log('[ExtensionBridge] 📦 Full data payload from extension:', data);
+
+    // EXTENSION MAPPING FIX:
+    // Some extension responses nest the array in results.sources
+    // Others use results, pages, or data
+    let finalResults = [];
+    if (results) {
+      if (Array.isArray(results)) {
+        finalResults = results;
+      } else if (results.sources && Array.isArray(results.sources)) {
+        finalResults = results.sources;
+      }
+    } else {
+      finalResults = data.pages || data.data || [];
+    }
+
+    console.log('[ExtensionBridge] ✅ Request completed:', finalResults?.length || 0, 'items found');
     pending.resolve({
       success: true,
-      results: results || []
+      results: finalResults
     });
   }
 

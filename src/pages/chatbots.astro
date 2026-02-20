@@ -1,0 +1,240 @@
+---
+// Edge.AI - Chatbots for Web Landing Page
+import "@/styles/global.css";
+import {
+    Shield,
+    Zap,
+    Lock,
+    Rocket,
+    BookOpen,
+    Globe,
+    Check,
+    X,
+    MessageSquare,
+    Code,
+    Cpu,
+    Database,
+    FileCode,
+    ArrowLeft,
+    ChevronRight
+} from "lucide-preact";
+---
+
+<!doctype html>
+<html lang="es" data-theme="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Edge.AI - Chatbots para tu sitio web</title>
+        <meta
+            name="description"
+            content="Crea asistentes inteligentes privados, gratuitos e independientes con un solo archivo HTML"
+        />
+        <link rel="icon" href="/inledai.png" />
+        <style>
+            html { scroll-behavior: smooth; }
+            @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
+            @keyframes gradient-shift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+            @keyframes fade-in-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+            .animate-float { animation: float 6s ease-in-out infinite; }
+            .animate-gradient { background-size: 200% 200%; animation: gradient-shift 8s ease infinite; }
+            .fade-in-up { animation: fade-in-up 0.8s ease-out forwards; }
+            .gradient-text {
+                background: linear-gradient(90deg, var(--color-primary), #20b813, var(--color-primary));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            .glass {
+                background: rgba(20, 20, 20, 0.6);
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .grid-pattern {
+                background-image: linear-gradient(rgba(40, 229, 24, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(40, 229, 24, 0.03) 1px, transparent 1px);
+                background-size: 50px 50px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="min-h-screen bg-[var(--color-bg)] grid-pattern">
+            <!-- Language Switcher & Back Link -->
+            <div class="fixed top-6 left-6 z-[70]">
+                <a
+                    href="/landing"
+                    class="px-4 py-2 glass hover:bg-white/5 text-[var(--color-text)] font-semibold rounded-xl transition-all duration-300 border border-white/10 flex items-center gap-2"
+                >
+                    <ArrowLeft size={18} />
+                    <span data-i18n="chatbots.back">Volver a Edge.AI</span>
+                </a>
+            </div>
+            
+            <div class="fixed top-6 right-6 z-[70]">
+                <button
+                    id="langSwitcher"
+                    class="px-4 py-2 glass hover:bg-[var(--color-primary)]/10 text-[var(--color-text)] font-semibold rounded-xl transition-all duration-300 border border-white/10 flex items-center gap-2"
+                >
+                    <Globe size={18} />
+                    <span id="langLabel">English</span>
+                </button>
+            </div>
+
+            <!-- Hero Section -->
+            <section class="relative overflow-hidden pt-20">
+                <div class="absolute inset-0 pointer-events-none overflow-hidden">
+                    <div class="absolute top-0 left-1/4 w-[600px] h-[600px] bg-[var(--color-primary)] opacity-15 blur-[150px] rounded-full animate-float"></div>
+                </div>
+
+                <div class="container mx-auto px-4 py-16 sm:py-24 relative">
+                    <div class="max-w-5xl mx-auto text-center">
+                        <div class="flex justify-center mb-8 opacity-0 fade-in-up">
+                            <div class="bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-4 py-1 rounded-full text-sm font-bold border border-[var(--color-primary)]/30">
+                                BETA
+                            </div>
+                        </div>
+
+                        <h1 class="text-5xl sm:text-7xl lg:text-8xl font-extrabold leading-none tracking-tight mb-8 opacity-0 fade-in-up">
+                            <span class="block gradient-text animate-gradient" data-i18n="chatbots.heroTitle">
+                                Chatbots para tu web
+                            </span>
+                        </h1>
+
+                        <p class="text-xl sm:text-2xl text-[var(--color-text-secondary)] max-w-3xl mx-auto leading-relaxed mb-12 opacity-0 fade-in-up">
+                            <span data-i18n="chatbots.heroSubtitle">
+                                Crea asistentes inteligentes privados, gratuitos e independientes con un solo archivo.
+                            </span>
+                        </p>
+
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 opacity-0 fade-in-up">
+                            <a
+                                href="/"
+                                class="group relative px-10 py-5 bg-gradient-to-r from-[var(--color-primary)] to-[#20b813] text-black font-bold rounded-2xl text-xl transition-all duration-300 hover:shadow-2xl hover:shadow-[var(--color-primary)]/60 hover:scale-105 w-full sm:w-auto overflow-hidden"
+                            >
+                                <span class="relative z-10 flex items-center justify-center gap-2">
+                                    <span data-i18n="chatbots.tryNow">Crear mi Chatbot</span>
+                                    <MessageSquare size={20} />
+                                </span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Key Features -->
+            <section class="py-20 relative">
+                <div class="container mx-auto px-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                        <!-- Feature 1 -->
+                        <div class="p-8 glass rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-300">
+                            <div class="w-12 h-12 bg-[var(--color-primary)]/20 rounded-xl flex items-center justify-center text-[var(--color-primary)] mb-6">
+                                <FileCode size={24} />
+                            </div>
+                            <h3 class="text-xl font-bold mb-4" data-i18n="chatbots.feature1Title">Un solo archivo HTML</h3>
+                            <p class="text-[var(--color-text-secondary)]" data-i18n="chatbots.feature1Desc">Todo el chatbot, el modelo de IA y tu base de conocimiento en un único archivo integrable.</p>
+                        </div>
+
+                        <!-- Feature 2 -->
+                        <div class="p-8 glass rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-300">
+                            <div class="w-12 h-12 bg-[var(--color-primary)]/20 rounded-xl flex items-center justify-center text-[var(--color-primary)] mb-6">
+                                <Shield size={24} />
+                            </div>
+                            <h3 class="text-xl font-bold mb-4" data-i18n="chatbots.feature2Title">Privacidad RGPD Nativa</h3>
+                            <p class="text-[var(--color-text-secondary)]" data-i18n="chatbots.feature2Desc">Al ejecutarse 100% en el navegador del usuario, cumples con el RGPD sin esfuerzo. Los datos nunca viajan.</p>
+                        </div>
+
+                        <!-- Feature 3 -->
+                        <div class="p-8 glass rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-300">
+                            <div class="w-12 h-12 bg-[var(--color-primary)]/20 rounded-xl flex items-center justify-center text-[var(--color-primary)] mb-6">
+                                <Database size={24} />
+                            </div>
+                            <h3 class="text-xl font-bold mb-4" data-i18n="chatbots.feature3Title">Gobernanza Total</h3>
+                            <p class="text-[var(--color-text-secondary)]" data-i18n="chatbots.feature3Desc">Inledai no tiene acceso a tu base de conocimiento. Tú eres el único dueño de tus datos.</p>
+                        </div>
+
+                        <!-- Feature 4 -->
+                        <div class="p-8 glass rounded-3xl hover:border-[var(--color-primary)]/50 transition-all duration-300">
+                            <div class="w-12 h-12 bg-[var(--color-primary)]/20 rounded-xl flex items-center justify-center text-[var(--color-primary)] mb-6">
+                                <Zap size={24} />
+                            </div>
+                            <h3 class="text-xl font-bold mb-4" data-i18n="chatbots.feature4Title">Sin Límites ni Costes</h3>
+                            <p class="text-[var(--color-text-secondary)]" data-i18n="chatbots.feature4Desc">Sin APIs externas, sin suscripciones mensuales y sin límites de mensajes.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- How it works -->
+            <section class="py-20 bg-black/30">
+                <div class="container mx-auto px-4">
+                    <h2 class="text-4xl font-bold text-center mb-16 gradient-text" data-i18n="chatbots.howItWorks">Cómo funciona</h2>
+                    <div class="flex flex-col md:flex-row gap-8 justify-center items-stretch">
+                        <div class="flex-1 glass p-8 rounded-3xl text-center">
+                            <div class="text-4xl font-black text-[var(--color-primary)]/30 mb-4">01</div>
+                            <p class="text-lg" data-i18n="chatbots.step1">Sube tus documentos a Edge.AI</p>
+                        </div>
+                        <div class="flex items-center justify-center rotate-90 md:rotate-0">
+                            <ChevronRight size={32} className="text-[var(--color-primary)]" />
+                        </div>
+                        <div class="flex-1 glass p-8 rounded-3xl text-center">
+                            <div class="text-4xl font-black text-[var(--color-primary)]/30 mb-4">02</div>
+                            <p class="text-lg" data-i18n="chatbots.step2">Configura el modelo y diseño</p>
+                        </div>
+                        <div class="flex items-center justify-center rotate-90 md:rotate-0">
+                            <ChevronRight size={32} className="text-[var(--color-primary)]" />
+                        </div>
+                        <div class="flex-1 glass p-8 rounded-3xl text-center">
+                            <div class="text-4xl font-black text-[var(--color-primary)]/30 mb-4">03</div>
+                            <p class="text-lg" data-i18n="chatbots.step3">Exporta y sube el archivo a tu servidor</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer class="py-12 border-t border-white/5">
+                <div class="container mx-auto px-4 text-center">
+                    <img src="/inledai.png" alt="Edge.AI" class="w-12 mx-auto mb-6 opacity-50 grayscale hover:grayscale-0 transition-all" />
+                    <p class="text-sm text-[var(--color-text-tertiary)]" data-i18n="landing.footerLicense">
+                        Licenciado bajo GNU General Public License v3.0 | Inled Group
+                    </p>
+                </div>
+            </footer>
+        </div>
+
+        <script>
+            import { i18nStore } from '@/lib/stores/i18n';
+
+            function updateLanguage() {
+                const elements = document.querySelectorAll('[data-i18n]');
+                elements.forEach(el => {
+                    const key = el.getAttribute('data-i18n');
+                    if (key) {
+                        el.innerHTML = i18nStore.t(key);
+                    }
+                });
+                const langLabel = document.getElementById('langLabel');
+                if (langLabel) {
+                    langLabel.textContent = i18nStore.current === 'es' ? 'English' : 'Español';
+                }
+            }
+
+            async function init() {
+                await i18nStore.init();
+                updateLanguage();
+            }
+
+            const langSwitcher = document.getElementById('langSwitcher');
+            if (langSwitcher) {
+                langSwitcher.addEventListener('click', async () => {
+                    const nextLang = i18nStore.current === 'es' ? 'en' : 'es';
+                    await i18nStore.setLanguage(nextLang);
+                    updateLanguage();
+                });
+            }
+
+            if (typeof window !== 'undefined') {
+                init();
+            }
+        </script>
+    </body>
+</html>

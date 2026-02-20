@@ -22,10 +22,10 @@ function QualityIndicator({ quality, score }: { quality?: string, score?: number
   if (!quality) return null;
 
   const config = {
-    excellent: { color: 'text-green-500', bg: 'bg-green-500/10', label: 'Excelente', icon: CheckCircle },
-    good: { color: 'text-blue-500', bg: 'bg-blue-500/10', label: 'Buena', icon: CheckCircle },
-    fair: { color: 'text-amber-500', bg: 'bg-amber-500/10', label: 'Regular', icon: AlertCircle },
-    poor: { color: 'text-red-500', bg: 'bg-red-500/10', label: 'Baja', icon: AlertCircle },
+    excellent: { color: 'text-green-500', bg: 'bg-green-500/10', label: i18nStore.t('quality.excellent'), icon: CheckCircle },
+    good: { color: 'text-blue-500', bg: 'bg-blue-500/10', label: i18nStore.t('quality.good'), icon: CheckCircle },
+    fair: { color: 'text-amber-500', bg: 'bg-amber-500/10', label: i18nStore.t('quality.fair'), icon: AlertCircle },
+    poor: { color: 'text-red-500', bg: 'bg-red-500/10', label: i18nStore.t('quality.poor'), icon: AlertCircle },
   }[quality as any] || { color: 'text-gray-500', bg: 'bg-gray-500/10', label: quality, icon: Zap };
 
   const showWarning = quality === 'poor' || quality === 'fair';
@@ -34,15 +34,19 @@ function QualityIndicator({ quality, score }: { quality?: string, score?: number
     <div className="flex flex-col gap-2">
       <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider w-fit", config.bg, config.color)}>
         <config.icon size={12} />
-        <span>Calidad RAG: {config.label}</span>
+        <span>{i18nStore.t('quality.title')}: {config.label}</span>
         {typeof score === 'number' && !isNaN(score) && (
-          <span className="opacity-60 ml-1">({(score * 100).toFixed(0)}% precisión)</span>
+          <span className="opacity-60 ml-1">({i18nStore.t('quality.precision', { percent: (score * 100).toFixed(0) })})</span>
         )}
       </div>
       {showWarning && (
         <div className="text-[10px] text-red-400/80 italic px-1 flex items-center gap-1">
           <AlertCircle size={10} />
-          <span>Sugerencia: Añade más contexto, pregunta de nuevo o <a href="#" onClick={(e) => { e.preventDefault(); window.open('https://form.typeform.com/to/h0cyYt3d', '_blank'); }} className="underline hover:text-red-400 transition-colors">comparte feedback con Inled</a> para mejorar.</span>
+          <span>
+            {i18nStore.t('quality.warning', { 
+              link: <a href="#" onClick={(e) => { e.preventDefault(); window.open('https://form.typeform.com/to/h0cyYt3d', '_blank'); }} className="underline hover:text-red-400 transition-colors">{i18nStore.t('quality.shareFeedback')}</a> 
+            })}
+          </span>
         </div>
       )}
     </div>
@@ -76,7 +80,9 @@ function ChunkPreviewModal({ id, content, docName, score, onClose }: { id: strin
             </div>
             <div>
               <h3 className="text-sm font-bold truncate max-w-[300px]">{docName}</h3>
-              <p className="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-widest font-bold">Fragmento del Documento • {(score * 100).toFixed(1)}% relevancia</p>
+              <p className="text-[10px] text-[var(--color-text-tertiary)] uppercase tracking-widest font-bold">
+                {i18nStore.t('chunkViewer.documentFragment')} • {i18nStore.t('chunkViewer.relevance', { percent: (score * 100).toFixed(1) })}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -84,14 +90,14 @@ function ChunkPreviewModal({ id, content, docName, score, onClose }: { id: strin
               <button 
                 onClick={() => handleVote('up')}
                 className={cn("p-1.5 rounded-md transition-colors", voted === 'up' ? "bg-green-500/20 text-green-500" : "hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-tertiary)]")}
-                title="Este fragmento es útil"
+                title={i18nStore.t('chunkViewer.useful')}
               >
                 <ThumbsUp size={14} />
               </button>
               <button 
                 onClick={() => handleVote('down')}
                 className={cn("p-1.5 rounded-md transition-colors", voted === 'down' ? "bg-red-500/20 text-red-500" : "hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-tertiary)]")}
-                title="Este fragmento NO es útil"
+                title={i18nStore.t('chunkViewer.notUseful')}
               >
                 <ThumbsDown size={14} />
               </button>
@@ -107,7 +113,7 @@ function ChunkPreviewModal({ id, content, docName, score, onClose }: { id: strin
           </div>
         </div>
         <div className="p-3 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-center text-[10px] text-[var(--color-text-tertiary)]">
-          {voted ? "¡Gracias por tu feedback! El sistema aprenderá de esta valoración." : "Vota este fragmento para que el sistema aprenda su importancia real."}
+          {voted ? i18nStore.t('chunkViewer.thanksFeedback') : i18nStore.t('chunkViewer.voteFeedback')}
         </div>
       </div>
     </div>
@@ -343,10 +349,10 @@ export function Message({ message, onOpenInCanvas, onRegenerate }: MessageProps)
                 size="sm"
                 onClick={onRegenerate}
                 className="h-7 px-2 text-xs"
-                title="Regenerar respuesta"
+                title={i18nStore.t('chat.regenerate')}
               >
                 <RefreshCw size={14} className="mr-1" />
-                Regenerar
+                {i18nStore.t('chat.regenerate')}
               </Button>
             )}
 

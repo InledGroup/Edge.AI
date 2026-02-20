@@ -301,6 +301,11 @@ export interface WebRAGResult {
   /** Respuesta generada por LLM */
   answer: string;
 
+  /** Métricas de calidad RAG (opcional) */
+  ragQuality?: 'excellent' | 'good' | 'fair' | 'poor';
+  ragMetrics?: any; // RAGMetrics de rag-metrics.ts
+  faithfulness?: number;
+
   /** Metadata del proceso */
   metadata: {
     /** Tiempo total en ms */
@@ -371,6 +376,9 @@ export interface WebRAGOptions {
   /** Número máximo de URLs a descargar */
   maxUrlsToFetch?: number;
 
+  /** Alias para maxUrlsToFetch */
+  webSearchMaxUrls?: number;
+
   /** Top-K para vector search */
   topK?: number;
 
@@ -388,6 +396,9 @@ export interface WebRAGOptions {
 
   /** Callback de progreso */
   onProgress?: (step: WebSearchStep, progress: number, message?: string, data?: any) => void;
+
+  /** Historial de conversación para contexto (opcional) */
+  conversationHistory?: Array<{ role: string; content: string }>;
 
   /** Callback para streaming de tokens durante la generación de respuesta */
   onToken?: (token: string) => void;

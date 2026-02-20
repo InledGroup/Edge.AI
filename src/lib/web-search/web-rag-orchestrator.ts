@@ -26,11 +26,14 @@ import type { WllamaEngine } from '../ai/wllama-engine';
 import type { WebLLMEngine } from '../ai/webllm-engine';
 import { WebSearchService } from './web-search';
 import { ContentExtractor } from './content-extractor';
-import { AdvancedRAGPipeline } from '../new-rag';
-import { getUseAdvancedRAG } from '../db/settings';
+import { getUseAdvancedRAG, getRAGSettings, getGenerationSettings, getWebSearchSettings } from '../db/settings';
 import { semanticChunkText } from '../rag/semantic-chunking';
-import { cosineSimilarity } from '../rag/vector-search';
+import { cosineSimilarity, createRAGContext, rerankResults } from '../rag/vector-search';
+import { calculateRAGMetrics, assessRAGQuality, calculateFaithfulness } from '../rag/rag-metrics';
+import { generateRAGAnswer, processDocument, completeRAGFlow } from '../rag/rag-pipeline';
+import { BM25 } from '../rag/bm25';
 import { getWorkerPool } from '../workers';
+import { createDocument, deleteDocument } from '../db/documents';
 import {
   getCachedWebPage,
   cacheWebPage,
@@ -92,17 +95,22 @@ export class WebRAGOrchestrator {
 
   /**
    * Ejecuta búsqueda web + RAG completo
-   * MEJORADO: Con caché de páginas y embeddings
+   * UNIFICADO: Usa el flujo estándar de documentos
    */
   async search(
     userQuery: string,
     options: WebRAGOptions = {}
   ): Promise<WebRAGResult> {
+    // Load latest settings from DB to match UI configuration
+    const ragSettings = await getRAGSettings();
+    const genSettings = await getGenerationSettings();
+    const webSettings = await getWebSearchSettings();
+
     const {
-      sources, // Si es undefined, WebSearchService usará todos los disponibles
+      sources = webSettings.webSearchSources, 
       maxSearchResults = 10,
-      maxUrlsToFetch = 3,
-      topK = 5,
+      maxUrlsToFetch = webSettings.webSearchMaxUrls || 3,
+      topK = ragSettings.topK || 5, 
       onProgress,
     } = options;
 
@@ -176,30 +184,21 @@ export class WebRAGOrchestrator {
 
         // Actualizar lista de URLs con las confirmadas
         selectedUrls = confirmedUrls;
-        
-        // Filtrar selectedResults para mantener consistencia (opcional, pero bueno para logs)
-        // Nota: selectedResults ya no coincidirá exactamente si el usuario editó la lista, 
-        // pero usaremos selectedUrls para el fetch.
         console.log(`[WebRAG] User confirmed ${selectedUrls.length} URLs`);
       }
 
       // ====================================================================
-      // PASO 4: Obtener contenido (ya sea desde extensión o fetching)
+      // PASO 4: Obtener contenido
       // ====================================================================
       onProgress?.('page_fetch', 40);
       const fetchStart = Date.now();
 
-      // Check if we have content from extension (fullContent in metadata)
-      const hasExtensionContent = selectedResults.some(
-        (r: any) => r.metadata?.fullContent
-      );
-
+      const hasExtensionContent = selectedResults.some((r: any) => r.metadata?.fullContent);
       let cleanedContents: CleanedContent[] = [];
       let sourcesUsed = 0;
 
       if (hasExtensionContent) {
-        // Strategy 1: Use content already extracted by extension (during search)
-        console.log(`[WebRAG] Using content extracted by browser extension`);
+        console.log('[WebRAG] Usando contenido pre-extraído de la extensión');
         cleanedContents = selectedResults
           .filter((r: any) => r.metadata?.fullContent)
           .map((r: any) => ({
@@ -211,160 +210,119 @@ export class WebRAGOrchestrator {
           }));
         timestamps.pageFetch = Date.now() - fetchStart;
         sourcesUsed = cleanedContents.length;
-        console.log(`[WebRAG] Using ${cleanedContents.length} pre-extracted pages from extension`);
       } else {
-        // Strategy 2: Try to fetch & extract via Extension (if connected)
-        // This is better than fetching HTML because extension bypasses CORS and ads
         const bridge = getExtensionBridgeSafe();
-        let extensionSuccess = false;
-
-        if (bridge && bridge.isConnected()) {
-          try {
-            console.log(`[WebRAG] Fetching ${selectedUrls.length} pages via browser extension...`);
-            const response = await bridge.extractUrls(selectedUrls);
-
-            if (response.success && response.results) {
-              console.log(`[WebRAG] Extension successfully extracted ${response.results.length} pages`);
-              
-              // Map directly to CleanedContent, preserving the title!
-              cleanedContents = response.results.map(r => ({
-                text: r.content,
-                title: r.title || 'Sin título', // Use title from extension
-                url: r.url,
-                extractedAt: Date.now(),
-                wordCount: r.wordCount,
-              }));
-              
-              sourcesUsed = cleanedContents.length;
-              timestamps.pageFetch = Date.now() - fetchStart;
-              // Skip content extraction step since extension already did it
-              timestamps.contentExtraction = 0; 
-              extensionSuccess = true;
-            }
-          } catch (extError) {
-            console.warn('[WebRAG] Extension fetch failed, falling back to worker:', extError);
-          }
+        
+        if (!bridge || !bridge.isConnected()) {
+          throw new Error('La extensión del navegador no está conectada. Es necesaria para descargar y analizar páginas web sin restricciones.');
         }
 
-        // Strategy 3: Fallback to traditional fetch (Worker/Proxy) + extraction
-        if (!extensionSuccess) {
-          const fetchedPages = await this.fetchPages(selectedUrls);
-          timestamps.pageFetch = Date.now() - fetchStart;
-
-          console.log(`[WebRAG] Successfully fetched ${fetchedPages.length} pages`);
-
-          if (fetchedPages.length === 0) {
-            throw new Error('No se pudo descargar ninguna página');
+        try {
+          console.log(`[WebRAG] Extrayendo ${selectedUrls.length} URLs vía extensión...`);
+          const response = await bridge.extractUrls(selectedUrls);
+          
+          if (response.success && response.results && response.results.length > 0) {
+            cleanedContents = response.results.map(r => ({
+              text: r.content,
+              title: r.title || 'Sin título',
+              url: r.url,
+              extractedAt: Date.now(),
+              wordCount: r.wordCount || 0,
+            }));
+            sourcesUsed = cleanedContents.length;
+            timestamps.pageFetch = Date.now() - fetchStart;
+            timestamps.contentExtraction = 0; 
+            console.log(`[WebRAG] Extracción vía extensión exitosa: ${cleanedContents.length} páginas`);
+          } else {
+            console.error('[WebRAG] La extensión no devolvió contenido:', response);
+            throw new Error('La extensión no pudo extraer el contenido de las páginas seleccionadas.');
           }
-
-          sourcesUsed = fetchedPages.length;
-
-          // ====================================================================
-          // PASO 5: Limpieza de contenido
-          // ====================================================================
-          onProgress?.('content_extraction', 50);
-          const extractionStart = Date.now();
-
-          cleanedContents = fetchedPages.map((page) =>
-            this.contentExtractor.extract(page.html, page.url, {
-              maxWords: 2000 // Aumentado a 2000 palabras (~8000 chars) para capturar más contexto
-            })
-          );
-          timestamps.contentExtraction = Date.now() - extractionStart;
+        } catch (extError) {
+          console.warn('[WebRAG] Error crítico en extracción vía extensión:', extError);
+          throw extError instanceof Error ? extError : new Error('Error al intentar extraer contenido con la extensión.');
         }
       }
 
-      console.log(
-        `[WebRAG] Extracted content from ${cleanedContents.length} pages`
+      if (cleanedContents.length === 0) {
+        throw new Error('No se pudo extraer contenido legible de ninguna de las URLs seleccionadas.');
+      }
+
+      console.log(`[WebRAG] Listas para RAG: ${cleanedContents.length} páginas extraídas`);
+
+      // ====================================================================
+      // PASO 6: Indexar como documentos temporales en DB (NUEVO)
+      // ====================================================================
+      onProgress?.('chunking', 60);
+      const tempDocIds: string[] = [];
+      
+      for (const content of cleanedContents) {
+        try {
+          console.log(`[WebRAG] Creando documento temporal para: ${content.title}`);
+          const doc = await createDocument({
+            name: content.title || 'Página Web',
+            type: 'txt',
+            content: content.text,
+            size: content.text.length,
+            metadata: { 
+              url: content.url, 
+              temporary: true,
+              source: 'web_search' 
+            }
+          });
+          
+          // Solo lo añadimos si se procesa correctamente
+          console.log(`[WebRAG] Generando embeddings para: ${doc.id}`);
+          await processDocument(
+            doc.id, 
+            content.text, 
+            this.embeddingEngine, 
+            ragSettings.chunkSize || 800,
+            (status) => {
+              onProgress?.('embedding', 60 + (tempDocIds.length / cleanedContents.length) * 20, `Procesando: ${doc.name}`);
+            }
+          );
+          
+          tempDocIds.push(doc.id);
+        } catch (docError) {
+          console.error(`[WebRAG] Error crítico procesando ${content.url}:`, docError);
+        }
+      }
+
+      if (tempDocIds.length === 0) {
+        throw new Error('Error técnico: Se obtuvo contenido pero falló la indexación en la base de datos local.');
+      }
+
+      // ====================================================================
+      // PASO 7: Búsqueda y Generación con Pipeline Oficial
+      // ====================================================================
+      onProgress?.('vector_search', 85);
+      
+      const result = await completeRAGFlow(
+        userQuery,
+        this.embeddingEngine,
+        this.llmEngine,
+        topK,
+        tempDocIds, // Filtrar SOLO por las páginas recién descargadas
+        options.conversationHistory,
+        options.onToken,
+        {
+          calculateMetrics: true,
+          faithfulnessThreshold: genSettings.faithfulnessThreshold,
+          chunkWindowSize: ragSettings.chunkWindowSize
+        }
       );
 
       // ====================================================================
-      // PASO 6: Chunking + embeddings (RAG pipeline)
+      // PASO 8: Limpieza (Borrar documentos temporales)
       // ====================================================================
-      onProgress?.('chunking', 60);
-      const chunkingStart = Date.now();
-
-      const useAdvanced = await getUseAdvancedRAG();
-      let retrievedChunks: RetrievedWebChunk[] = [];
-      let webDocuments: WebDocument[] = [];
-      let totalChunks = 0;
-      let ragAnswer = '';
-
-      if (useAdvanced) {
-        console.log('[WebRAG] Using Advanced RAG Worker for web content');
-        const pool = getWorkerPool();
-        const worker = await pool.getAdvancedRAGWorker();
-        
-        // 1. Index all fetched pages in the advanced local store (Background Thread)
-        for (const content of cleanedContents) {
-          await worker.indexDocument(content.text, { 
-            url: content.url, 
-            title: content.title,
-            source: 'web_search'
-          });
+      // No bloqueamos la respuesta por la limpieza
+      const cleanup = async () => {
+        console.log(`[WebRAG] Limpiando ${tempDocIds.length} documentos temporales...`);
+        for (const id of tempDocIds) {
+          try { await deleteDocument(id); } catch (e) {}
         }
-        
-        // 2. Execute the advanced pipeline (Background Thread)
-        const res = await worker.execute(userQuery, (progress, msg) => {
-          // Map pipeline steps to web search progress
-          onProgress?.('searching' as any, 60 + progress * 0.3, msg);
-        });
-        
-        ragAnswer = res.context || '';
-        // Map advanced results back to expected format for compatibility
-        retrievedChunks = (res.sources || []).map((s: any) => ({
-          content: '', 
-          score: 1.0,
-          document: {
-            id: s.id,
-            title: s.metadata?.title || 'Web Result',
-            url: s.metadata?.url || '',
-            type: 'web'
-          }
-        }));
-      } else {
-        // Legacy Path
-        webDocuments = await this.processWebDocuments(
-          cleanedContents,
-          searchQuery,
-          (progress) => {
-            onProgress?.('embedding', 60 + progress * 0.2);
-          }
-        );
-        timestamps.chunking = Date.now() - chunkingStart;
-        timestamps.embedding = timestamps.chunking;
-
-        totalChunks = webDocuments.reduce((sum, doc) => sum + doc.chunks.length, 0);
-        
-        onProgress?.('vector_search', 80);
-        const searchVectorStart = Date.now();
-        const queryEmbedding = await this.embeddingEngine.generateEmbedding(userQuery);
-        retrievedChunks = await this.searchWebDocuments(
-          queryEmbedding,
-          webDocuments,
-          topK
-        );
-        timestamps.vectorSearch = Date.now() - searchVectorStart;
-      }
-
-      // ====================================================================
-      // PASO 8: Generación de respuesta
-      // ====================================================================
-      onProgress?.('answer_generation', 90);
-      const answerStart = Date.now();
-
-      const answer = useAdvanced 
-        ? await this.generateAnswerFromAdvancedContext(userQuery, ragAnswer, retrievedChunks, options.onToken)
-        : await this.generateAnswer(userQuery, retrievedChunks, options.onToken);
-      
-      timestamps.answerGeneration = Date.now() - answerStart;
-
-      console.log(`[WebRAG] Generated answer (${answer.length} characters)`);
-
-      // ====================================================================
-      // Resultado final
-      // ====================================================================
-      const totalTime = Date.now() - startTime;
+      };
+      cleanup();
 
       onProgress?.('completed', 100);
 
@@ -374,16 +332,15 @@ export class WebRAGOrchestrator {
         searchResults,
         selectedUrls,
         cleanedContents,
-        webDocuments,
-        ragResult: {
-          chunks: retrievedChunks,
-          totalSearched: totalChunks,
-          searchTime: timestamps.vectorSearch,
-        },
-        answer,
+        webDocuments: [],
+        ragResult: result.ragResult,
+        answer: result.answer,
+        ragQuality: result.quality?.overall,
+        ragMetrics: result.metrics,
+        faithfulness: result.faithfulness,
         metadata: {
-          totalTime,
-          sourcesUsed,
+          totalTime: Date.now() - startTime,
+          sourcesUsed: tempDocIds.length,
           timestamps: timestamps as any,
         },
       };
@@ -517,226 +474,6 @@ Responde SOLO con un JSON en este formato exacto:
   }
 
   // ==========================================================================
-  // PASO 6: Chunking + Embeddings
-  // ==========================================================================
-
-  private async processWebDocuments(
-    contents: CleanedContent[],
-    searchQuery: string,
-    onProgress?: (progress: number) => void
-  ): Promise<WebDocument[]> {
-    const documents: WebDocument[] = [];
-    let totalProcessed = 0;
-    const totalItems = contents.length;
-
-    console.log(`[WebRAG] Processing ${totalItems} cleaned pages...`);
-
-    for (const content of contents) {
-      // 1. Chunking semántico
-      const chunks = await semanticChunkText(content.text, 800, 400);
-
-      // 2. Generar embeddings
-      const texts = chunks.map((c) => c.content);
-      let embeddings: Float32Array[] = [];
-
-      try {
-        if ('generateEmbeddingsBatch' in (this.embeddingEngine as any)) {
-           embeddings = await (this.embeddingEngine as any).generateEmbeddingsBatch(
-             texts,
-             4, // Concurrency
-             (_p: number) => {
-               // Optional: report detailed embedding progress
-             }
-           );
-        } else {
-           // Fallback for engines without batch support
-           for (const text of texts) {
-             const emb = await (this.embeddingEngine as any).generateEmbedding(text);
-             embeddings.push(emb);
-           }
-        }
-      } catch (error) {
-        console.warn(`[WebRAG] Failed to generate embeddings for ${content.url}:`, error);
-        // Continue with empty embeddings (or skip document?)
-        // Let's skip document to avoid bad results
-        continue;
-      }
-
-      // 3. Crear WebDocument
-      const webDoc: WebDocument = {
-        id: `web-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: 'web',
-        url: content.url,
-        title: content.title,
-        content: content.text,
-        chunks: chunks.map((chunk, i) => ({
-          ...chunk,
-          index: i,
-          embedding: embeddings[i] || new Float32Array(0),
-          metadata: {
-            ...chunk.metadata,
-            startChar: 0,
-            endChar: chunk.content.length,
-          } as any,
-        })),
-        temporary: true,
-        fetchedAt: Date.now(),
-        metadata: {
-          source: 'extension', 
-          searchQuery,
-          originalSize: content.text.length,
-          fetchTime: 0,
-        }
-      };
-
-      documents.push(webDoc);
-      
-      totalProcessed++;
-      if (onProgress) {
-        onProgress((totalProcessed / totalItems) * 100);
-      }
-    }
-
-    return documents;
-  }
-
-  // ==========================================================================
-  // PASO 7: Vector Search
-  // ==========================================================================
-
-  private async searchWebDocuments(
-    queryEmbedding: Float32Array | number[],
-    documents: WebDocument[],
-    topK: number
-  ): Promise<RetrievedWebChunk[]> {
-    const allChunks: RetrievedWebChunk[] = [];
-    
-    // Normalize query embedding to Float32Array
-    const queryVec = queryEmbedding instanceof Float32Array 
-      ? queryEmbedding 
-      : new Float32Array(queryEmbedding);
-
-    // Collect all chunks from all documents
-    for (const doc of documents) {
-      for (const chunk of doc.chunks) {
-        // Calculate similarity
-        let score = 0;
-        if (chunk.embedding.length > 0) {
-          score = cosineSimilarity(queryVec, chunk.embedding);
-        }
-
-        allChunks.push({
-          content: chunk.content,
-          score,
-          document: {
-            id: doc.id,
-            title: doc.title,
-            url: doc.url,
-            type: 'web',
-          },
-          metadata: chunk.metadata,
-        });
-      }
-    }
-
-    // Sort by score descending
-    allChunks.sort((a, b) => b.score - a.score);
-
-    // Return top K
-    return allChunks.slice(0, topK);
-  }
-
-  // ==========================================================================
-  // PASO 8: Generar respuesta final
-  // ==========================================================================
-
-  private async generateAnswer(
-    query: string,
-    chunks: RetrievedWebChunk[],
-    onToken?: (token: string) => void
-  ): Promise<string> {
-    // Formatear contexto RAG
-    const context = chunks
-      .map((chunk, i) => {
-        const score = (chunk.score * 100).toFixed(1);
-        const cleanUrl = cleanProxyUrl(chunk.document.url);
-        return `[Fuente ${i + 1}: ${chunk.document.title} (${score}% relevancia)]
-URL: ${cleanUrl}
-
-${chunk.content}`;
-      })
-      .join('\n\n---\n\n');
-
-    const messages = [
-      {
-        role: 'system',
-        content: `Eres un asistente experto que sintetiza información de múltiples fuentes web para proporcionar respuestas completas y precisas.
-
-CONTEXTO DE FUENTES WEB:
-${context}
-
-INSTRUCCIONES:
-- Analiza y sintetiza la información de TODAS las fuentes proporcionadas
-- Combina información complementaria de diferentes fuentes cuando sea relevante
-- Cita las fuentes usando su número (ej: "Según la Fuente 1...")
-- Prioriza información de fuentes con mayor relevancia (%)
-- Si encuentras información contradictoria entre fuentes, menciónalo
-- Haz inferencias razonables basándote en la información disponible
-- Proporciona una respuesta completa y bien estructurada
-- Solo indica falta de información si NINGUNA fuente contiene datos relacionados`
-      },
-      {
-        role: 'user',
-        content: `PREGUNTA DEL USUARIO: ${query}`
-      }
-    ];
-
-    const answer = await this.generateText(messages, {
-      temperature: 0.7,
-      max_tokens: 1024, // Aumentado de 512 a 1024 para respuestas más completas
-      stop: ['<|im_end|>', '<|end|>', '<|eot_id|>'],
-      onToken, // Pass streaming callback
-    });
-
-    return answer.trim();
-  }
-
-  private async generateAnswerFromAdvancedContext(
-    query: string,
-    context: string,
-    sources: RetrievedWebChunk[],
-    onToken?: (token: string) => void
-  ): Promise<string> {
-    const messages = [
-      {
-        role: 'system',
-        content: `Eres un asistente experto que sintetiza información web.
-        
-CONTEXTO COMPRIMIDO (RECOMP):
-${context}
-
-FUENTES:
-${sources.map((s, i) => `[Fuente ${i+1}]: ${s.document.title} - ${s.document.url}`).join('\n')}
-
-INSTRUCCIONES:
-- Responde basándote en el contexto comprimido.
-- Cita las fuentes por su número.
-- Si el contexto no es suficiente, indícalo.`
-      },
-      {
-        role: 'user',
-        content: `PREGUNTA: ${query}`
-      }
-    ];
-
-    return await this.generateText(messages, {
-      temperature: 0.7,
-      max_tokens: 1024,
-      onToken
-    });
-  }
-
-  // ==========================================================================
   // UTILIDADES
   // ==========================================================================
 
@@ -768,12 +505,6 @@ INSTRUCCIONES:
     }
 
     // Wllama (chat API) - legacy support check
-    // Since we updated WllamaEngine to have generateText matching WebLLMEngine signature,
-    // this branch might be redundant if WllamaEngine also has generateText.
-    // However, keeping it safe if llmEngine is typed strictly.
-    // BUT wait, WllamaEngine has generateText now. The type definition LLMEngine union should cover it.
-    
-    // Fallback for any other engine type or if WllamaEngine uses different interface in types
     if ('createChatCompletion' in (this.llmEngine as any)) {
       // Convert input to messages if string
       const messages = Array.isArray(input) ? input : [{ role: 'user', content: input }];

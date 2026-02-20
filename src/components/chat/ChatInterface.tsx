@@ -107,11 +107,15 @@ export function ChatInterface() {
 
   useEffect(() => {
     const activeId = conversationsStore.activeId;
-    if (activeId) {
-      const conv = conversationsStore.active;
-      if (conv) setMessages(conv.messages || []);
-    } else setMessages([]);
-  }, [conversationsStore.activeId]);
+    
+    // Solo sincronizar si NO estamos generando (para evitar limpiar mensajes locales del primer envío)
+    if (!isGenerating) {
+      if (activeId) {
+        const conv = conversationsStore.active;
+        if (conv) setMessages(conv.messages || []);
+      } else setMessages([]);
+    }
+  }, [conversationsStore.activeId, isGenerating]);
 
   const handleOpenInCanvas = (content: string) => {
     canvasStore.open(markdownToHTML(content));
@@ -144,6 +148,23 @@ export function ChatInterface() {
   async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[], activeTool?: { type: 'app' | 'mcp', id: string, name: string } | null) {
     if (!isModelsReady) { alert(i18nStore.t('chat.loadModelsFirst')); return; }
 
+    // 1. Pre-crear o asegurar ID de conversación antes de tocar el estado de mensajes
+    let conversationId = conversationsStore.activeId;
+    let isFirstMessage = false;
+
+    if (!conversationId) {
+      const conv = await getOrCreateConversation();
+      conversationId = conv.id;
+      isFirstMessage = true;
+      conversationsStore.add(conv);
+      conversationsStore.setActive(conversationId); // Activar ANTES de empezar a generar
+    } else {
+      const activeConv = conversationsStore.active;
+      if (!activeConv || !activeConv.messages || activeConv.messages.length === 0) {
+        isFirstMessage = true;
+      }
+    }
+
     // Load latest global settings before processing
     const genSettings = await getGenerationSettings();
     const ragSettings = await getRAGSettings();
@@ -161,7 +182,8 @@ export function ChatInterface() {
       extensionsStore.setActiveTool(null);
     }
 
-    // 1. Detect MCP Trigger (Pill or Slash command or Keyword)
+    // Detect MCP Trigger (Pill or Slash command or Keyword)
+    // ... rest of logic remains similar but with conversationId guaranteed ...
     let mcpTools: any[] = [];
     let activeServerName = '';
     const toolNameMap = new Map<string, string>();
@@ -245,33 +267,12 @@ export function ChatInterface() {
     
     // Add user message to state and DB
     setMessages(prev => [...prev, userMessage]);
-    
-    let conversationId = conversationsStore.activeId;
-    let isFirstMessage = false;
-
-    if (!conversationId) {
-      const conv = await getOrCreateConversation();
-      conversationId = conv.id;
-      isFirstMessage = true;
-      conversationsStore.add(conv);
-    } else {
-      const activeConv = conversationsStore.active;
-      if (!activeConv || !activeConv.messages || activeConv.messages.length === 0) {
-        isFirstMessage = true;
-      }
-    }
-
     await addMessage(conversationId, userMessage);
 
+    // Actualizar título si es necesario
     if (isFirstMessage) {
       const tempTitle = generateTitle(originalContent);
       await updateConversationTitle(conversationId, tempTitle);
-      const updatedConv = await getConversation(conversationId);
-      if (updatedConv) {
-        conversationsStore.update(conversationId, updatedConv);
-        conversationsStore.setActive(conversationId);
-      }
-    } else {
       const updatedConv = await getConversation(conversationId);
       if (updatedConv) conversationsStore.update(conversationId, updatedConv);
     }
@@ -311,6 +312,10 @@ export function ChatInterface() {
         const embeddingEngine = await EngineManager.getEmbeddingEngine();
         const orchestrator = await WebRAGOrchestrator.create(chatEngine, embeddingEngine);
         
+        // Calculate history for context
+        const maxHistory = genSettings.historyLimit || 5;
+        const history = messages.slice(-maxHistory).map(m => ({ role: m.role, content: m.content }));
+
         const res = await orchestrator.search(originalContent, {
           onToken: (t) => {
             finalContent += t;
@@ -321,6 +326,7 @@ export function ChatInterface() {
           onProgress: (step, progress, message) => {
             setWebSearchProgress({ step, progress, message });
           },
+          conversationHistory: history, // Pass history for context
           confirmUrls: true,
           onConfirmationRequest: async (urls) => {
             setPendingUrls(urls);
@@ -333,7 +339,30 @@ export function ChatInterface() {
             });
           }
         });
+        
         finalContent = res.answer;
+        finalSources = res.ragResult.chunks;
+        
+        // Map chunks to unique web sources for UI component
+        const uniqueSourcesMap = new Map<string, any>();
+        res.ragResult.chunks.forEach(chunk => {
+          const url = chunk.document.url;
+          if (!uniqueSourcesMap.has(url) || uniqueSourcesMap.get(url).score < chunk.score) {
+            uniqueSourcesMap.set(url, {
+              title: chunk.document.title,
+              url: url,
+              score: chunk.score
+            });
+          }
+        });
+
+        // Pass accuracy metrics and web sources to metadata for UI
+        finalMetadata = {
+          ragQuality: res.ragQuality,
+          ragMetrics: res.ragMetrics,
+          faithfulness: res.faithfulness,
+          webSources: Array.from(uniqueSourcesMap.values())
+        };
       } else if (effectiveMode === 'local') {
         const useAdvanced = await getUseAdvancedRAG();
         
@@ -442,7 +471,13 @@ export function ChatInterface() {
         }
         
         const systemPrompt = `Eres un asistente inteligente local. ${canvasContext}${memoryContext}\n${getExtensionsSystemPrompt()}${customAppPrompt}`;
-        const chatMsgs = [{ role: 'system', content: systemPrompt }, ...history];
+        
+        // El historial NO incluye el mensaje actual que acabamos de enviar, así que lo añadimos explícitamente
+        const chatMsgs = [
+          { role: 'system', content: systemPrompt }, 
+          ...history,
+          { role: 'user', content: assistantPrompt } // Mensaje actual
+        ];
         
         const isMcpIntent = mcpTools.length > 0 || content.match(/\/(notion|weather|google|search)/i);
 

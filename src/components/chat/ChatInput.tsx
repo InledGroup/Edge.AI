@@ -92,17 +92,8 @@ export function ChatInput({
     // Si estamos en modo continuo, el speechService se encargará de reiniciar
     // Si solo estamos dictando, actualizamos el input
     if (vState === 'listening') {
-      speechService.startListening((text) => {
-        // Accedemos directamente a la señal para evitar cierres obsoletos (stale closures)
-        if (isVoiceModeEnabled.value) {
-          // Si es modo conversación, enviar automáticamente
-          onSend(text, mode, selectedImage ? [selectedImage] : undefined, activeTool);
-          setSelectedImage(null);
-        } else {
-          // Si es solo dictado, añadir al input
-          setMessage(prev => prev + ' ' + text);
-        }
-      });
+      // El callback ya debería estar configurado si startListening se llamó correctamente
+      // No volvemos a llamar a startListening() aquí para evitar bucles.
     }
   }, [vState, mode, onSend, selectedImage, showLiveMode, activeTool]);
 
@@ -162,7 +153,18 @@ export function ChatInput({
     if (vState === 'listening') {
       speechService.stopListening();
     } else {
-      speechService.startListening((text) => setMessage(prev => (prev + ' ' + text).trim()));
+      // Si el modo continuo estaba activo, lo quitamos para dictado simple
+      if (isVoiceModeEnabled.value) {
+        isVoiceModeEnabled.value = false;
+      }
+      
+      speechService.startListening((text) => {
+        setMessage(prev => (prev + ' ' + text).trim());
+        // Auto-stop after dictation if not in continuous mode
+        if (!isVoiceModeEnabled.value) {
+           speechService.stopListening();
+        }
+      });
     }
   }
 

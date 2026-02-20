@@ -16,6 +16,9 @@ class SpeechService {
   private currentLang: 'es-ES' | 'en-US' = 'es-ES';
   private currentCallback: ((text: string) => void) | null = null;
   private isExplicitlyStopped: boolean = false;
+  private restartTimeout: any = null;
+  private errorCount: number = 0;
+  private lastErrorTime: number = 0;
   private activeUtterances: Set<SpeechSynthesisUtterance> = new Set();
   private audioContext: AudioContext | null = null;
   private audioQueue: AudioBuffer[] = [];
@@ -48,6 +51,17 @@ class SpeechService {
   }
 
   private initRecognition() {
+    // Cleanup previous instance if any
+    if (this.recognition) {
+      try {
+        this.recognition.onstart = null;
+        this.recognition.onresult = null;
+        this.recognition.onend = null;
+        this.recognition.onerror = null;
+        this.recognition.stop();
+      } catch (e) {}
+    }
+
     // @ts-ignore - Webkit prefix for Chrome/Safari/Android
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
@@ -67,9 +81,9 @@ class SpeechService {
       this.recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         console.log('🎤 Result:', transcript);
+        this.errorCount = 0; // Reset errors on success
         if (transcript && this.currentCallback) {
           // Flag as explicitly stopped to prevent immediate race condition in onend
-          // The callback (LiveMode) will call stopListening() anyway, but this is a safety guard
           this.isExplicitlyStopped = true;
           this.currentCallback(transcript);
         }
@@ -87,26 +101,61 @@ class SpeechService {
         // Auto-restart logic for continuous mode
         if (isVoiceModeEnabled.value && !this.isExplicitlyStopped) {
           // CRITICAL: Only restart if the state is idle.
-          // If it's 'processing' or 'speaking', it means the AI is working or replying.
           if (voiceState.value === 'idle') {
-            setTimeout(() => {
-              // Double check after delay to allow state transitions to settle
+            // Check for too many rapid errors
+            if (this.errorCount > 3) {
+                console.warn('🎤 Too many speech recognition errors, stopping auto-restart');
+                isVoiceModeEnabled.value = false;
+                voiceError.value = 'Error de conexión persistente con el servicio de voz.';
+                return;
+            }
+
+            // Exponential backoff or standard delay
+            const delay = this.errorCount > 0 ? 1500 * this.errorCount : 250;
+            
+            if (this.restartTimeout) clearTimeout(this.restartTimeout);
+            this.restartTimeout = setTimeout(() => {
               if (isVoiceModeEnabled.value && !this.isExplicitlyStopped && voiceState.value === 'idle') {
-                console.log('🎤 Auto-restarting...');
+                console.log(`🎤 Auto-restarting (delay: ${delay}ms)...`);
                 this.startListening();
               }
-            }, 150);
+            }, delay);
           }
         }
       };
 
       this.recognition.onerror = (event: any) => {
-        console.error('Speech recognition error', event.error);
-        if (event.error === 'no-speech') {
-           // Silence - just let onend restart it
+        const errorType = event.error;
+        console.error('Speech recognition error:', errorType);
+        
+        // Track errors for backoff/cooldown
+        const now = Date.now();
+        if (now - this.lastErrorTime < 5000) {
+            this.errorCount++;
+        } else {
+            this.errorCount = 1;
+        }
+        this.lastErrorTime = now;
+
+        if (errorType === 'no-speech') {
            return;
         }
-        voiceError.value = `Error: ${event.error}`;
+
+        // Network error is common on Chrome with local IPs
+        if (errorType === 'network') {
+           console.error('🎤 Network error detected. Re-initializing engine...');
+           // On network error, Chrome's recognition object often gets stuck.
+           // We re-init to try and clear the internal state.
+           setTimeout(() => this.initRecognition(), 500);
+        }
+
+        if (errorType === 'not-allowed' || errorType === 'service-not-allowed') {
+           console.error(`🎤 Critical speech error "${errorType}", disabling continuous mode.`);
+           this.isExplicitlyStopped = true;
+           isVoiceModeEnabled.value = false;
+        }
+
+        voiceError.value = `Error: ${errorType}`;
         voiceState.value = 'idle';
       };
     } else {

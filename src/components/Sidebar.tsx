@@ -178,7 +178,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
               }`}
           >
             <MessageSquare size={16} />
-            <span>Chats</span>
+            <span>{i18nStore.t('common.conversations')}</span>
           </button>
           <button
             onClick={() => setActiveTab('documents')}
@@ -188,7 +188,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
               }`}
           >
             <FileText size={16} />
-            <span>Docs</span>
+            <span>{i18nStore.t('common.documents')}</span>
           </button>
           <button
             onClick={() => setActiveTab('extensions')}
@@ -368,7 +368,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
           >
             <Download size={16} />
-            <span>Exportar Chatbot</span>
+            <span>{i18nStore.t('exportChatbot.title')}</span>
           </button>
 
           <button
@@ -376,7 +376,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
           >
             <Sliders size={16} />
-            <span>Configuración RAG</span>
+            <span>{i18nStore.t('ragSettings.title')}</span>
           </button>
 
           <button
@@ -384,7 +384,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
           >
             <Settings size={16} />
-            <span>MCP Servers</span>
+            <span>{i18nStore.t('mcp.title')}</span>
           </button>
 
           <button
