@@ -30,6 +30,13 @@ const DEFAULT_SETTINGS: Settings = {
   faithfulnessThreshold: 0.45, // Default sensitivity
   chunkWindowSize: 1, // Default Small-to-Big window
   enableUpdates: null, // null = not asked yet, true = enabled, false = disabled
+  // Remote API defaults
+  enableInboundApi: false, // Disabled by default for privacy
+  inboundApiKey: '', // No key by default
+  enableOutboundApi: false, // Use local engine by default
+  outboundApiUrl: 'http://localhost:11434/v1', // Ollama default
+  outboundApiKey: '', // No key by default
+  outboundModelId: 'llama3.2', // Common default model
 };
 
 /**

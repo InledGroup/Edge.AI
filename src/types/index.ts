@@ -150,6 +150,13 @@ export interface Settings {
   historyLimit?: number; // max messages from history to include
   faithfulnessThreshold?: number; // 0-1, sensitivity of accuracy algorithm
   chunkWindowSize?: number; // 0-3, surrounding context for Small-to-Big
+  // Remote API settings
+  enableInboundApi?: boolean; // Expose OpenAI-compatible API via extension
+  inboundApiKey?: string; // Optional API key for inbound requests
+  enableOutboundApi?: boolean; // Use external OpenAI-compatible provider
+  outboundApiUrl?: string; // e.g. http://localhost:11434/v1
+  outboundApiKey?: string; // API key for outbound requests
+  outboundModelId?: string; // Default model for outbound requests
 }
 
 /**

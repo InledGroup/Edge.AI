@@ -1,12 +1,14 @@
 import { WebLLMEngine } from './webllm-engine';
 import { WllamaEngine } from './wllama-engine';
 import { TransformersEngine } from './transformers-engine';
+import { OpenAIEngine } from './openai-engine';
 import type { ProgressCallback } from './webllm-engine';
 import { getModelById } from './model-registry';
 import { modelsStore } from '../stores';
+import { getSetting } from '../db/settings';
 
-let chatEngineInstance: WebLLMEngine | WllamaEngine | TransformersEngine | null = null;
-let embeddingEngineInstance: WebLLMEngine | WllamaEngine | TransformersEngine | null = null;
+let chatEngineInstance: WebLLMEngine | WllamaEngine | TransformersEngine | OpenAIEngine | null = null;
+let embeddingEngineInstance: WebLLMEngine | WllamaEngine | TransformersEngine | OpenAIEngine | null = null;
 let toolEngineInstance: WllamaEngine | null = null; // Specialized for MCP tools
 let liveEngineInstance: WllamaEngine | TransformersEngine | null = null;
 let liveInitializationPromise: Promise<WllamaEngine | TransformersEngine> | null = null;
@@ -18,8 +20,22 @@ let liveModelName: string = '';
 const TOOL_MODEL_URL = 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_0.gguf';
 
 export const EngineManager = {
-  async getChatEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine | TransformersEngine> {
+  async getChatEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine | TransformersEngine | OpenAIEngine> {
+    const outboundEnabled = await getSetting('enableOutboundApi');
     const targetId = modelName || modelsStore.chat?.id || chatModelName;
+    
+    // Remote engine takes precedence if enabled and no specific model override is provided,
+    // OR if the targetId starts with "remote:" (future-proofing)
+    if (outboundEnabled || targetId?.startsWith('remote:')) {
+      if (!chatEngineInstance || !(chatEngineInstance instanceof OpenAIEngine)) {
+         console.log('🔄 Initializing Remote Chat Engine (OpenAI API)');
+         chatEngineInstance = new OpenAIEngine();
+         await (chatEngineInstance as OpenAIEngine).initialize(targetId?.replace('remote:', '') || '', onProgress);
+         chatModelName = 'remote';
+      }
+      return chatEngineInstance!;
+    }
+
     if (!targetId) throw new Error('No chat model selected');
 
     if (!chatEngineInstance || targetId !== chatModelName) {
@@ -42,8 +58,20 @@ export const EngineManager = {
     return chatEngineInstance!;
   },
 
-  async getEmbeddingEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine | TransformersEngine> {
+  async getEmbeddingEngine(modelName?: string, onProgress?: ProgressCallback): Promise<WebLLMEngine | WllamaEngine | TransformersEngine | OpenAIEngine> {
+    const outboundEnabled = await getSetting('enableOutboundApi');
     const targetId = modelName || modelsStore.embedding?.id || embeddingModelName;
+
+    if (outboundEnabled || targetId?.startsWith('remote:')) {
+      if (!embeddingEngineInstance || !(embeddingEngineInstance instanceof OpenAIEngine)) {
+         console.log('🔄 Initializing Remote Embedding Engine (OpenAI API)');
+         embeddingEngineInstance = new OpenAIEngine();
+         await (embeddingEngineInstance as OpenAIEngine).initialize(targetId?.replace('remote:', '') || '', onProgress);
+         embeddingModelName = 'remote';
+      }
+      return embeddingEngineInstance!;
+    }
+
     if (!targetId) throw new Error('No embedding model selected');
 
     if (!embeddingEngineInstance || targetId !== embeddingModelName) {

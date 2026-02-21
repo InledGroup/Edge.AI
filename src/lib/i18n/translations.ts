@@ -543,7 +543,19 @@ export const translations = {
       enableUpdates: 'Buscar actualizaciones automáticamente',
       enableUpdatesDesc: 'Permite que la app consulte extupdater.inled.es al iniciar para avisarte de nuevas versiones.',
       dataStorage: 'Almacenamiento Local',
-      dataStorageDesc: 'Tus conversaciones y documentos se guardan exclusivamente en tu navegador (IndexedDB) y nunca salen de tu dispositivo.'
+      dataStorageDesc: 'Tus conversaciones y documentos se guardan exclusivamente en tu navegador (IndexedDB) y nunca salen de tu dispositivo.',
+      inboundApi: 'Exponer API (Servidor)',
+      inboundApiDesc: 'Permite que otras aplicaciones usen este navegador como motor de inferencia (vía extensión).',
+      outboundApi: 'Proveedor Externo (Cliente)',
+      outboundApiDesc: 'Usa un servidor remoto (Ollama, LM Studio) en lugar del motor local.',
+      apiUrl: 'URL de la API (Virtual Endpoint)',
+      apiKey: 'Clave API (Opcional)',
+      modelId: 'ID del Modelo',
+      extensionId: 'ID de la Extensión (Puerto Virtual)',
+      availableModels: 'Modelos Disponibles (IDs)',
+      testConnection: 'Probar Conexión',
+      connectionSuccess: '¡Conexión exitosa!',
+      connectionError: 'Error de conexión'
     },
     quality: {
       title: 'Calidad RAG',
@@ -1117,7 +1129,19 @@ export const translations = {
       enableUpdates: 'Search for updates automatically',
       enableUpdatesDesc: 'Allow the app to query extupdater.inled.es at startup to notify you about new versions.',
       dataStorage: 'Local Storage',
-      dataStorageDesc: 'Your conversations and documents are saved exclusively in your browser (IndexedDB) and never leave your device.'
+      dataStorageDesc: 'Your conversations and documents are saved exclusively in your browser (IndexedDB) and never leave your device.',
+      inboundApi: 'Expose API (Server)',
+      inboundApiDesc: 'Allow other apps to use this browser as an inference engine (via extension).',
+      outboundApi: 'External Provider (Client)',
+      outboundApiDesc: 'Use a remote server (Ollama, LM Studio) instead of the local engine.',
+      apiUrl: 'API URL',
+      apiKey: 'API Key (Optional)',
+      modelId: 'Model ID',
+      extensionId: 'Extension ID (Endpoint)',
+      availableModels: 'Available Models',
+      testConnection: 'Test Connection',
+      connectionSuccess: 'Connection successful!',
+      connectionError: 'Connection error'
     },
     quality: {
       title: 'RAG Quality',
