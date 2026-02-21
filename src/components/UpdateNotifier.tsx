@@ -60,7 +60,7 @@ export function UpdateNotifier() {
       if (!Array.isArray(updates)) return;
 
       // Buscar actualizaciones para edgeai (web o general)
-      const edgeUpdate = updates.find(u => u.id && (u.id.startsWith('edgeai-web-v') || u.id.startsWith('edgeai-v')));
+      const edgeUpdate = updates.find(u => u.id && (u.id.startsWith('edgeai-web-v') || u.id.startsWith('edgeai-web-v')));
       
       if (edgeUpdate) {
         const versionMatch = edgeUpdate.id.match(/v(\d+\.\d+\.\d+)/);
