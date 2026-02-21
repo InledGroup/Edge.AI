@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS: Settings = {
   historyLimit: 10, // Default limit
   faithfulnessThreshold: 0.45, // Default sensitivity
   chunkWindowSize: 1, // Default Small-to-Big window
+  enableUpdates: null, // null = not asked yet, true = enabled, false = disabled
 };
 
 /**

@@ -49,9 +49,10 @@ export function RAGSettingsPopup() {
 
   if (!show) return null;
 
-  const handleMaxWebUrlsChange = async (val: number) => {
-    setMaxWebUrls(val);
-    await updateWebSearchSettings({ webSearchMaxUrls: val });
+  const handleEnableUpdatesChange = async (val: boolean) => {
+    setEnableUpdates(val);
+    const { setSetting } = await import('@/lib/db/settings');
+    await setSetting('enableUpdates', val);
   };
 
   const handleTemperatureChange = async (val: number) => {

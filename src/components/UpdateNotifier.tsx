@@ -1,66 +1,51 @@
 import { useState, useEffect } from 'preact/hooks';
-import { RefreshCw, AlertTriangle, X, ShieldAlert, Globe } from 'lucide-preact';
+import { RefreshCw, AlertTriangle, ShieldAlert, Globe, Check, X, Shield, Bell } from 'lucide-preact';
 import { i18nStore } from '@/lib/stores/i18n';
-import { getExtensionBridgeSafe } from '@/lib/extension-bridge';
+import { getSetting, setSetting } from '@/lib/db/settings';
 
 const CURRENT_VERSION = '0.1.0';
 const UPDATE_API_URL = 'https://extupdater.inled.es/api/updates.json';
 
 export function UpdateNotifier() {
   const [showUpdate, setShowUpdate] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
   const [newVersion, setNewVersion] = useState('');
 
   useEffect(() => {
-    async function checkUpdates() {
-      const bridge = getExtensionBridgeSafe();
-      let updates = null;
-
-      // MÉTODO 1: Extensión (Bypassea CORS 100%)
-      if (bridge && bridge.isConnected()) {
-        try {
-          console.log('[UpdateNotifier] Checking via extension...');
-          const res = await bridge.fetchJson(`${UPDATE_API_URL}?t=${Date.now()}`);
-          if (res && res.results) updates = res.results;
-          else if (Array.isArray(res)) updates = res;
-        } catch (e) {
-          console.warn('[UpdateNotifier] Extension fetch failed, falling back to proxies');
-        }
-      }
-
-      // MÉTODO 2: Proxies (Si no hay extensión o falló)
-      if (!updates) {
-        updates = await fetchWithProxies();
-      }
-
-      if (updates) {
-        processUpdates(updates);
+    async function init() {
+      const enabled = await getSetting('enableUpdates');
+      
+      if (enabled === null) {
+        // Primera vez, pedir consentimiento
+        setShowConsent(true);
+      } else if (enabled === true) {
+        // Si está activado, comprobar actualizaciones directamente (sin proxies)
+        checkUpdates();
       }
     }
 
-    async function fetchWithProxies() {
-      // Intento 1: AllOrigins
+    async function checkUpdates() {
       try {
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(UPDATE_API_URL)}&t=${Date.now()}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.contents) return JSON.parse(data.contents);
+        const response = await fetch(UPDATE_API_URL, { 
+          cache: 'no-store',
+          mode: 'cors' // Petición directa estándar
+        });
+        
+        if (response.ok) {
+          const updates = await response.json();
+          processUpdates(updates);
         }
-      } catch (e) {}
-
-      // Intento 2: CORSProxy.io (Excelente alternativa)
-      try {
-        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(UPDATE_API_URL)}`);
-        if (res.ok) return await res.json();
-      } catch (e) {}
-
-      return null;
+      } catch (error) {
+        // Fallará si hay problemas de red o CORS en el servidor, 
+        // pero cumplimos con no usar proxies.
+        console.warn('[UpdateNotifier] Update check failed (Direct connection only)');
+      }
     }
 
     function processUpdates(updates: any[]) {
       if (!Array.isArray(updates)) return;
 
-      // Buscar actualizaciones para edgeai (web o general)
-      const edgeUpdate = updates.find(u => u.id && (u.id.startsWith('edgeai-web-v') || u.id.startsWith('edgeai-web-v')));
+      const edgeUpdate = updates.find(u => u.id && (u.id.startsWith('edgeai-web-v')));
       
       if (edgeUpdate) {
         const versionMatch = edgeUpdate.id.match(/v(\d+\.\d+\.\d+)/);
@@ -73,9 +58,54 @@ export function UpdateNotifier() {
       }
     }
 
-    // Comprobar al cargar
-    checkUpdates();
+    init();
   }, []);
+
+  const handleConsent = async (consent: boolean) => {
+    await setSetting('enableUpdates', consent);
+    setShowConsent(false);
+    if (consent) {
+      // Si acepta, podemos recargar o simplemente esperar a la próxima vez
+      // Por simplicidad, ejecutamos la comprobación ahora
+      window.location.reload();
+    }
+  };
+
+  if (showConsent) {
+    return (
+      <div className="fixed bottom-6 right-6 z-[200] max-w-sm bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl shadow-2xl p-5 animate-in slide-in-from-bottom-10 duration-500">
+        <div className="flex gap-4">
+          <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center shrink-0">
+            <Shield size={20} className="text-[var(--color-primary)]" />
+          </div>
+          <div className="space-y-3">
+            <div>
+              <h4 className="font-bold text-sm text-[var(--color-text-primary)]">
+                {i18nStore.t('updates.title')}
+              </h4>
+              <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed mt-1">
+                {i18nStore.t('privacy.enableUpdatesDesc')}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => handleConsent(true)}
+                className="px-3 py-1.5 bg-[var(--color-primary)] text-black text-xs font-bold rounded-lg hover:opacity-90 transition-all"
+              >
+                {i18nStore.t('common.ready')}
+              </button>
+              <button 
+                onClick={() => handleConsent(false)}
+                className="px-3 py-1.5 bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] text-xs font-medium rounded-lg hover:bg-[var(--color-bg-hover)] transition-all"
+              >
+                {i18nStore.t('common.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!showUpdate) return null;
 

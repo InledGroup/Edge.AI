@@ -537,6 +537,14 @@ export const translations = {
       optimalConfig: 'Configuración Óptima',
       saveClose: 'Guardar y Cerrar'
     },
+    privacy: {
+      title: 'Privacidad',
+      subtitle: 'Gestiona tus preferencias de datos y conexiones externas',
+      enableUpdates: 'Buscar actualizaciones automáticamente',
+      enableUpdatesDesc: 'Permite que la app consulte extupdater.inled.es al iniciar para avisarte de nuevas versiones.',
+      dataStorage: 'Almacenamiento Local',
+      dataStorageDesc: 'Tus conversaciones y documentos se guardan exclusivamente en tu navegador (IndexedDB) y nunca salen de tu dispositivo.'
+    },
     quality: {
       title: 'Calidad RAG',
       precision: '{percent}% precisión',
@@ -562,7 +570,8 @@ export const translations = {
       step2: '2. Eliminar todos los datos y cookies de este sitio.',
       step3: '3. Recargar la página para aplicar los cambios.',
       backupNotice: 'Puedes exportar tus conversaciones desde el menú inferior de la barra lateral.',
-      close: 'Entendido'
+      close: 'Entendido',
+      enableUpdatesDesc: 'Conecta con extupdater.inled.es para avisarte de nuevas versiones.'
     }
   },
   en: {
@@ -1101,6 +1110,14 @@ export const translations = {
       sensitivity: 'Sensitivity',
       optimalConfig: 'Optimal Configuration',
       saveClose: 'Save and Close'
+    },
+    privacy: {
+      title: 'Privacy',
+      subtitle: 'Manage your data preferences and external connections',
+      enableUpdates: 'Search for updates automatically',
+      enableUpdatesDesc: 'Allow the app to query extupdater.inled.es at startup to notify you about new versions.',
+      dataStorage: 'Local Storage',
+      dataStorageDesc: 'Your conversations and documents are saved exclusively in your browser (IndexedDB) and never leave your device.'
     },
     quality: {
       title: 'RAG Quality',

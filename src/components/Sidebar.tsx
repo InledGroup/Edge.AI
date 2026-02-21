@@ -23,7 +23,8 @@ import {
   Globe,
   Sliders,
   Download,
-  Database
+  Database,
+  Shield
 } from 'lucide-preact';
 import { conversationsStore, documentsStore, uiStore, extensionsStore, generatingTitleIdSignal } from '@/lib/stores';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
@@ -40,6 +41,7 @@ import { MemoryManager } from './MemoryManager';
 import { MCPSettings } from './mcp/MCPSettings';
 import { CustomAppsSettings } from './CustomAppsSettings';
 import { DataManager } from './DataManager';
+import { PrivacySettings } from './PrivacySettings';
 
 interface SidebarProps {
   onDocumentClick?: (documentId: string) => void;
@@ -137,6 +139,7 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
       {showMCPSettings && <MCPSettings onClose={() => setShowMCPSettings(false)} />}
       {showCustomAppsSettings && <CustomAppsSettings onClose={() => setShowCustomAppsSettings(false)} />}
       {showDataManager && <DataManager onClose={() => setShowDataManager(false)} />}
+      {uiStore.showPrivacySettings && <PrivacySettings />}
       
       {/* Mobile toggle button */}
       <button
@@ -389,6 +392,14 @@ export function Sidebar({ onDocumentClick, onShowDocumentUpload, onShowModelWiza
           >
             <Sliders size={16} />
             <span>{i18nStore.t('ragSettings.title')}</span>
+          </button>
+
+          <button
+            onClick={() => uiStore.togglePrivacySettings()}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          >
+            <Shield size={16} />
+            <span>{i18nStore.t('privacy.title')}</span>
           </button>
 
           <button

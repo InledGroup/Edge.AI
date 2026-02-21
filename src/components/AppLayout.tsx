@@ -14,6 +14,7 @@ import { RAGSettingsPopup } from './RAGSettings';
 import { ExportChatbotModal } from './ExportChatbotModal';
 import { MemoryNotificationContainer } from './MemoryManager';
 import { UpdateNotifier } from './UpdateNotifier';
+import { PrivacySettings } from './PrivacySettings';
 import LiveMode from './chat/LiveMode';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
@@ -190,6 +191,9 @@ export function AppLayout() {
 
       {/* Export Chatbot Modal */}
       <ExportChatbotModal />
+
+      {/* Privacy Settings Modal */}
+      <PrivacySettings />
 
       {/* Memory Notification Toast */}
       <MemoryNotificationContainer />
