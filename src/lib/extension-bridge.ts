@@ -72,16 +72,19 @@ export class ExtensionBridge {
 
         case 'SEARCH_RESPONSE':
         case 'EXTRACT_URLS_RESPONSE':
+        case 'FETCH_RESPONSE':
           this.handleSearchResponse(message.data);
           break;
 
         case 'SEARCH_DENIED':
         case 'EXTRACT_URLS_DENIED':
+        case 'FETCH_DENIED':
           this.handleSearchDenied(message.data);
           break;
 
         case 'SEARCH_ERROR':
         case 'EXTRACT_URLS_ERROR':
+        case 'FETCH_ERROR':
           this.handleSearchError(message.data);
           break;
       }
@@ -338,6 +341,36 @@ export class ExtensionBridge {
         data: {
           requestId,
           urls
+        }
+      }, '*');
+    });
+  }
+
+  /**
+   * Generic fetch via extension to bypass CORS
+   */
+  async fetchJson(url: string): Promise<any> {
+    if (!this.isConnected()) {
+      throw new Error('Extension not connected');
+    }
+
+    const requestId = `fetch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log('[ExtensionBridge] 🌐 Fetching via extension:', url);
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(new Error('Extension fetch timeout'));
+      }, 15000);
+
+      this.pendingRequests.set(requestId, { resolve, reject, timeout });
+
+      window.postMessage({
+        source: 'edgeai-webapp',
+        type: 'FETCH_REQUEST',
+        data: {
+          requestId,
+          url
         }
       }, '*');
     });

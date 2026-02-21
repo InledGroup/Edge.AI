@@ -12,6 +12,8 @@ import { ModelLoadingIndicator } from './ModelLoadingIndicator';
 import { ExtensionStatus } from './ExtensionStatus';
 import { RAGSettingsPopup } from './RAGSettings';
 import { ExportChatbotModal } from './ExportChatbotModal';
+import { MemoryNotificationContainer } from './MemoryManager';
+import { UpdateNotifier } from './UpdateNotifier';
 import LiveMode from './chat/LiveMode';
 import { hasCompletedSetup } from '@/lib/ai/model-settings';
 import { autoLoadModels } from '@/lib/ai/model-loader';
@@ -114,7 +116,7 @@ export function AppLayout() {
         {/* Main Content Area */}
         <main className="flex-1 flex flex-row lg:ml-64 overflow-hidden">
           <div className="flex-1 flex flex-col min-w-0">
-            <ChatInterface key={conversationsStore.activeId} />
+            <ChatInterface />
           </div>
 
           {/* Right Sidebar (Canvas) */}
@@ -188,6 +190,12 @@ export function AppLayout() {
 
       {/* Export Chatbot Modal */}
       <ExportChatbotModal />
+
+      {/* Memory Notification Toast */}
+      <MemoryNotificationContainer />
+
+      {/* Update Notifier */}
+      <UpdateNotifier />
 
       {/* Mobile Warning Modal */}
       {showMobileWarning && (

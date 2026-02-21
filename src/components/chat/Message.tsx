@@ -258,7 +258,15 @@ export function Message({ message, onOpenInCanvas, onRegenerate }: MessageProps)
             </div>
           ) : (
             <div className="flex flex-col gap-3 text-left">
-              <MarkdownRenderer content={message.content} className="leading-relaxed" />
+              {message.content ? (
+                <MarkdownRenderer content={message.content} className="leading-relaxed" />
+              ) : (message as any).streaming ? (
+                <div className="flex items-center gap-1.5 py-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] animate-bounce" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] animate-bounce [animation-delay:0.2s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] animate-bounce [animation-delay:0.4s]" />
+                </div>
+              ) : null}
               {/* Quality Indicator below the text */}
               {!isUser && message.metadata?.ragQuality && (
                 <QualityIndicator quality={message.metadata.ragQuality} score={message.metadata.faithfulness} />

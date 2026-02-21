@@ -214,6 +214,15 @@ pre code {
   to { transform: rotate(360deg); }
 }
 
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
 @keyframes pulse-glow {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -482,4 +491,53 @@ pre code {
   height: auto;
   border-radius: var(--radius-md);
   margin: 1em 0;
+}
+
+/* Print Styles */
+@media print {
+  aside, 
+  nav, 
+  form, 
+  button, 
+  .sticky,
+  .fixed,
+  .no-print,
+  .chat-header-actions {
+    display: none !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    position: static !important;
+  }
+
+  .lg\:ml-64 {
+    margin-left: 0 !important;
+  }
+
+  .flex-1 {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  body, html {
+    background: white !important;
+    color: black !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .max-w-3xl {
+    max-width: 100% !important;
+  }
+
+  /* Reset colors for printing */
+  :root, [data-theme="dark"] {
+    --color-bg: #ffffff;
+    --color-bg-secondary: #ffffff;
+    --color-text: #000000;
+    --color-border: #eeeeee;
+  }
 }

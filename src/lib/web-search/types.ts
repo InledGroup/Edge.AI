@@ -400,6 +400,9 @@ export interface WebRAGOptions {
   /** Historial de conversación para contexto (opcional) */
   conversationHistory?: Array<{ role: string; content: string }>;
 
+  /** Contexto adicional (ej: memorias, canvas) */
+  additionalContext?: string;
+
   /** Callback para streaming de tokens durante la generación de respuesta */
   onToken?: (token: string) => void;
 }

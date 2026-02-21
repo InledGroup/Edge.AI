@@ -1,7 +1,87 @@
 import { useState, useEffect } from 'preact/hooks';
-import { X, Brain, Trash2, Plus, Save, AlertCircle } from 'lucide-preact';
+import { X, Brain, Trash2, Plus, Save, AlertCircle, Check, Edit2 } from 'lucide-preact';
 import { i18nStore } from '@/lib/stores/i18n';
-import { getMemories, addMemory, deleteMemory, clearMemories, type Memory } from '@/lib/db/memories';
+import { getMemories, addMemory, deleteMemory, clearMemories, updateMemory, type Memory } from '@/lib/db/memories';
+import { memoryNotificationSignal } from '@/lib/stores';
+
+export function MemoryNotificationContainer() {
+  const notification = memoryNotificationSignal.value;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+
+  if (!notification) return null;
+
+  useEffect(() => {
+    setEditContent(notification.content);
+    setIsEditing(false);
+  }, [notification]);
+
+  const handleClose = () => {
+    memoryNotificationSignal.value = null;
+  };
+
+  const handleSaveEdit = async () => {
+    await updateMemory(notification.memoryId, editContent);
+    setIsEditing(false);
+    memoryNotificationSignal.value = { ...notification, content: editContent };
+    // Mantener un poco más si se editó, luego cerrar
+    setTimeout(handleClose, 2000);
+  };
+
+  const handleDelete = async () => {
+    await deleteMemory(notification.memoryId);
+    handleClose();
+  };
+
+  return (
+    <div className="fixed bottom-24 right-6 z-[60] w-80 bg-[var(--color-bg-secondary)] border border-[var(--color-primary)]/30 rounded-2xl shadow-2xl shadow-[var(--color-primary)]/10 animate-in slide-in-from-right-10 duration-500">
+      <div className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[var(--color-primary)]">
+            <Brain size={16} className="animate-pulse" />
+            <span className="text-xs font-bold uppercase tracking-widest">{i18nStore.t('memory.newAdded') || 'Memory Added'}</span>
+          </div>
+          <button onClick={handleClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+            <X size={14} className="text-[var(--color-text-tertiary)]" />
+          </button>
+        </div>
+
+        {isEditing ? (
+          <div className="space-y-2">
+            <textarea
+              value={editContent}
+              onInput={(e) => setEditContent(e.currentTarget.value)}
+              className="w-full p-2 text-xs bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-lg outline-none focus:border-[var(--color-primary)]/50 min-h-[60px]"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setIsEditing(false)} className="text-[10px] text-[var(--color-text-tertiary)] hover:underline">
+                {i18nStore.t('common.cancel')}
+              </button>
+              <button onClick={handleSaveEdit} className="flex items-center gap-1 text-[10px] text-[var(--color-primary)] font-bold hover:underline">
+                <Check size={10} /> {i18nStore.t('common.save')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed italic">
+            "{notification.content}"
+          </p>
+        )}
+
+        {!isEditing && (
+          <div className="flex items-center justify-end gap-3 pt-1 border-t border-[var(--color-border)]/30">
+            <button onClick={() => setIsEditing(true)} className="flex items-center gap-1 text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors">
+              <Edit2 size={10} /> {i18nStore.t('common.edit')}
+            </button>
+            <button onClick={handleDelete} className="flex items-center gap-1 text-[10px] text-[var(--color-text-tertiary)] hover:text-red-400 transition-colors">
+              <Trash2 size={10} /> {i18nStore.t('common.delete')}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface MemoryManagerProps {
   onClose: () => void;

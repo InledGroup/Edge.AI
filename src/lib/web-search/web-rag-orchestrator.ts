@@ -306,6 +306,7 @@ export class WebRAGOrchestrator {
         options.conversationHistory,
         options.onToken,
         {
+          additionalContext: options.additionalContext,
           calculateMetrics: true,
           faithfulnessThreshold: genSettings.faithfulnessThreshold,
           chunkWindowSize: ragSettings.chunkWindowSize

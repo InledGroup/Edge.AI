@@ -1,7 +1,7 @@
 // ChatInterface - Complete chat interface with RAG & Specialized MCP Support
 
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { Sparkles, AlertCircle, Server, History, Sliders, X } from 'lucide-preact';
+import { Sparkles, AlertCircle, Server, History, Sliders, X, MoreVertical, Printer, FileDown, FileText, FileCode } from 'lucide-preact';
 import { Message } from './Message';
 import { ChatInput } from './ChatInput';
 import { WebSearchProgress } from './WebSearchProgress';
@@ -22,10 +22,63 @@ import { generateUUID, cn } from '@/lib/utils';
 import { speechService, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { mcpManager } from '@/lib/ai/mcp-manager';
 import { processExtensionIntent, getExtensionsSystemPrompt } from '@/lib/insuite-utils';
-import { extensionsStore, extensionsSignal } from '@/lib/stores';
+import { extensionsStore, extensionsSignal, memoryNotificationSignal } from '@/lib/stores';
 import { getWorkerPool } from '@/lib/workers';
 
 // Helper functions moved out of component
+const autoExtractMemory = async (userMsg: string, assistantRes: string) => {
+  try {
+    const chatEngine = await EngineManager.getChatEngine();
+    
+    // Prompt más inteligente que distingue entre AFIRMAR y PREGUNTAR
+    const extractionPrompt = `### INSTRUCCIÓN DE MEMORIA ###
+Tu tarea es identificar si el usuario está PROPORCIONANDO información personal nueva en su mensaje.
+
+CONTEXTO ACTUAL:
+Mensaje del Usuario: "${userMsg}"
+Respuesta previa de la IA: "${assistantRes}"
+
+REGLAS CRÍTICAS:
+1. Si el usuario está PREGUNTANDO algo sobre sí mismo (ej: "¿cuántos años tengo?", "¿qué sabes de mí?"), responde ÚNICAMENTE: NONE.
+2. Si el usuario está AFIRMANDO o CONFIRMANDO un dato nuevo (ej: "tengo 25 años", "mi ciudad es Madrid"), extráelo.
+3. Responde en una frase breve en tercera persona (ej: "El usuario tiene 25 años").
+4. Si NO hay información personal AFIRMADA, responde ÚNICAMENTE: NONE.
+5. NO inventes datos ni asumas cosas que no se han dicho explícitamente.
+
+DATO EXTRAÍDO:`;
+
+    const result = await chatEngine.generateText([
+      { role: 'user', content: extractionPrompt }
+    ], { max_tokens: 60, temperature: 0.1 } as any);
+
+    let memoryText = result.trim().replace(/^["']|["']$/g, '').replace(/^DATO EXTRAÍDO: /i, '');
+    
+    if (memoryText.toLowerCase().includes('hecho:')) {
+      memoryText = memoryText.split(/hecho:/i)[1].trim();
+    }
+
+    if (memoryText && !memoryText.toUpperCase().includes('NONE') && memoryText.length > 4) {
+      console.log('🧠 [Memory] Nuevo recuerdo detectado:', memoryText);
+      const memory = await addMemory(memoryText, 'system');
+      
+      // Notificar al usuario con el Signal global
+      memoryNotificationSignal.value = {
+        id: generateUUID(),
+        content: memoryText,
+        memoryId: memory.id
+      };
+      
+      setTimeout(() => {
+        if (memoryNotificationSignal.value?.memoryId === memory.id) {
+          memoryNotificationSignal.value = null;
+        }
+      }, 8000);
+    }
+  } catch (e) {
+    console.warn('Memory extraction failed', e);
+  }
+};
+
 const isDocumentGenerationRequest = (message: string): boolean => {
   const lowerMessage = message.toLowerCase().trim();
   const keywords = ['genera un documento', 'crea un documento', 'escribe un documento', 'redacta un documento', 'genera un informe', 'crea un informe'];
@@ -61,13 +114,59 @@ export function ChatInterface() {
   const [webSearchProgress, setWebSearchProgress] = useState<{ step: any; progress: number; message?: string } | null>(null);
   const [pendingUrls, setPendingUrls] = useState<string[] | null>(null);
   const [confirmationResolver, setConfirmationResolver] = useState<((urls: string[] | null) => void) | null>(null);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const streamingState = useRef({ spokenIndex: 0, buffer: '', isStreamingAudio: false, timer: null as any });
 
   const isModelsReady = modelsReady.value;
   const isHasDocs = hasReadyDocuments.value;
   const canChat = isModelsReady && (isHasDocs || webSearchEnabled);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowOptionsMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handlePrint = () => {
+    setShowOptionsMenu(false);
+    window.print();
+  };
+
+  const handleExportTxt = () => {
+    setShowOptionsMenu(false);
+    const content = messages.map(m => `[${m.role.toUpperCase()}] (${new Date(m.timestamp).toLocaleString()}):\n${m.content}\n`).join('\n---\n\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-export-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportJson = () => {
+    setShowOptionsMenu(false);
+    const data = JSON.stringify({
+      conversationId: conversationsStore.activeId,
+      exportedAt: new Date().toISOString(),
+      messages: messages
+    }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-export-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const startAudioStreaming = () => {
     if (streamingState.current.timer) clearTimeout(streamingState.current.timer);
@@ -105,17 +204,30 @@ export function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, currentResponse, webSearchProgress]);
 
+  const lastSyncedId = useRef<string | null>(null);
+
   useEffect(() => {
     const activeId = conversationsStore.activeId;
     
-    // Solo sincronizar si NO estamos generando (para evitar limpiar mensajes locales del primer envío)
-    if (!isGenerating) {
+    // Sincronizar solo si la identidad de la conversación ha cambiado (switch de chat)
+    // Esto evita que al terminar de generar (isGenerating: false) se sobrescriba
+    // el estado local con un store que podría estar aún desincronizado.
+    if (activeId !== lastSyncedId.current) {
       if (activeId) {
         const conv = conversationsStore.active;
         if (conv) setMessages(conv.messages || []);
-      } else setMessages([]);
+        else setMessages([]);
+      } else {
+        setMessages([]);
+      }
+      lastSyncedId.current = activeId;
+      
+      // Si cambiamos de conversación, nos aseguramos de resetear estados de UI
+      setIsGenerating(false);
+      setCurrentResponse('');
+      setWebSearchProgress(null);
     }
-  }, [conversationsStore.activeId, isGenerating]);
+  }, [conversationsStore.activeId]);
 
   const handleOpenInCanvas = (content: string) => {
     canvasStore.open(markdownToHTML(content));
@@ -148,152 +260,152 @@ export function ChatInterface() {
   async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[], activeTool?: { type: 'app' | 'mcp', id: string, name: string } | null) {
     if (!isModelsReady) { alert(i18nStore.t('chat.loadModelsFirst')); return; }
 
-    // 1. Pre-crear o asegurar ID de conversación antes de tocar el estado de mensajes
-    let conversationId = conversationsStore.activeId;
-    let isFirstMessage = false;
-
-    if (!conversationId) {
-      const conv = await getOrCreateConversation();
-      conversationId = conv.id;
-      isFirstMessage = true;
-      conversationsStore.add(conv);
-      conversationsStore.setActive(conversationId); // Activar ANTES de empezar a generar
-    } else {
-      const activeConv = conversationsStore.active;
-      if (!activeConv || !activeConv.messages || activeConv.messages.length === 0) {
-        isFirstMessage = true;
-      }
-    }
-
-    // Load latest global settings before processing
-    const genSettings = await getGenerationSettings();
-    const ragSettings = await getRAGSettings();
-    const hWeight = genSettings.historyWeight;
-    const fThreshold = genSettings.faithfulnessThreshold;
-    const cWindow = ragSettings.chunkWindowSize;
-    const tK = ragSettings.topK;
-
-    const originalContent = content; 
-    let assistantPrompt = content;   
-    let effectiveMode = mode;
-
-    // Reset active tool in store if it was used
-    if (activeTool) {
-      extensionsStore.setActiveTool(null);
-    }
-
-    // Detect MCP Trigger (Pill or Slash command or Keyword)
-    // ... rest of logic remains similar but with conversationId guaranteed ...
-    let mcpTools: any[] = [];
-    let activeServerName = '';
-    const toolNameMap = new Map<string, string>();
-
-    let serverToUse = (activeTool?.type === 'mcp') ? activeTool.name : null;
-    
-    if (!serverToUse) {
-      const mcpMatch = content.match(/\/(\w+)/);
-      serverToUse = mcpMatch ? mcpMatch[1] : null;
-    }
-
-    // Auto-detection by keyword if no slash command
-    if (!serverToUse) {
-      const enabledServers = await mcpManager.getEnabledMCPServers();
-      for (const s of enabledServers) {
-        if (content.toLowerCase().includes(s.name.toLowerCase())) {
-          serverToUse = s.name;
-          break;
-        }
-      }
-    }
-
-    if (serverToUse) {
-      activeServerName = serverToUse;
-      const allTools = await mcpManager.getTools(activeServerName);
-      
-      if (allTools.length > 0) {
-        // --- TOOL RAG: Filter relevant tools ---
-        const queryKeywords = content.toLowerCase().split(/\s+/);
-        const filteredTools = allTools.filter(t => {
-          if (allTools.length <= 5) return true;
-          const text = `${t.name} ${t.description}`.toLowerCase();
-          return queryKeywords.some(kw => kw.length > 3 && text.includes(kw));
-        }).slice(0, 5);
-
-        const finalTools = filteredTools.length > 0 ? filteredTools : allTools.slice(0, 5);
-
-        mcpTools = finalTools.map(t => {
-          const modelToolName = `${t.serverName}__${t.name}`.replace(/-/g, '_');
-          toolNameMap.set(modelToolName, t.name);
-          
-          const minifySchema = (schema: any) => {
-            if (!schema) return undefined;
-            const minified = { ...schema };
-            if (minified.properties) {
-              for (const key in minified.properties) {
-                delete minified.properties[key].title;
-                if (minified.properties[key].description) {
-                  minified.properties[key].description = minified.properties[key].description.substring(0, 100);
-                }
-              }
-            }
-            return minified;
-          };
-
-          return {
-            type: 'function',
-            function: {
-              name: modelToolName, 
-              description: (t.description || '').substring(0, 150),
-              parameters: minifySchema(t.inputSchema || t.parameters)
-            }
-          };
-        });
-        if (content.trim() === `/${activeServerName}`) assistantPrompt = `Lista las herramientas de ${activeServerName}`;
-        effectiveMode = 'conversation'; 
-      }
-    }
-
-    const userMessage: MessageType = { 
-      id: generateUUID(), 
-      role: 'user', 
-      content: originalContent, 
-      images, 
-      timestamp: Date.now(),
-      metadata: activeTool ? { 
-        appId: activeTool.type === 'app' ? activeTool.id : undefined,
-        mcpServerId: activeTool.type === 'mcp' ? activeTool.id : undefined
-      } : undefined
-    };
-    
-    // Add user message to state and DB
-    setMessages(prev => [...prev, userMessage]);
-    await addMessage(conversationId, userMessage);
-
-    // Actualizar título si es necesario
-    if (isFirstMessage) {
-      const tempTitle = generateTitle(originalContent);
-      await updateConversationTitle(conversationId, tempTitle);
-      const updatedConv = await getConversation(conversationId);
-      if (updatedConv) conversationsStore.update(conversationId, updatedConv);
-    }
-
     setIsGenerating(true);
     setCurrentResponse('');
     setWebSearchProgress(null);
     startAudioStreaming();
 
-    // Prepare temporary assistant message for streaming
     let assistantId = generateUUID();
-    const tempAssistantMsg: MessageType = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-      streaming: true
-    };
-    setMessages(prev => [...prev, tempAssistantMsg]);
 
     try {
+      // 1. Pre-crear o asegurar ID de conversación antes de tocar el estado de mensajes
+      let conversationId = conversationsStore.activeId;
+      let isFirstMessage = false;
+
+      if (!conversationId) {
+        const conv = await getOrCreateConversation();
+        conversationId = conv.id;
+        isFirstMessage = true;
+        conversationsStore.add(conv);
+        conversationsStore.setActive(conversationId); // Activar ANTES de empezar a generar
+      } else {
+        const activeConv = conversationsStore.active;
+        if (!activeConv || !activeConv.messages || activeConv.messages.length === 0) {
+          isFirstMessage = true;
+        }
+      }
+
+      // Load latest global settings before processing
+      const genSettings = await getGenerationSettings();
+      const ragSettings = await getRAGSettings();
+      const hWeight = genSettings.historyWeight;
+      const fThreshold = genSettings.faithfulnessThreshold;
+      const cWindow = ragSettings.chunkWindowSize;
+      const tK = ragSettings.topK;
+
+      const originalContent = content; 
+      let assistantPrompt = content;   
+      let effectiveMode = mode;
+
+      // Reset active tool in store if it was used
+      if (activeTool) {
+        extensionsStore.setActiveTool(null);
+      }
+
+      // Detect MCP Trigger (Pill or Slash command or Keyword)
+      let mcpTools: any[] = [];
+      let activeServerName = '';
+      const toolNameMap = new Map<string, string>();
+
+      let serverToUse = (activeTool?.type === 'mcp') ? activeTool.name : null;
+      
+      if (!serverToUse) {
+        const mcpMatch = content.match(/\/(\w+)/);
+        serverToUse = mcpMatch ? mcpMatch[1] : null;
+      }
+
+      // Auto-detection by keyword if no slash command
+      if (!serverToUse) {
+        const enabledServers = await mcpManager.getEnabledMCPServers();
+        for (const s of enabledServers) {
+          if (content.toLowerCase().includes(s.name.toLowerCase())) {
+            serverToUse = s.name;
+            break;
+          }
+        }
+      }
+
+      if (serverToUse) {
+        activeServerName = serverToUse;
+        const allTools = await mcpManager.getTools(activeServerName);
+        
+        if (allTools.length > 0) {
+          // --- TOOL RAG: Filter relevant tools ---
+          const queryKeywords = content.toLowerCase().split(/\s+/);
+          const filteredTools = allTools.filter(t => {
+            if (allTools.length <= 5) return true;
+            const text = `${t.name} ${t.description}`.toLowerCase();
+            return queryKeywords.some(kw => kw.length > 3 && text.includes(kw));
+          }).slice(0, 5);
+
+          const finalTools = filteredTools.length > 0 ? filteredTools : allTools.slice(0, 5);
+
+          mcpTools = finalTools.map(t => {
+            const modelToolName = `${t.serverName}__${t.name}`.replace(/-/g, '_');
+            toolNameMap.set(modelToolName, t.name);
+            
+            const minifySchema = (schema: any) => {
+              if (!schema) return undefined;
+              const minified = { ...schema };
+              if (minified.properties) {
+                for (const key in minified.properties) {
+                  delete minified.properties[key].title;
+                  if (minified.properties[key].description) {
+                    minified.properties[key].description = minified.properties[key].description.substring(0, 100);
+                  }
+                }
+              }
+              return minified;
+            };
+
+            return {
+              type: 'function',
+              function: {
+                name: modelToolName, 
+                description: (t.description || '').substring(0, 150),
+                parameters: minifySchema(t.inputSchema || t.parameters)
+              }
+            };
+          });
+          if (content.trim() === `/${activeServerName}`) assistantPrompt = `Lista las herramientas de ${activeServerName}`;
+          effectiveMode = 'conversation'; 
+        }
+      }
+
+      const userMessage: MessageType = { 
+        id: generateUUID(), 
+        role: 'user', 
+        content: originalContent, 
+        images, 
+        timestamp: Date.now(),
+        metadata: activeTool ? { 
+          appId: activeTool.type === 'app' ? activeTool.id : undefined,
+          mcpServerId: activeTool.type === 'mcp' ? activeTool.id : undefined
+        } : undefined
+      };
+      
+      // Add user message to state and DB
+      setMessages(prev => [...prev, userMessage]);
+      await addMessage(conversationId, userMessage);
+
+      // Actualizar título si es necesario
+      if (isFirstMessage) {
+        const tempTitle = generateTitle(originalContent);
+        await updateConversationTitle(conversationId, tempTitle);
+        const updatedConv = await getConversation(conversationId);
+        if (updatedConv) conversationsStore.update(conversationId, updatedConv);
+      }
+
+      // Prepare temporary assistant message for streaming
+      const tempAssistantMsg: MessageType = {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        streaming: true
+      };
+      setMessages(prev => [...prev, tempAssistantMsg]);
+
       const chatEngine = await EngineManager.getChatEngine();
       const chatModelId = modelsStore.chat?.id;
       const memories = await getMemories();
@@ -327,6 +439,7 @@ export function ChatInterface() {
             setWebSearchProgress({ step, progress, message });
           },
           conversationHistory: history, // Pass history for context
+          additionalContext: canvasContext + memoryContext, // Pass memories and canvas
           confirmUrls: true,
           onConfirmationRequest: async (urls) => {
             setPendingUrls(urls);
@@ -470,7 +583,18 @@ export function ChatInterface() {
           }
         }
         
-        const systemPrompt = `Eres un asistente inteligente local. ${canvasContext}${memoryContext}\n${getExtensionsSystemPrompt()}${customAppPrompt}`;
+        const systemPrompt = `Eres un asistente inteligente local con memoria persistente.
+### DATOS IMPORTANTES DEL USUARIO (MEMORIA) ###
+${memoryContext || 'No hay recuerdos previos.'}
+### FIN DE MEMORIA ###
+
+Instrucciones Críticas:
+1. Revisa SIEMPRE la sección de MEMORIA antes de responder.
+2. Si el usuario te pregunta por datos personales (como su edad, nombre, proyectos), búscalos en la sección de MEMORIA y responde con esa información.
+3. Si el dato no está en la MEMORIA, di honestamente que no lo recuerdas.
+4. ${canvasContext ? 'Tienes un documento abierto en el Canvas que debes tener en cuenta.' : ''}
+5. ${getExtensionsSystemPrompt()}
+6. ${customAppPrompt}`;
         
         // El historial NO incluye el mensaje actual que acabamos de enviar, así que lo añadimos explícitamente
         const chatMsgs = [
@@ -636,6 +760,9 @@ export function ChatInterface() {
       }
       setTimeout(() => processExtensionIntent(finalContent, activeTool?.id), 500);
 
+      // Auto-extract memory in background
+      setTimeout(() => autoExtractMemory(originalContent, finalContent), 1000);
+
     } catch (error: any) {
       console.error(error);
       setMessages(prev => [...prev.filter(m => m.id !== assistantId), { id: generateUUID(), role: 'assistant', content: 'Error: ' + error.message, timestamp: Date.now() }]);
@@ -646,6 +773,60 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full bg-[var(--color-bg)]">
+      {/* Chat Header with Options */}
+      {messages.length > 0 && (
+        <div className="sticky top-0 z-10 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg)]/80 backdrop-blur-md flex justify-between items-center">
+          <div className="text-xs font-medium text-[var(--color-text-tertiary)] truncate max-w-[200px]">
+            {conversationsStore.active?.title || i18nStore.t('common.conversations')}
+          </div>
+          <div className="relative chat-header-actions" ref={menuRef}>
+            <button
+              onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+              className="p-1.5 rounded-lg hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text)] transition-all"
+              title={i18nStore.t('chat.moreActions')}
+            >
+              <MoreVertical size={18} />
+            </button>
+
+            {showOptionsMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                <div className="p-1.5 space-y-0.5">
+                  <button
+                    onClick={handlePrint}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] rounded-lg transition-colors text-left"
+                  >
+                    <Printer size={16} />
+                    <span>{i18nStore.t('chat.print')}</span>
+                  </button>
+                  
+                  <div className="h-[1px] bg-[var(--color-border)] my-1 mx-1" />
+                  
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                    {i18nStore.t('chat.export')}
+                  </div>
+                  
+                  <button
+                    onClick={handleExportTxt}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] rounded-lg transition-colors text-left"
+                  >
+                    <FileText size={16} />
+                    <span>{i18nStore.t('chat.exportTxt')}</span>
+                  </button>
+                  
+                  <button
+                    onClick={handleExportJson}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] rounded-lg transition-colors text-left"
+                  >
+                    <FileCode size={16} />
+                    <span>{i18nStore.t('chat.exportJson')}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-4 max-w-3xl mx-auto w-full custom-scrollbar">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center opacity-50 space-y-4">
@@ -687,27 +868,9 @@ export function ChatInterface() {
                                             </div>                   </div>
                  );
               }
-              // Skip empty assistant messages
-              if (m.role === 'assistant' && !m.content && !(m as any).tool_calls) return null;
               
               return <Message key={m.id} message={m} onOpenInCanvas={handleOpenInCanvas} onRegenerate={() => handleRegenerate(m.id)} />;
             })}
-            {isGenerating && !currentResponse && !webSearchProgress && (
-              <div className="flex gap-3 animate-slideUp">
-                <div className="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center shadow-lg"><Sparkles size={16} color="black" /></div>
-                <div className="flex items-center gap-1.5 px-4 py-3 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl shadow-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] animate-bounce" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] animate-bounce [animation-delay:0.2s]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] animate-bounce [animation-delay:0.4s]" />
-                </div>
-              </div>
-            )}
-            {isGenerating && currentResponse && (
-              <div className="flex gap-3 animate-slideUp">
-                <div className="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center shadow-lg"><Sparkles size={16} color="black" /></div>
-                <div className="flex-1 p-4 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl shadow-sm"><MarkdownRenderer content={currentResponse} /></div>
-              </div>
-            )}
             {webSearchProgress && <div className="px-10"><WebSearchProgress {...webSearchProgress} /></div>}
             <div ref={messagesEndRef} className="h-4" />
           </div>

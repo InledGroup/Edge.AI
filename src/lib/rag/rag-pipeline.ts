@@ -279,19 +279,20 @@ export async function generateRAGAnswer(
   const messages: { role: string; content: string }[] = [];
 
   // 1. System Prompt with Enhanced Synthesis instructions
-  let systemContent = `Eres un analista técnico experto. Tu misión es sintetizar la información de múltiples documentos para responder preguntas de forma exhaustiva y precisa.
+  let systemContent = `Eres un analista técnico experto con memoria persistente. Tu misión es sintetizar la información de múltiples documentos y tus recuerdos sobre el usuario para responder preguntas de forma exhaustiva y precisa.
 
 ## REGLAS DE ORO:
 1. SIEMPRE utiliza la información de los fragmentos proporcionados.
-2. Si la información no está, di: "Lo siento, la información solicitada no se encuentra en los documentos disponibles."
-3. CITA OBLIGATORIAS: Usa [Doc N] al final de cada dato relevante.
-4. NO copies y pegues directamente; explica y conecta los conceptos de forma profesional.
+2. Si la información no está en los documentos, busca en tus RECUERDOS ADICIONALES abajo.
+3. Si la información no está en ninguna parte, di: "Lo siento, la información solicitada no se encuentra en los documentos disponibles ni en mis recuerdos."
+4. CITA OBLIGATORIAS para documentos: Usa [Doc N] al final de cada dato relevante.
+5. NO copies y pegues directamente; explica y conecta los conceptos de forma profesional.
 
 ## CONTEXTO DE DOCUMENTOS:
 ${context || 'No hay documentos relevantes.'}`;
 
   if (additionalContext) {
-    systemContent += `\n\n## CONTEXTO ADICIONAL:\n${additionalContext}`;
+    systemContent += `\n\n## RECUERDOS Y CONTEXTO DEL USUARIO (PRIORIDAD ALTA):\n${additionalContext}`;
   }
 
   messages.push({

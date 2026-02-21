@@ -5,7 +5,7 @@ import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, M
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
-import { uiStore, uiSignal, extensionsStore, extensionsSignal } from '@/lib/stores';
+import { uiStore, uiSignal, extensionsStore, extensionsSignal, chatModeSignal } from '@/lib/stores';
 import { speechService, voiceState, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { getEnabledMCPServers } from '@/lib/db/mcp';
 import type { MCPServer } from '@/types';
@@ -31,7 +31,6 @@ export function ChatInput({
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [mode, setMode] = useState<'web' | 'local' | 'smart' | 'conversation'>('conversation');
   const [showMenu, setShowMenu] = useState(false);
   const [mcpServers, setMcpServers] = useState<MCPServer[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -41,6 +40,7 @@ export function ChatInput({
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to signals
+  const mode = chatModeSignal.value;
   const lang = languageSignal.value;
   const vState = voiceState.value;
   const vMode = isVoiceModeEnabled.value;
@@ -128,8 +128,8 @@ export function ChatInput({
     input.value = '';
   }
 
-  function setModeAndNotify(newMode: typeof mode) {
-    setMode(newMode);
+  function setModeAndNotify(newMode: any) {
+    chatModeSignal.value = newMode;
     if (newMode === 'web') {
       onWebSearchToggle?.(true);
     } else {

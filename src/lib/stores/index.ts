@@ -214,6 +214,16 @@ export const uiSignal = signal<UIState>({
   showExportChatbot: false
 });
 
+export type ChatMode = 'web' | 'local' | 'smart' | 'conversation';
+export const chatModeSignal = signal<ChatMode>('conversation');
+
+export interface MemoryNotification {
+  id: string;
+  content: string;
+  memoryId: string;
+}
+export const memoryNotificationSignal = signal<MemoryNotification | null>(null);
+
 export const uiStore = {
   get sidebarOpen() {
     return uiSignal.value.sidebarOpen;

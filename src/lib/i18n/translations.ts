@@ -66,7 +66,12 @@ export const translations = {
       uploadImage: 'Subir imagen',
       moreOptions: 'Más opciones',
       generatingTitle: 'Generando título...',
-      regenerate: 'Regenerar'
+      regenerate: 'Regenerar',
+      export: 'Exportar chat',
+      print: 'Imprimir chat',
+      exportTxt: 'Archivo de texto (.txt)',
+      exportJson: 'Archivo de datos (.json)',
+      moreActions: 'Más acciones'
     },
     documents: {
       title: 'Subir Documentos',
@@ -94,8 +99,11 @@ export const translations = {
     },
     data: {
       title: 'Gestión de Datos',
+      notice: 'Tus datos se guardan localmente en este navegador. Si borras las cookies o cambias de dispositivo, perderás tus conversaciones a menos que hagas un backup.',
       export: 'Exportar Historial',
+      exportDesc: 'Descarga todo tu historial en un archivo .json',
       import: 'Restaurar Historial',
+      importDesc: 'Restaura conversaciones desde un backup previo',
       exportSuccess: 'Historial exportado correctamente',
       importSuccess: 'Historial restaurado correctamente',
       importError: 'Error al importar el archivo. Asegúrate de que sea un JSON válido.',
@@ -162,7 +170,8 @@ export const translations = {
       empty: 'No hay recuerdos guardados aún.',
       emptyHint: 'La IA aprenderá automáticamente de tus conversaciones, o puedes añadir recuerdos manualmente.',
       systemSource: 'Sistema',
-      userSource: 'Usuario'
+      userSource: 'Usuario',
+      newAdded: 'Nuevo Recuerdo'
     },
     webSearch: {
       title: 'Fuentes web consultadas',
@@ -545,6 +554,15 @@ export const translations = {
       notUseful: 'Este fragmento NO es útil',
       thanksFeedback: '¡Gracias por tu feedback! El sistema aprenderá de esta valoración.',
       voteFeedback: 'Vota este fragmento para que el sistema aprenda su importancia real.'
+    },
+    updates: {
+      title: 'Nueva versión disponible',
+      message: 'Se ha detectado una nueva versión de Edge.AI. Para obtener las últimas funciones y mejoras, se recomienda:',
+      step1: '1. Realizar una copia de seguridad de tus datos.',
+      step2: '2. Eliminar todos los datos y cookies de este sitio.',
+      step3: '3. Recargar la página para aplicar los cambios.',
+      backupNotice: 'Puedes exportar tus conversaciones desde el menú inferior de la barra lateral.',
+      close: 'Entendido'
     }
   },
   en: {
@@ -614,7 +632,12 @@ export const translations = {
       uploadImage: 'Upload image',
       moreOptions: 'More options',
       generatingTitle: 'Generating title...',
-      regenerate: 'Regenerate'
+      regenerate: 'Regenerate',
+      export: 'Export chat',
+      print: 'Print chat',
+      exportTxt: 'Text file (.txt)',
+      exportJson: 'Data file (.json)',
+      moreActions: 'More actions'
     },
     documents: {
       title: 'Upload Documents',
@@ -642,8 +665,11 @@ export const translations = {
     },
     data: {
       title: 'Data Management',
+      notice: 'Your data is saved locally in this browser. If you clear cookies or change devices, you will lose your conversations unless you make a backup.',
       export: 'Export Chat History',
+      exportDesc: 'Download your entire history in a .json file',
       import: 'Restore Chat History',
+      importDesc: 'Restore conversations from a previous backup',
       exportSuccess: 'Chat history exported successfully',
       importSuccess: 'Chat history restored successfully',
       importError: 'Error importing file. Make sure it is a valid JSON.',
@@ -710,7 +736,8 @@ export const translations = {
       empty: 'No memories saved yet.',
       emptyHint: 'The AI will automatically learn from your conversations, or you can add memories manually.',
       systemSource: 'System',
-      userSource: 'User'
+      userSource: 'User',
+      newAdded: 'Memory Added'
     },
     webSearch: {
       title: 'Web sources consulted',
@@ -1092,6 +1119,15 @@ export const translations = {
       notUseful: 'This fragment is NOT useful',
       thanksFeedback: 'Thanks for your feedback! The system will learn from this valuation.',
       voteFeedback: 'Vote this fragment so the system learns its real importance.'
+    },
+    updates: {
+      title: 'New Version Available',
+      message: 'A new version of Edge.AI has been detected. To get the latest features and improvements, it is recommended to:',
+      step1: '1. Back up your data.',
+      step2: '2. Clear all data and cookies for this site.',
+      step3: '3. Reload the page to apply changes.',
+      backupNotice: 'You can export your conversations from the bottom menu in the sidebar.',
+      close: 'Got it'
     }
   }
 };
