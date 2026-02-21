@@ -418,6 +418,7 @@
             name: '__CHATBOT_NAME__',
             description: '__CHATBOT_DESCRIPTION__',
             modelId: '__MODEL_ID__',
+            modelMetadata: __MODEL_METADATA__,
             engine: '__MODEL_ENGINE__',
             ggufUrl: '__MODEL_GGUF_URL__',
             ragConfig: {
@@ -578,15 +579,38 @@
             async init() {
                 try {
                     this.updateUIForLang();
+                    
+                    // Safety check for protocol
+                    if (window.location.protocol === 'file:') {
+                        const errorMsg = this.currentLang === 'es' 
+                            ? "Error de Seguridad: Los modelos de IA requieren un servidor web. Por favor, sirve este archivo con 'npx serve' o súbelo a un hosting (no abras el archivo .html directamente)."
+                            : "Security Error: AI models require a web server. Please serve this file with 'npx serve' or upload to hosting (do not open the .html file directly).";
+                        throw new Error(errorMsg);
+                    }
+
                     this.rag = new RAGSystem(CHATBOT_CONFIG.chunks, CHATBOT_CONFIG.ragConfig);
                     this.updateProgress(10, this.t('loading_engine'));
 
-                    if (CHATBOT_CONFIG.engine === 'webllm') {
+                    let engineToUse = CHATBOT_CONFIG.engine;
+                    
+                    // Fallback to wllama if WebGPU is missing
+                    if (engineToUse === 'webllm' && !navigator.gpu) {
+                        console.warn("WebGPU not available, falling back to Wllama");
+                        if (CHATBOT_CONFIG.ggufUrl) {
+                            engineToUse = 'wllama';
+                        } else {
+                            const errorMsg = this.currentLang === 'es'
+                                ? "Tu navegador no soporta WebGPU y este modelo no tiene versión compatible con CPU (Wllama)."
+                                : "Your browser does not support WebGPU and this model doesn't have a CPU-compatible version (Wllama).";
+                            throw new Error(errorMsg);
+                        }
+                    }
+
+                    if (engineToUse === 'webllm') {
                         await this.initWebLLM();
-                    } else if (CHATBOT_CONFIG.engine === 'wllama') {
+                    } else if (engineToUse === 'wllama') {
                         await this.initWllama();
                     } else {
-                        // Fallback to WebLLM
                         await this.initWebLLM();
                     }
 
@@ -599,22 +623,55 @@
 
                     this.setupEventListeners();
                 } catch (e) {
-                    console.error(e);
-                    this.loadingStatus.innerHTML = `<span style="color: #ef4444">${this.t('error')}${e.message}</span>`;
+                    console.error("Initialization Error:", e);
+                    this.loadingStatus.style.color = "#ef4444";
+                    this.loadingStatus.innerHTML = `<strong>${this.t('error')}</strong><br><small>${e.message}</small>`;
+                    // Remove loader animation on error
+                    const ring = document.querySelector('.loader-ring');
+                    if (ring) {
+                        ring.style.animation = 'none';
+                        ring.style.borderColor = '#ef4444';
+                    }
                 }
             }
 
             async initWebLLM() {
-                let webllmModule;
+                let webllm;
                 try {
-                    webllmModule = await import('https://esm.run/@mlc-ai/web-llm@0.2.80');
+                    const module = await import('https://esm.run/@mlc-ai/web-llm@0.2.80');
+                    webllm = module.default || module;
                 } catch (e) {
-                    webllmModule = await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.80/+esm');
+                    const module = await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.80/+esm');
+                    webllm = module.default || module;
                 }
-                const webllm = webllmModule.MLCEngine ? webllmModule : (webllmModule.default || webllmModule);
 
-                this.engine = new webllm.MLCEngine();
-                await this.engine.reload(CHATBOT_CONFIG.modelId, {
+                // WebLLM can be nested depending on the CDN
+                const engineCreator = webllm.CreateMLCEngine || (webllm.webllm && webllm.webllm.CreateMLCEngine);
+                const prebuiltConfig = webllm.prebuiltAppConfig || (webllm.webllm && webllm.webllm.prebuiltAppConfig);
+                
+                if (!engineCreator) {
+                    throw new Error("Could not find WebLLM CreateMLCEngine in the loaded module.");
+                }
+
+                // Usamos la configuración preestablecida como base o una nueva si no existe
+                const appConfig = JSON.parse(JSON.stringify(prebuiltConfig || { model_list: [] }));
+                
+                // Forzamos el uso de IndexedDB para evitar errores de Cache API en entornos restrictivos
+                appConfig.useIndexedDBCache = true;
+                appConfig.cachePrefix = "inledai-chat-" + CHATBOT_CONFIG.modelId.substring(0, 10);
+
+                // Si el modelo no está en la lista estándar, lo añadimos
+                const modelExists = appConfig.model_list.some(m => m.model_id === CHATBOT_CONFIG.modelId);
+                if (!modelExists) {
+                    appConfig.model_list.push({
+                        model_id: CHATBOT_CONFIG.modelId,
+                        model: `https://huggingface.co/mlc-ai/${CHATBOT_CONFIG.modelId}/resolve/main/`,
+                        model_lib: `https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/${CHATBOT_CONFIG.modelId}-ctx4k-webgpu.wasm`,
+                    });
+                }
+
+                this.engine = await engineCreator(CHATBOT_CONFIG.modelId, {
+                    appConfig,
                     initProgressCallback: (report) => {
                         const progress = 10 + (report.progress * 90);
                         this.updateProgress(progress, this.t('loading_model'), report.text);

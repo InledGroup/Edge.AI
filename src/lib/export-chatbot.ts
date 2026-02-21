@@ -83,11 +83,20 @@ export async function generateChatbotHTML(
   const webllmModelId = model?.webllmModelId || config.modelId;
   const ggufUrl = model?.ggufUrl || '';
 
+  // Prepare model metadata for WebLLM appConfig
+  const modelMetadata = model ? {
+    model_id: webllmModelId,
+    model_lib: `https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/${webllmModelId}-ctx4k-webgpu.wasm`,
+    vram_required_MB: model.minMemoryGB * 1024,
+    low_resource_required: model.minMemoryGB <= 2
+  } : null;
+
   // Replace placeholders
   html = html
     .replaceAll('__CHATBOT_NAME__', config.name)
     .replaceAll('__CHATBOT_DESCRIPTION__', config.description)
     .replaceAll('__MODEL_ID__', webllmModelId)
+    .replaceAll('__MODEL_METADATA__', JSON.stringify(modelMetadata))
     .replaceAll('__MODEL_ENGINE__', engine)
     .replaceAll('__MODEL_GGUF_URL__', ggufUrl)
     .replaceAll('__TOP_K__', config.topK.toString())

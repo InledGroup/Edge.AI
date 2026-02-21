@@ -72,9 +72,9 @@ export const i18nStore = {
   
   /**
    * Get translation
-   * Usage: t('common.appName')
+   * Usage: t('common.appName') or t('quality.precision', { percent: 90 })
    */
-  t(key: string): string {
+  t(key: string, replacements?: Record<string, string | number>): string {
     const keys = key.split('.');
     let value: any = translations[languageSignal.value];
     
@@ -86,6 +86,12 @@ export const i18nStore = {
     if (value === undefined) {
       console.warn(`Translation missing for key: ${key} (${languageSignal.value})`);
       return key;
+    }
+    
+    if (typeof value === 'string' && replacements) {
+      Object.entries(replacements).forEach(([k, v]) => {
+        value = value.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      });
     }
     
     return value;
@@ -103,10 +109,10 @@ function updateHtmlLang(lang: Language) {
 
 /**
  * Reactive translation helper
- * Usage: const t = useTranslations(); t('key')
+ * Usage: const t = useTranslations(); t('key', { count: 5 })
  */
 export function useTranslations() {
-  return (key: string) => i18nStore.t(key);
+  return (key: string, replacements?: Record<string, string | number>) => i18nStore.t(key, replacements);
 }
 
 // Export a direct reference for non-reactive usage (careful, won't update on change)
