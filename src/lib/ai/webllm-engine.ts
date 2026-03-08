@@ -13,6 +13,7 @@ export interface GenerationOptions {
   stop?: string[];
   tools?: any[];
   tool_choice?: any;
+  signal?: AbortSignal;
   onStream?: (chunk: string) => void;
   onAudio?: (audio: Float32Array | Uint8Array) => void;
 }
@@ -29,15 +30,26 @@ export class WebLLMEngine {
   private modelName: string = '';
   private isInitialized: boolean = false;
   private backend: 'webgpu' = 'webgpu';
+  private needsReload: boolean = false;
 
   constructor() {
     console.log('🤖 WebLLM Engine created');
   }
 
   async initialize(modelName: string, onProgress?: ProgressCallback): Promise<void> {
-    if (this.isInitialized && this.modelName === modelName) return;
+    if (this.isInitialized && this.modelName === modelName && !this.needsReload) return;
     try {
       console.log('🚀 Initializing WebLLM:', modelName);
+      
+      // Cleanup existing engine to free GPU memory
+      if (this.engine) {
+        try {
+          console.log('🧹 WebLLM: Unloading previous engine instance...');
+          await this.engine.unload();
+        } catch (e) {}
+        this.engine = null;
+      }
+
       onProgress?.(0, i18nStore.t('models.progress.initializing'));
       const gpuLimits = await probeActualLimits();
       if (!gpuLimits) throw new Error('WebGPU not available');
@@ -65,6 +77,7 @@ export class WebLLMEngine {
 
       this.modelName = modelName;
       this.isInitialized = true;
+      this.needsReload = false;
       onProgress?.(100, i18nStore.t('models.progress.modelReady'));
     } catch (error) {
       console.error('❌ WebLLM Error:', error);
@@ -74,8 +87,28 @@ export class WebLLMEngine {
   }
 
   async chat(messages: any[], options: GenerationOptions = {}): Promise<any> {
+    // Check if we need to recover from a previous stuck state
+    if (this.needsReload) {
+      console.log('🔄 WebLLM: Recovering from previous abort, reloading engine...');
+      await this.initialize(this.modelName);
+    }
+
     if (!this.isInitialized || !this.engine) throw new Error('WebLLM not initialized');
-    const { temperature = 0.7, maxTokens = 512, topP = 0.95, stop, tools, onStream } = options;
+    const { temperature = 0.7, maxTokens = 512, topP = 0.95, stop, tools, onStream, signal } = options;
+
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    const abortHandler = () => {
+      if (this.engine) {
+        console.log('🛑 WebLLM: Abort triggered. Marking engine for reload.');
+        this.engine.interruptGenerate();
+        this.needsReload = true; 
+      }
+    };
+    
+    if (signal) {
+      signal.addEventListener('abort', abortHandler);
+    }
 
     try {
       const nativeToolModels = ['Hermes-2-Pro', 'Hermes-3', 'Llama-3.1-8B-Instruct'];
@@ -139,6 +172,7 @@ Assistant: {"tool": "some__list_items", "args": {}}`;
         });
 
         for await (const chunk of completion) {
+          if (signal?.aborted) break;
           const delta = chunk.choices[0]?.delta;
           if (delta) {
              if (delta.content) {
@@ -180,8 +214,22 @@ Assistant: {"tool": "some__list_items", "args": {}}`;
       }
       return finalMessage;
     } catch (error) {
+      if (signal?.aborted || (error instanceof Error && (error.message.includes('abort') || error.message.includes('cancel')))) {
+        console.log('✅ WebLLM: Generation aborted successfully');
+        return finalMessage;
+      }
+      
+      if (error instanceof Error && error.message.includes('busy')) {
+        console.warn('🔄 WebLLM: Engine busy, forcing reload next time...');
+        this.needsReload = true;
+      }
+      
       console.error('❌ Chat completion failed:', error);
       throw error;
+    } finally {
+      if (signal) {
+        signal.removeEventListener('abort', abortHandler);
+      }
     }
   }
 
@@ -208,46 +256,80 @@ Assistant: {"tool": "some__list_items", "args": {}}`;
   }
 
   async generateText(input: string | { role: string; content: string | any[] }[], options: GenerationOptions = {}): Promise<string> {
+    if (this.needsReload) {
+      console.log('🔄 WebLLM: Recovering from previous abort, reloading engine...');
+      await this.initialize(this.modelName);
+    }
+
     if (!this.isInitialized || !this.engine) throw new Error('WebLLM not initialized');
     
     let messages = Array.isArray(input) ? input : [{ role: 'user', content: input }];
+    const { signal, onStream } = options;
     
-    // Fix for "Role is not supported: tool" in generateText
-    // Map tool outputs to user messages for non-native models
-    const nativeToolModels = ['Hermes-2-Pro', 'Hermes-3', 'Llama-3.1-8B-Instruct'];
-    const supportsNativeTools = nativeToolModels.some(m => this.modelName.includes(m));
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    const abortHandler = () => {
+      if (this.engine) {
+        console.log('🛑 WebLLM: Abort triggered. Marking engine for reload.');
+        this.engine.interruptGenerate();
+        this.needsReload = true;
+      }
+    };
     
-    if (!supportsNativeTools) {
-      messages = messages.map(m => {
-        if (m.role === 'tool') {
-          return { role: 'user', content: `[TOOL RESULT]: ${m.content}` };
-        }
-        return m;
-      });
-    }
+    if (signal) signal.addEventListener('abort', abortHandler);
     
-    if (options.onStream) {
+    try {
+      // Fix for "Role is not supported: tool" in generateText
+      // Map tool outputs to user messages for non-native models
+      const nativeToolModels = ['Hermes-2-Pro', 'Hermes-3', 'Llama-3.1-8B-Instruct'];
+      const supportsNativeTools = nativeToolModels.some(m => this.modelName.includes(m));
+      
+      if (!supportsNativeTools) {
+        messages = messages.map(m => {
+          if (m.role === 'tool') {
+            return { role: 'user', content: `[TOOL RESULT]: ${m.content}` };
+          }
+          return m;
+        });
+      }
+      
       let fullResponse = '';
-      const completion = await this.engine.chat.completions.create({ 
-        messages: messages as any, 
-        ...options, 
-        stream: true 
-      });
-      for await (const chunk of completion) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          fullResponse += content;
-          options.onStream(content);
+      if (onStream) {
+        const completion = await this.engine.chat.completions.create({ 
+          messages: messages as any, 
+          ...options, 
+          stream: true 
+        });
+        for await (const chunk of completion) {
+          if (signal?.aborted) break;
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            fullResponse += content;
+            onStream(content);
+          }
         }
+      } else {
+        const response = await this.engine.chat.completions.create({ 
+          messages: messages as any, 
+          ...options, 
+          stream: false 
+        });
+        fullResponse = response.choices[0]?.message?.content || '';
       }
       return fullResponse;
-    } else {
-      const response = await this.engine.chat.completions.create({ 
-        messages: messages as any, 
-        ...options, 
-        stream: false 
-      });
-      return response.choices[0]?.message?.content || '';
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && (error.message.includes('abort') || error.message.includes('cancel')))) {
+        return fullResponse;
+      }
+      
+      if (error instanceof Error && error.message.includes('busy')) {
+        console.warn('🔄 WebLLM: Engine busy, forcing reload next time...');
+        this.needsReload = true;
+      }
+      
+      throw error;
+    } finally {
+      if (signal) signal.removeEventListener('abort', abortHandler);
     }
   }
 

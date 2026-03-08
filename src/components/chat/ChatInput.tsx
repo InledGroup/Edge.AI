@@ -1,7 +1,7 @@
 // ChatInput Component - Message input with auto-resize
 
 import { useState, useRef, useEffect } from 'preact/hooks';
-import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle, AudioWaveform, MoreHorizontal, Server, AppWindow } from 'lucide-preact';
+import { Send, Loader2, Globe, Sparkles, MessageCircle, FileSearchCorner, Mic, MicOff, Volume2, Image as ImageIcon, X, AlertTriangle, AudioWaveform, MoreHorizontal, Server, AppWindow, Square } from 'lucide-preact';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
 import { i18nStore, languageSignal } from '@/lib/stores/i18n';
@@ -12,6 +12,7 @@ import type { MCPServer } from '@/types';
 
 export interface ChatInputProps {
   onSend: (message: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[], activeTool?: { type: 'app' | 'mcp', id: string, name: string } | null) => void;
+  onStop?: () => void;
   disabled?: boolean;
   loading?: boolean;
   placeholder?: string;
@@ -22,6 +23,7 @@ export interface ChatInputProps {
 
 export function ChatInput({
   onSend,
+  onStop,
   disabled = false,
   loading = false,
   placeholder = i18nStore.t('chat.placeholder'),
@@ -484,14 +486,18 @@ export function ChatInput({
         />
 
         <Button
-          type="submit"
+          type={loading ? "button" : "submit"}
           size="icon"
-          variant="primary"
-          disabled={(!message.trim() && !selectedImage) || disabled || loading}
-          className="flex-shrink-0"
+          variant={loading ? "danger" as any : "primary"}
+          onClick={loading ? (e) => { e.preventDefault(); onStop?.(); } : undefined}
+          disabled={loading ? false : (!message.trim() && !selectedImage) || disabled}
+          className={cn(
+            "flex-shrink-0 transition-all duration-300",
+            loading && "bg-red-600 hover:bg-red-700 border-none shadow-lg shadow-red-500/40 text-white"
+          )}
         >
           {loading ? (
-            <Loader2 size={18} className="animate-spin" />
+            <Square size={16} fill="white" className="animate-in zoom-in-50 duration-300" />
           ) : (
             <Send size={18} />
           )}

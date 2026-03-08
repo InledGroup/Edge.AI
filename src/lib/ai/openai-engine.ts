@@ -11,6 +11,7 @@ export interface GenerationOptions {
   stop?: string[];
   tools?: any[];
   tool_choice?: any;
+  signal?: AbortSignal;
   onStream?: (chunk: string) => void;
   onAudio?: (audio: Float32Array | Uint8Array) => void;
 }

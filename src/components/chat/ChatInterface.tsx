@@ -21,6 +21,7 @@ import { WebRAGOrchestrator } from '@/lib/web-search';
 import { generateUUID, cn } from '@/lib/utils';
 import { speechService, isVoiceModeEnabled } from '@/lib/voice/speech-service';
 import { mcpManager } from '@/lib/ai/mcp-manager';
+import { LoopDetector } from '@/lib/ai/loop-detector';
 import { processExtensionIntent, getExtensionsSystemPrompt } from '@/lib/insuite-utils';
 import { extensionsStore, extensionsSignal, memoryNotificationSignal } from '@/lib/stores';
 import { getWorkerPool } from '@/lib/workers';
@@ -119,6 +120,7 @@ export function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const streamingState = useRef({ spokenIndex: 0, buffer: '', isStreamingAudio: false, timer: null as any });
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isModelsReady = modelsReady.value;
   const isHasDocs = hasReadyDocuments.value;
@@ -233,6 +235,20 @@ export function ChatInterface() {
     canvasStore.open(markdownToHTML(content));
   };
 
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      console.log('🛑 Stopping generation...');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      
+      // Let engine cleanup for 300ms before enabling chat again
+      setTimeout(() => {
+        setIsGenerating(false);
+        setWebSearchProgress(null);
+      }, 300);
+    }
+  };
+
   const handleRegenerate = async (msgId: string) => {
     if (isGenerating) return;
 
@@ -256,9 +272,16 @@ export function ChatInterface() {
     // Re-trigger sending (this will add a new assistant message)
     handleSendMessage(userMsg.content, 'local', userMsg.images);
   };
-
   async function handleSendMessage(content: string, mode: 'web' | 'local' | 'smart' | 'conversation', images?: string[], activeTool?: { type: 'app' | 'mcp', id: string, name: string } | null) {
     if (!isModelsReady) { alert(i18nStore.t('chat.loadModelsFirst')); return; }
+
+    // Abort previous generation if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    const loopDetector = new LoopDetector();
 
     setIsGenerating(true);
     setCurrentResponse('');
@@ -430,6 +453,11 @@ export function ChatInterface() {
 
         const res = await orchestrator.search(originalContent, {
           onToken: (t) => {
+            if (signal.aborted) return;
+            if (loopDetector.detect(t)) {
+              abortControllerRef.current?.abort();
+              return;
+            }
             finalContent += t;
             setCurrentResponse(finalContent);
             processAudioChunk(t);
@@ -441,6 +469,7 @@ export function ChatInterface() {
           conversationHistory: history, // Pass history for context
           additionalContext: canvasContext + memoryContext, // Pass memories and canvas
           confirmUrls: true,
+          signal,
           onConfirmationRequest: async (urls) => {
             setPendingUrls(urls);
             return new Promise((resolve) => {
@@ -517,6 +546,11 @@ export function ChatInterface() {
 
           // 1. Initial RAG Pass
           const result = await completeRAGFlow(assistantPrompt, embeddingEngine, chatEngine, tK, undefined, history, (c) => {
+            if (signal.aborted) return;
+            if (loopDetector.detect(c)) {
+              abortControllerRef.current?.abort();
+              return;
+            }
             streamedText += c;
             setCurrentResponse(streamedText);
             processAudioChunk(c);
@@ -525,7 +559,8 @@ export function ChatInterface() {
             additionalContext: canvasContext + memoryContext,
             calculateMetrics: true,
             faithfulnessThreshold: fThreshold,
-            chunkWindowSize: cWindow
+            chunkWindowSize: cWindow,
+            signal
           });
 
           let finalAnswer = result.answer;
@@ -533,7 +568,7 @@ export function ChatInterface() {
           
           // 2. Check for 'Read More' pattern in the response
           const readMoreMatch = finalAnswer.match(/\((.*?)\)\.readmore=(\d+)/);
-          if (readMoreMatch) {
+          if (readMoreMatch && !signal.aborted) {
             const [_, docName, lines] = readMoreMatch;
             setWebSearchProgress({ step: 'searching' as any, progress: 50, message: `Expandiendo lectura: ${docName}...` });
             
@@ -543,6 +578,11 @@ export function ChatInterface() {
             if (targetDoc) {
               const extraK = Math.min(parseInt(lines) || 5, 10);
               const secondResult = await completeRAGFlow(assistantPrompt, embeddingEngine, chatEngine, tK + extraK, [targetDoc.id], history, (c) => {
+                if (signal.aborted) return;
+                if (loopDetector.detect(c)) {
+                  abortControllerRef.current?.abort();
+                  return;
+                }
                 streamedText = c;
                 setCurrentResponse(streamedText);
                 setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: streamedText } : m));
@@ -550,7 +590,8 @@ export function ChatInterface() {
                 additionalContext: `\n\nINFO ADICIONAL DE ${targetDoc.name}:\nEl usuario (via comando) solicitó leer más. Aquí tienes contexto expandido. RE-ESCRIBE tu respuesta integrando estos nuevos datos.`,
                 calculateMetrics: true,
                 faithfulnessThreshold: fThreshold,
-                chunkWindowSize: cWindow
+                chunkWindowSize: cWindow,
+                signal
               });
               
               finalAnswer = secondResult.answer;
@@ -628,12 +669,18 @@ Instrucciones Críticas:
            let loops = 0;
            let lastResContent = '';
 
-           while (loops < 5) {
+           while (loops < 5 && !signal.aborted) {
              let isToolCallDetected = false;
              let loopAccumulated = '';
              const res = await toolEngine.chat(currentMsgs, { 
                tools: mcpTools, 
+               signal,
                onStream: (c) => { 
+                 if (signal.aborted) return;
+                 if (loopDetector.detect(c)) {
+                   abortControllerRef.current?.abort();
+                   return;
+                 }
                  loopAccumulated += c;
                  if (loopAccumulated.includes('{') || loopAccumulated.includes('###')) { 
                    isToolCallDetected = true; 
@@ -648,7 +695,7 @@ Instrucciones Críticas:
                } 
              });
 
-             if (res.tool_calls && res.tool_calls.length > 0) {
+             if (res.tool_calls && res.tool_calls.length > 0 && !signal.aborted) {
                 currentMsgs.push(res);
                 const toolCallMsg = { id: generateUUID(), role: 'assistant', content: res.content || '', timestamp: Date.now(), tool_calls: res.tool_calls };
                 setMessages(prev => [...prev.filter(m => m.id !== assistantId), toolCallMsg as any]);
@@ -687,33 +734,56 @@ Instrucciones Críticas:
              }
            }
 
-           if (loops > 0 && (!lastResContent || lastResContent.length < 5)) {
-              await chatEngine.generateText(currentMsgs as any, { onStream: (c) => { 
-                finalContent += c;
-                setCurrentResponse(finalContent); 
-                processAudioChunk(c);
-                // Need to find the latest assistant message to update
-                setMessages(prev => {
-                  const last = prev[prev.length - 1];
-                  if (last.role === 'assistant') return prev.map(m => m.id === last.id ? { ...m, content: last.content + c } : m);
-                  return prev;
-                });
+           if (loops > 0 && (!lastResContent || lastResContent.length < 5) && !signal.aborted) {
+              await chatEngine.generateText(currentMsgs as any, { 
+                signal,
+                onStream: (c) => { 
+                  if (signal.aborted) return;
+                  if (loopDetector.detect(c)) {
+                    abortControllerRef.current?.abort();
+                    return;
+                  }
+                  finalContent += c;
+                  setCurrentResponse(finalContent); 
+                  processAudioChunk(c);
+                  // Need to find the latest assistant message to update
+                  setMessages(prev => {
+                    const last = prev[prev.length - 1];
+                    if (last.role === 'assistant') return prev.map(m => m.id === last.id ? { ...m, content: last.content + c } : m);
+                    return prev;
+                  });
               } });
            } else {
               finalContent = lastResContent;
-              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent, streaming: false } : m));
+              if (!signal.aborted) {
+                setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent, streaming: false } : m));
+              }
            }
         } else {
-            await chatEngine.generateText(chatMsgs as any, { onStream: (c) => { 
-              finalContent += c;
-              setCurrentResponse(finalContent); 
-              processAudioChunk(c);
-              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent } : m));
-            } });
+            await chatEngine.generateText(chatMsgs as any, { 
+              signal,
+              onStream: (c) => { 
+                if (signal.aborted) return;
+                if (loopDetector.detect(c)) {
+                  abortControllerRef.current?.abort();
+                  return;
+                }
+                finalContent += c;
+                setCurrentResponse(finalContent); 
+                processAudioChunk(c);
+                setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: finalContent } : m));
+              } 
+            });
         }
       }
 
       // Finalize the message
+      if (signal.aborted && !finalContent) {
+        setMessages(prev => prev.filter(m => m.id !== assistantId));
+        setIsGenerating(false);
+        return;
+      }
+
       const finalizedAssistantMsg = { 
         id: assistantId, 
         role: 'assistant', 
@@ -729,14 +799,16 @@ Instrucciones Críticas:
       setWebSearchProgress(null);
       finishAudioStreaming(finalContent);
       
-      // Save to DB using the PRE-GENERATED ID
-      await addMessage(conversationId, {
-        id: assistantId,
-        role: 'assistant',
-        content: finalContent,
-        sources: finalSources,
-        metadata: finalMetadata
-      });
+      if (!signal.aborted) {
+        // Save to DB using the PRE-GENERATED ID
+        await addMessage(conversationId, {
+          id: assistantId,
+          role: 'assistant',
+          content: finalContent,
+          sources: finalSources,
+          metadata: finalMetadata
+        });
+      }
 
       // Refresh conversation list/title in background
       if (isFirstMessage) {
@@ -764,6 +836,11 @@ Instrucciones Críticas:
       setTimeout(() => autoExtractMemory(originalContent, finalContent), 1000);
 
     } catch (error: any) {
+      if (error.name === 'AbortError' || error.message === 'AbortError' || signal.aborted) {
+        console.log('✅ Generation stopped by user or loop detector');
+        setIsGenerating(false);
+        return;
+      }
       console.error(error);
       setMessages(prev => [...prev.filter(m => m.id !== assistantId), { id: generateUUID(), role: 'assistant', content: 'Error: ' + error.message, timestamp: Date.now() }]);
     } finally { 
@@ -878,7 +955,7 @@ Instrucciones Críticas:
       </div>
       <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-bg)]/80 backdrop-blur-md">
         <div className="max-w-3xl mx-auto">
-          <ChatInput onSend={handleSendMessage} disabled={!canChat} loading={isGenerating} supportsVision={!!modelsStore.chat?.requiresGPU} />
+          <ChatInput onSend={handleSendMessage} onStop={handleStopGeneration} disabled={!canChat} loading={isGenerating} supportsVision={!!modelsStore.chat?.requiresGPU} />
         </div>
       </div>
       {pendingUrls && confirmationResolver && <UrlConfirmationModal urls={pendingUrls} onConfirm={confirmationResolver} onCancel={() => confirmationResolver(null)} />}

@@ -403,6 +403,9 @@ export interface WebRAGOptions {
   /** Contexto adicional (ej: memorias, canvas) */
   additionalContext?: string;
 
+  /** AbortSignal to stop generation */
+  signal?: AbortSignal;
+
   /** Callback para streaming de tokens durante la generación de respuesta */
   onToken?: (token: string) => void;
 }

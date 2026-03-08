@@ -243,7 +243,8 @@ export async function generateRAGAnswer(
   chatEngine: WebLLMEngine | WllamaEngine,
   conversationHistory?: Array<{role: string, content: string}>,
   onStream?: (chunk: string) => void,
-  additionalContext?: string
+  additionalContext?: string,
+  signal?: AbortSignal
 ): Promise<string> {
   // Get dynamic generation settings from database
   const genSettings = await getGenerationSettings();
@@ -322,7 +323,8 @@ ${context || 'No hay documentos relevantes.'}`;
     temperature: temperature,
     maxTokens: maxTokens,
     stop: ['<|im_end|>', '<|end|>', '<|eot_id|>'],
-    onStream
+    onStream,
+    signal
   });
 }
 
@@ -345,6 +347,7 @@ export async function completeRAGFlow(
     additionalContext?: string;
     faithfulnessThreshold?: number;
     chunkWindowSize?: number;
+    signal?: AbortSignal;
   }
 ): Promise<{
   answer: string;
@@ -393,7 +396,7 @@ export async function completeRAGFlow(
   }
 
   // Step 3: Generate answer with conversation history
-  const answer = await generateRAGAnswer(query, ragResult, chatEngine, conversationHistory, onStream, options?.additionalContext);
+  const answer = await generateRAGAnswer(query, ragResult, chatEngine, conversationHistory, onStream, options?.additionalContext, options?.signal);
 
   // Step 4: Calculate answer faithfulness (if metrics enabled)
   let faithfulness;

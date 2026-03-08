@@ -117,24 +117,38 @@ export class TransformersEngine {
     // Use processor if available (for audio input support), else tokenizer
     const inputs = this.processor ? await this.processor(textInput) : await this.tokenizer(textInput);
     
+    const { signal } = options;
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
     // 2. Generate
     const streamer = new TextStreamer(this.tokenizer, {
       skip_prompt: true,
       callback_function: (text: string) => {
+        if (signal?.aborted) {
+          throw new Error('AbortError');
+        }
         if (onStream) onStream(text);
       }
     });
 
-    const output = await this.model.generate({
-      ...inputs,
-      max_new_tokens: maxTokens,
-      temperature,
-      do_sample: temperature > 0,
-      streamer,
-    });
+    try {
+      const output = await this.model.generate({
+        ...inputs,
+        max_new_tokens: maxTokens,
+        temperature,
+        do_sample: temperature > 0,
+        streamer,
+      });
 
-    const decodedText = this.tokenizer.decode(output[0], { skip_special_tokens: true });
-    return decodedText;
+      const decodedText = this.tokenizer.decode(output[0], { skip_special_tokens: true });
+      return decodedText;
+    } catch (e: any) {
+      if (e.message === 'AbortError' || signal?.aborted) {
+        console.log('✅ Transformers: Generation aborted successfully');
+        return '';
+      }
+      throw e;
+    }
   }
 
   getBackend() { return 'webgpu'; }

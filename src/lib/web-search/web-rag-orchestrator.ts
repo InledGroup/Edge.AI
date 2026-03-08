@@ -112,7 +112,10 @@ export class WebRAGOrchestrator {
       maxUrlsToFetch = webSettings.webSearchMaxUrls || 3,
       topK = ragSettings.topK || 5, 
       onProgress,
+      signal
     } = options;
+
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
     const startTime = Date.now();
     const timestamps: Record<string, number> = {};
@@ -128,8 +131,10 @@ export class WebRAGOrchestrator {
       onProgress?.('query_generation', 10);
       const stepStart = Date.now();
 
-      const searchQuery = await this.generateSearchQuery(userQuery);
+      const searchQuery = await this.generateSearchQuery(userQuery, signal);
       timestamps.queryGeneration = Date.now() - stepStart;
+
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
       console.log(`[WebRAG] Generated search query: "${searchQuery}"`);
 
@@ -144,6 +149,8 @@ export class WebRAGOrchestrator {
         sources,
       });
       timestamps.webSearch = Date.now() - searchStart;
+
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
       console.log(`[WebRAG] Found ${searchResults.length} search results`);
 
@@ -160,9 +167,12 @@ export class WebRAGOrchestrator {
       const selectedIndices = await this.selectRelevantResults(
         userQuery,
         searchResults,
-        maxUrlsToFetch
+        maxUrlsToFetch,
+        signal
       );
       timestamps.urlSelection = Date.now() - selectionStart;
+
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
       const selectedResults = selectedIndices.map((i) => searchResults[i]);
       let selectedUrls = selectedResults.map((r) => r.url);
@@ -178,7 +188,7 @@ export class WebRAGOrchestrator {
         console.log('[WebRAG] Requesting user confirmation for URLs:', selectedUrls);
         const confirmedUrls = await options.onConfirmationRequest(selectedUrls);
 
-        if (!confirmedUrls || confirmedUrls.length === 0) {
+        if (signal?.aborted || !confirmedUrls || confirmedUrls.length === 0) {
            throw new Error('Búsqueda cancelada por el usuario o sin URLs seleccionadas');
         }
 
@@ -221,6 +231,8 @@ export class WebRAGOrchestrator {
           console.log(`[WebRAG] Extrayendo ${selectedUrls.length} URLs vía extensión...`);
           const response = await bridge.extractUrls(selectedUrls);
           
+          if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
           if (response.success && response.results && response.results.length > 0) {
             cleanedContents = response.results.map(r => ({
               text: r.content,
@@ -256,6 +268,7 @@ export class WebRAGOrchestrator {
       const tempDocIds: string[] = [];
       
       for (const content of cleanedContents) {
+        if (signal?.aborted) break;
         try {
           console.log(`[WebRAG] Creando documento temporal para: ${content.title}`);
           const doc = await createDocument({
@@ -297,6 +310,8 @@ export class WebRAGOrchestrator {
       // ====================================================================
       onProgress?.('vector_search', 85);
       
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
       const result = await completeRAGFlow(
         userQuery,
         this.embeddingEngine,
@@ -309,7 +324,8 @@ export class WebRAGOrchestrator {
           additionalContext: options.additionalContext,
           calculateMetrics: true,
           faithfulnessThreshold: genSettings.faithfulnessThreshold,
-          chunkWindowSize: ragSettings.chunkWindowSize
+          chunkWindowSize: ragSettings.chunkWindowSize,
+          signal
         }
       );
 
@@ -355,7 +371,7 @@ export class WebRAGOrchestrator {
   // PASO 1: Generar query de búsqueda
   // ==========================================================================
 
-  private async generateSearchQuery(userQuery: string): Promise<string> {
+  private async generateSearchQuery(userQuery: string, signal?: AbortSignal): Promise<string> {
     const messages = [
       {
         role: 'system',
@@ -380,6 +396,7 @@ Responde SOLO con la consulta de búsqueda, sin explicaciones.`
     const response = await this.generateText(messages, {
       temperature: 0.3,
       max_tokens: 50,
+      signal
     });
 
     // Limpiar y normalizar
@@ -393,7 +410,8 @@ Responde SOLO con la consulta de búsqueda, sin explicaciones.`
   private async selectRelevantResults(
     userQuery: string,
     results: SearchResult[],
-    maxUrls: number
+    maxUrls: number,
+    signal?: AbortSignal
   ): Promise<number[]> {
     // Formatear resultados para el LLM
     const resultsText = results
@@ -421,6 +439,7 @@ Responde SOLO con un JSON en este formato exacto:
     const response = await this.generateText(messages, {
       temperature: 0.1,
       max_tokens: 100,
+      signal
     });
 
     // Extraer JSON de la respuesta
@@ -483,7 +502,7 @@ Responde SOLO con un JSON en este formato exacto:
    */
   private async generateText(
     input: string | { role: string; content: string }[],
-    options: { temperature: number; max_tokens: number; stop?: string[]; onToken?: (token: string) => void }
+    options: { temperature: number; max_tokens: number; stop?: string[]; onToken?: (token: string) => void; signal?: AbortSignal }
   ): Promise<string> {
     // WebLLM with streaming support
     if ('generateText' in this.llmEngine) {
@@ -494,6 +513,7 @@ Responde SOLO con un JSON en este formato exacto:
           maxTokens: options.max_tokens,
           stop: options.stop,
           onStream: options.onToken, // Map onToken to onStream for WebLLM
+          signal: options.signal
         });
       } else {
         // Non-stream mode
@@ -501,6 +521,7 @@ Responde SOLO con un JSON en este formato exacto:
           temperature: options.temperature,
           maxTokens: options.max_tokens,
           stop: options.stop,
+          signal: options.signal
         });
       }
     }
@@ -518,6 +539,7 @@ Responde SOLO con un JSON en este formato exacto:
             temperature: options.temperature,
             max_tokens: options.max_tokens,
             stop: options.stop,
+            signal: options.signal
           },
           options.onToken
         );
@@ -529,6 +551,7 @@ Responde SOLO con un JSON en este formato exacto:
             temperature: options.temperature,
             max_tokens: options.max_tokens,
             stop: options.stop,
+            signal: options.signal
           }
         );
         return response; // Assuming it returns string content
