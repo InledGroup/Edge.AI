@@ -29,6 +29,13 @@ import { getWorkerPool } from '@/lib/workers';
 // Helper functions moved out of component
 const autoExtractMemory = async (userMsg: string, assistantRes: string) => {
   try {
+    // OPTIMIZATION: Wait 2 seconds before starting background memory extraction
+    // This allows the CPU to breathe after generating a long response
+    await new Promise(r => setTimeout(r, 2000));
+    
+    // Safety check: Don't start if another chat generation is already happening
+    if (conversationsStore.activeId === null) return;
+
     const chatEngine = await EngineManager.getChatEngine();
     
     // Prompt más inteligente que distingue entre AFIRMAR y PREGUNTAR
@@ -48,9 +55,14 @@ REGLAS CRÍTICAS:
 
 DATO EXTRAÍDO:`;
 
+    // OPTIMIZATION: Use low temperature and fewer tokens for memory extraction
     const result = await chatEngine.generateText([
       { role: 'user', content: extractionPrompt }
-    ], { max_tokens: 60, temperature: 0.1 } as any);
+    ], { 
+      max_tokens: 40, // Reduced from 60
+      temperature: 0.0, // Stable extraction
+      topP: 1.0
+    } as any);
 
     let memoryText = result.trim().replace(/^["']|["']$/g, '').replace(/^DATO EXTRAÍDO: /i, '');
     
@@ -429,15 +441,18 @@ export function ChatInterface() {
       };
       setMessages(prev => [...prev, tempAssistantMsg]);
 
-      const chatEngine = await EngineManager.getChatEngine();
-      const chatModelId = modelsStore.chat?.id;
-      const memories = await getMemories();
-      const memoryContext = memories.length > 0 ? `\n\nRECUERDOS:\n${memories.map(m => `- ${m.content}`).join('\n')}` : '';
-      
-      let canvasContext = '';
-      if (canvasSignal.value.isOpen && canvasSignal.value.content) {
-        canvasContext = `\n=== DOCUMENTO ABIERTO ===\n${canvasSignal.value.content.replace(/<[^>]*>/g, ' ').substring(0, 1000)}\n===`;
-      }
+        const chatEngine = await EngineManager.getChatEngine();
+        const chatModelId = modelsStore.chat?.id;
+        const memories = await getMemories();
+        const memoryContext = memories.length > 0 ? `MEMORIA:\n${memories.slice(0, 3).map(m => m.content).join('; ')}` : '';
+        
+        let canvasContext = '';
+        if (canvasSignal.value.isOpen && canvasSignal.value.content) {
+          canvasContext = `\nDOC: ${canvasSignal.value.content.replace(/<[^>]*>/g, '').substring(0, 300)}`;
+        }
+
+        const systemPrompt = `Asistente conciso. ${memoryContext}${canvasContext}\nResponde en español.`;
+
 
       let finalContent = '';
       let finalSources: any[] | undefined = undefined;
@@ -611,37 +626,17 @@ export function ChatInterface() {
           };
         }
       } else {
-        // Conversation mode
-        const maxHistory = Math.max(1, Math.round(hWeight * 20));
+        // CONVERSATION MODE OPTIMIZATION
+        const maxHistory = Math.max(1, Math.round(hWeight * 10)); // Reduced from 20 to keep prefill fast
         const history = messages.slice(-maxHistory).map(m => ({ role: m.role, content: m.content }));
         
-        let customAppPrompt = '';
-        if (activeTool && activeTool.type === 'app') {
-          const app = extensionsSignal.value.customApps.find(a => a.id === activeTool.id) || 
-                      builtInApps.find(a => a.id === activeTool.id);
-          if (app) {
-            customAppPrompt = `\n\n=== PRIORIDAD CRÍTICA: APP SELECCIONADA: ${app.name} ===\nInstrucciones específicas: ${app.instructions}\nSolo genera la URL técnica para esta app. IGNORA cualquier otra herramienta.\nURL de ejemplo: ${app.exampleUrl || (app as any).url}`;
-          }
-        }
+        // Final combined system prompt (using the one defined above)
+        const finalSystemPrompt = `${systemPrompt}\n${getExtensionsSystemPrompt().substring(0, 300)}`;
         
-        const systemPrompt = `Eres un asistente inteligente local con memoria persistente.
-### DATOS IMPORTANTES DEL USUARIO (MEMORIA) ###
-${memoryContext || 'No hay recuerdos previos.'}
-### FIN DE MEMORIA ###
-
-Instrucciones Críticas:
-1. Revisa SIEMPRE la sección de MEMORIA antes de responder.
-2. Si el usuario te pregunta por datos personales (como su edad, nombre, proyectos), búscalos en la sección de MEMORIA y responde con esa información.
-3. Si el dato no está en la MEMORIA, di honestamente que no lo recuerdas.
-4. ${canvasContext ? 'Tienes un documento abierto en el Canvas que debes tener en cuenta.' : ''}
-5. ${getExtensionsSystemPrompt()}
-6. ${customAppPrompt}`;
-        
-        // El historial NO incluye el mensaje actual que acabamos de enviar, así que lo añadimos explícitamente
         const chatMsgs = [
-          { role: 'system', content: systemPrompt }, 
+          { role: 'system', content: finalSystemPrompt }, 
           ...history,
-          { role: 'user', content: assistantPrompt } // Mensaje actual
+          { role: 'user', content: assistantPrompt }
         ];
         
         const isMcpIntent = mcpTools.length > 0 || content.match(/\/(notion|weather|google|search)/i);

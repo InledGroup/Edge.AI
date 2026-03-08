@@ -177,9 +177,13 @@ async function loadSavedEmbeddingModel(
 
       console.log('🚀 Loading embedding model with Wllama');
 
+      // OPTIMIZATION: Embedding models only need 2-4 threads and small context
+      const cores = navigator.hardwareConcurrency || 4;
+      const embeddingThreads = Math.max(2, Math.min(4, Math.floor(cores / 2)));
+      
       await wllamaEngine.initialize(modelUrl, (progress, status) => {
         onProgress?.('embedding', progress, status);
-      });
+      }, embeddingThreads);
     }
 
     // Register engine

@@ -87,7 +87,10 @@ export const EngineManager = {
         await (embeddingEngineInstance as WebLLMEngine).initialize(meta.webllmModelId || targetId, onProgress);
       } else {
         embeddingEngineInstance = new WllamaEngine();
-        await (embeddingEngineInstance as WllamaEngine).initialize(meta.ggufUrl || targetId, onProgress);
+        // Lower thread priority for embedding engine to leave room for UI and Chat
+        const cores = navigator.hardwareConcurrency || 4;
+        const embeddingThreads = Math.max(2, Math.min(6, Math.floor(cores / 2)));
+        await (embeddingEngineInstance as WllamaEngine).initialize(meta.ggufUrl || targetId, onProgress, embeddingThreads);
       }
       embeddingModelName = targetId;
     }
@@ -105,7 +108,10 @@ export const EngineManager = {
       try {
         console.log('🛠️ Initializing Specialized Tool Engine...');
         const engine = new WllamaEngine();
-        await engine.initialize(TOOL_MODEL_URL, onProgress);
+        // Specialized tool engine doesn't need 16 threads, 4-6 is optimal for small models
+        const cores = navigator.hardwareConcurrency || 4;
+        const toolThreads = Math.max(2, Math.min(6, Math.floor(cores / 2)));
+        await engine.initialize(TOOL_MODEL_URL, onProgress, toolThreads);
         toolEngineInstance = engine;
         return engine;
       } finally {

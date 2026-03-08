@@ -99,6 +99,12 @@ export function getOptimalThreadCount(features: WasmFeatures): number {
 
   const cores = navigator.hardwareConcurrency || 4;
 
-  // Use 75% of cores, minimum 2, maximum 8
-  return Math.max(2, Math.min(8, Math.floor(cores * 0.75)));
+  // More aggressive allocation: 
+  // - High-end (12+ cores): Use cores - 2 (leave some for UI)
+  // - Mid-range (6-11 cores): Use cores - 1
+  // - Low-end (2-5 cores): Use all cores
+  // Max threads increased to 16 for high-end consumer CPUs
+  if (cores >= 12) return Math.min(16, cores - 2);
+  if (cores >= 6) return cores - 1;
+  return cores;
 }
